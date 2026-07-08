@@ -1,0 +1,21 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "sqlproj: Build combat_tracker",
+			"type": "process",
+			"command": "dotnet",
+			"args": [
+				"build",
+				"c:/La Mierda/Dnd/Cosmere RPG/cosmere-app/cosmere-app/combat_tracker/combat_tracker.sqlproj"
+			],
+			"problemMatcher": "$sqlproj-problem-matcher",
+			"isBackground": true,
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"detail": "Builds the combat_tracker SQL project"
+		}
+	]
+}

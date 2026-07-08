@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cosmere Tracker — DM</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#211f1c;--bg2:#2c2924;--bg3:#353129;--bg4:#413c33;
+  --border:rgba(224,189,124,.14);--border2:rgba(224,189,124,.28);
+  --gold:#e0bd7c;--gold2:#f4d9a0;
+  --text:#efece4;--text2:#c1baa9;--text3:#948d7b;
+  --r:8px;--rl:12px;
+  --shadow:0 2px 10px rgba(0,0,0,.26);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,serif;font-size:15px;line-height:1.55;
+  background-image:radial-gradient(120% 55% at 50% -8%, rgba(224,189,124,.045), transparent 60%);}
+.app{max-width:1200px;margin:0 auto;padding:1.25rem 1rem 3rem;}
+.topbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;border-bottom:.5px solid var(--border2);padding-bottom:.9rem;margin-bottom:1.1rem;}
+.app-title{font-family:'Cinzel',serif;font-size:16px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;}
+.app-title small{display:block;font-size:11px;color:var(--text3);text-transform:none;letter-spacing:.05em;}
+.conn-status{font-size:12px;color:var(--text3);font-style:italic;}
+.conn-status.ok{color:#5aaa70;}
+
+.tabs{display:flex;gap:2px;margin-bottom:1.1rem;border-bottom:.5px solid var(--border);flex-wrap:wrap;}
+.tab{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:8px 16px;cursor:pointer;border:none;background:transparent;color:var(--text3);border-bottom:2px solid transparent;margin-bottom:-.5px;}
+.tab:hover{color:var(--text2);}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+
+.btn{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.08em;padding:6px 14px;border-radius:var(--r);cursor:pointer;text-transform:uppercase;border:.5px solid var(--border2);background:transparent;color:var(--gold2);}
+.btn:hover{background:rgba(200,169,110,.13);border-color:var(--gold);}
+.btn.sm{padding:4px 10px;font-size:10px;}
+.btn.danger{color:#e05050;border-color:rgba(200,64,64,.28);}
+.btn.danger:hover{background:rgba(200,64,64,.14);}
+.btn.ghost{color:var(--text2);border-color:var(--border);font-family:'Crimson Pro',serif;font-size:13px;text-transform:none;letter-spacing:0;padding:5px 12px;}
+.btn.accent{background:var(--gold);color:#1c1915;border-color:var(--gold);font-weight:600;}
+.btn.accent:hover{background:var(--gold2);border-color:var(--gold2);}
+
+.section-label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;font-family:'Cinzel',serif;}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem;}
+.sep{flex:1;}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-bottom:1.5rem;}
+.grid.wide{grid-template-columns:repeat(auto-fill,minmax(340px,1fr));}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:1rem;box-shadow:var(--shadow);}
+.card-head{display:flex;align-items:center;gap:6px;margin-bottom:8px;justify-content:space-between;}
+.cname{font-family:'Cinzel',serif;font-size:13px;color:var(--gold2);letter-spacing:.05em;}
+.ctype{font-size:11px;color:var(--text3);font-style:italic;margin-bottom:6px;}
+.cstats{font-size:12px;color:var(--text2);line-height:1.7;}
+.del-btn{background:transparent;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:2px 4px;}
+.del-btn:hover{color:#e05050;}
+.edit-btn{background:transparent;border:none;cursor:pointer;color:var(--text3);font-size:12px;font-style:italic;font-family:'Crimson Pro',serif;}
+.edit-btn:hover{color:var(--gold);}
+
+.form-wrap{background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--rl);padding:1.1rem;margin-bottom:1.1rem;}
+.form-title{font-family:'Cinzel',serif;font-size:12px;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.9rem;}
+.fg{display:grid;gap:8px;margin-bottom:8px;}
+.fl{font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;}
+.fi{width:100%;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--r);padding:6px 10px;color:var(--text);font-family:'Crimson Pro',serif;font-size:14px;outline:none;}
+.fi:focus{border-color:var(--gold);}
+.fta{width:100%;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--r);padding:6px 10px;color:var(--text);font-family:'Crimson Pro',serif;font-size:13px;outline:none;resize:vertical;min-height:52px;}
+.fta:focus{border-color:var(--gold);}
+.form-actions{display:flex;gap:8px;justify-content:flex-end;}
+.empty{text-align:center;padding:2.5rem 1rem;border:.5px dashed var(--border);border-radius:var(--rl);color:var(--text3);font-style:italic;font-size:14px;margin-bottom:1.5rem;}
+
+/* accion rows */
+.accion-row{display:grid;grid-template-columns:1.5fr 1fr 3fr auto;gap:6px;margin-bottom:6px;align-items:center;}
+.accion-item{background:var(--bg3);border-left:2px solid var(--gold);border-radius:0 var(--r) var(--r) 0;padding:6px 10px;margin-bottom:5px;font-size:12px;}
+.accion-nombre{font-family:'Cinzel',serif;color:var(--gold2);font-size:12px;}
+.accion-coste{color:#6aaae8;font-size:11px;margin-left:6px;}
+.accion-desc{color:var(--text2);font-size:12px;margin-top:2px;}
+
+/* combat */
+.combat-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:1rem;}
+.round-badge{font-family:'Cinzel',serif;font-size:18px;color:var(--gold);background:var(--bg3);border:.5px solid var(--border2);border-radius:30px;padding:5px 18px;}
+.phase-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:1.25rem;}
+.phase{font-family:'Cinzel',serif;font-size:10px;letter-spacing:.06em;text-transform:uppercase;text-align:center;padding:7px 4px;border-radius:var(--r);border:.5px solid var(--border);color:var(--text3);}
+.phase.fast-p{border-color:#5aaa70;color:#5aaa70;}
+.phase.fast-e{border-color:#e05050;color:#e05050;}
+.phase.slow-p{border-color:#4a8ac8;color:#4a8ac8;}
+.phase.slow-e{border-color:#c87830;color:#c87830;}
+
+.turn-toggle{display:inline-flex;border:.5px solid var(--border);border-radius:20px;overflow:hidden;}
+.turn-opt{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;cursor:pointer;background:transparent;border:none;color:var(--text3);}
+.turn-opt.active-fast{background:rgba(90,170,112,.2);color:#5aaa70;}
+.turn-opt.active-slow{background:rgba(74,138,200,.2);color:#6aaae8;}
+
+.pcard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:.9rem;box-shadow:var(--shadow);}
+.pcard.acted{opacity:.55;}
+.pcard.defeated{opacity:.35;}
+.pcard.player-kind{border-left:3px solid #5aaa70;}
+.stat-line{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;}
+.stat-lbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);}
+.stat-val{font-family:'Cinzel',serif;font-size:14px;}
+.bar{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-bottom:5px;}
+.bar-fill{height:100%;border-radius:2px;transition:width .3s;}
+.adj{display:flex;gap:3px;margin-bottom:7px;}
+.adj input{flex:1;background:var(--bg3);border:.5px solid var(--border);border-radius:var(--r);padding:4px;color:var(--text);font-size:13px;text-align:center;outline:none;min-width:0;}
+.adj button{border:.5px solid var(--border);border-radius:var(--r);padding:4px 8px;font-size:10px;cursor:pointer;font-family:'Cinzel',serif;background:transparent;color:var(--text2);white-space:nowrap;}
+.adj button.heal{color:#4a9a60;} .adj button.dmg{color:#e05050;}
+.adj button.fu{color:#6aaae8;} .adj button.iu{color:#aa8aec;}
+.spill{font-size:10px;letter-spacing:.05em;padding:3px 8px;border-radius:20px;cursor:pointer;border:.5px solid var(--border);color:var(--text3);background:transparent;font-family:'Cinzel',serif;}
+.spill.on{border-color:currentColor;}
+.spill-group{display:inline-flex;align-items:stretch;border:.5px solid;border-radius:20px;overflow:hidden;}
+.spill-group .spill{border:none;border-radius:0;}
+.spill-minus{border:none;border-left:.5px solid;background:rgba(0,0,0,.28);cursor:pointer;padding:0 10px;font-size:14px;font-family:'Cinzel',serif;line-height:1;}
+.spills{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px;}
+.acciones-toggle{font-size:11px;color:var(--text3);cursor:pointer;font-style:italic;margin-top:7px;}
+.acciones-toggle:hover{color:var(--gold);}
+.acted-btn{width:100%;margin-top:8px;font-family:'Cinzel',serif;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:6px;border:.5px solid var(--border);background:transparent;color:var(--text3);border-radius:var(--r);cursor:pointer;}
+.acted-btn.done{border-color:#5aaa70;color:#5aaa70;background:rgba(90,170,112,.08);}
+
+select.fi{appearance:auto;}
+.enc-enemy-pick{display:grid;grid-template-columns:2fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center;}
+
+/* import */
+.import-hint{font-size:12px;color:var(--text3);margin-bottom:8px;font-style:italic;}
+.import-ta{width:100%;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:'Courier New',monospace;font-size:12px;line-height:1.5;outline:none;resize:vertical;min-height:220px;white-space:pre;}
+.import-ta:focus{border-color:var(--gold);}
+
+/* statblock */
+.sb{margin-top:8px;}
+.sb-attrs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px;}
+.sb-col{background:var(--bg3);border:.5px solid var(--border);border-radius:var(--r);padding:6px 4px;}
+.sb-col-h{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);text-align:center;margin-bottom:5px;}
+.sb-attr{display:flex;justify-content:space-between;align-items:baseline;padding:1px 6px;}
+.sb-attr-l{font-size:10px;letter-spacing:.05em;color:var(--text3);}
+.sb-attr-v{font-family:'Cinzel',serif;font-size:13px;color:var(--text);}
+.sb-res{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--text2);margin-bottom:8px;padding-bottom:8px;border-bottom:.5px solid var(--border);}
+.sb-res b{font-family:'Cinzel',serif;color:var(--gold2);font-size:13px;font-weight:500;}
+.sb-line{font-size:12px;color:var(--text2);margin-bottom:3px;line-height:1.5;}
+.sb-line-l{color:var(--text3);letter-spacing:.03em;}
+.sb-section-h{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin:9px 0 5px;}
+.sb-entry{border-left:2px solid var(--gold);border-radius:0 var(--r) var(--r) 0;background:var(--bg3);padding:5px 10px;margin-bottom:5px;}
+.sb-entry.trait{border-left-color:var(--text3);}
+.sb-entry.opp{border-left-color:#6aaae8;}
+.sb-entry.opp .sb-entry-n{color:#8ac0f0;}
+.sb-entry-n{font-family:'Cinzel',serif;color:var(--gold2);font-size:12px;}
+.sb-entry.trait .sb-entry-n{color:var(--text2);}
+.sb-entry-d{color:var(--text2);font-size:12px;margin-top:2px;line-height:1.5;}
+.sb-entry-d b{color:var(--gold2);font-weight:500;}
+
+/* clase + colores */
+.clase-badge{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:1px 8px;border-radius:20px;border:.5px solid;display:inline-block;}
+.clase-minion{color:#9a9a9a;border-color:#9a9a9a;}
+.clase-rival{color:#d89050;border-color:#d89050;}
+.clase-boss{color:#e05050;border-color:#e05050;background:rgba(224,80,80,.1);}
+.color-swatches{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding-top:2px;}
+.swatch{width:22px;height:22px;border-radius:50%;border:2px solid var(--bg);cursor:pointer;outline:.5px solid var(--border2);padding:0;}
+.swatch.sel{outline:2px solid var(--gold2);outline-offset:1px;}
+.swatch.none{background:var(--bg2);color:var(--text3);font-size:11px;line-height:18px;}
+.color-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;}
+
+/* combate: boss + visibilidad */
+.turn-both{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:20px;border:.5px solid #c87830;color:#e8a860;background:rgba(200,120,48,.12);}
+.eye-btn{background:transparent;border:.5px solid var(--border);border-radius:var(--r);cursor:pointer;font-size:12px;padding:2px 7px;color:var(--text2);}
+.eye-btn.off{border-color:#c85050;color:#e07070;background:rgba(200,64,64,.1);}
+.color-row{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
+.cswatch{width:22px;height:22px;border-radius:50%;border:2px solid var(--bg2);outline:.5px solid var(--border2);cursor:pointer;padding:0;box-sizing:border-box;}
+.cswatch.sel{outline:2px solid var(--gold2);outline-offset:1px;}
+.cswatch-custom{background:conic-gradient(from 0deg,#e05050,#e8c840,#5aaa70,#3aa89a,#4a8ac8,#a06ad0,#d060a0,#e05050);}
+.cswatch-custom::-webkit-color-swatch-wrapper{padding:0;opacity:0;}
+.cswatch-custom::-webkit-color-swatch{border:none;opacity:0;}
+.cswatch-custom::-moz-color-swatch{border:none;opacity:0;}
+.acted-dual{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px;}
+.acted-dual .acted-btn{margin-top:0;}
+.hidden-mark{font-size:10px;letter-spacing:.05em;color:#e07070;font-style:italic;margin-top:4px;font-family:'Cinzel',serif;text-transform:uppercase;}
+.pcard.hidden-enemy{border-style:dashed;}
+.pstatuses{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px;}
+.pstatuses .stag{font-size:10px;padding:2px 7px;border-radius:20px;border:.5px solid;font-family:'Cinzel',serif;}
+.section-label.collapsible{cursor:pointer;user-select:none;}
+.section-label.collapsible:hover{color:var(--gold);}
+.enemy-group-h{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin:14px 0 8px;padding:5px 13px;border-radius:20px;display:inline-block;border:1px solid;}
+.enemy-group-h.fast{color:#7ac88c;border-color:#5aaa70;background:rgba(90,170,112,.12);}
+.enemy-group-h.slow{color:#7ab6e8;border-color:#4a8ac8;background:rgba(74,138,200,.12);}
+.enemy-group-h.both{color:#e8a860;border-color:#c87830;background:rgba(200,120,48,.12);}
+.pcard.turn-fast-card{border-top:3px solid #5aaa70;}
+.pcard.turn-slow-card{border-top:3px solid #4a8ac8;}
+.pcard.turn-both-card{border-top:3px solid #c87830;}
+.pcard.pet-ally{border-left:3px solid #5aaa70;}
+
+/* miembros + modal de ficha */
+.cmeta{font-size:13px;color:var(--text2);margin-top:4px;}
+.card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow:auto;z-index:50;}
+.overlay.on{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:1.4rem;max-width:640px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.5);}
+.modal-close{float:right;background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;}
+.sb-line .l{color:var(--text3);}
+.sb-h{font-family:'Cinzel',serif;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin:12px 0 5px;}
+.sb-item{background:var(--bg3);border-left:2px solid var(--gold);border-radius:0 var(--r) var(--r) 0;padding:5px 10px;margin-bottom:5px;font-size:13px;}
+.sb-item .n{font-family:'Cinzel',serif;color:var(--gold2);font-size:12px;}
+.chips{display:flex;flex-wrap:wrap;gap:5px;}
+.chip{font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:2px 9px;color:var(--text2);}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="app-title">Cosmere Combat Tracker<small id="campName">Panel del DM</small></div>
+    <div class="row" style="margin:0;gap:12px">
+      <span class="conn-status" id="connStatus">Conectando...</span>
+      <a class="btn sm" href="/">← Inicio</a>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="combate" onclick="showTab('combate')">⚔ Combate</button>
+    <button class="tab" data-tab="jugadores" onclick="showTab('jugadores')">Jugadores</button>
+    <button class="tab" data-tab="bestiario" onclick="showTab('bestiario')">Bestiario</button>
+    <button class="tab" data-tab="encuentros" onclick="showTab('encuentros')">Encuentros</button>
+  </div>
+
+  <!-- ═══════════ COMBATE ═══════════ -->
+  <div id="tab-combate">
+    <div id="noCombat">
+      <div class="section-label">Iniciar combate</div>
+      <div class="row">
+        <select class="fi" id="encounterSelect" style="max-width:320px"></select>
+        <button class="btn accent" onclick="startCombat()">Iniciar</button>
+      </div>
+      <div class="empty">No hay combate activo. Elegí un encuentro para empezar.</div>
+    </div>
+
+    <div id="activeCombat" style="display:none">
+      <div class="combat-header">
+        <span class="round-badge">Ronda <span id="roundNum">1</span></span>
+        <span style="font-size:13px;color:var(--text2);font-style:italic" id="encName"></span>
+        <div class="sep"></div>
+        <button class="btn" onclick="nextRound()">Siguiente ronda →</button>
+        <button class="btn danger" onclick="endCombat()">Terminar combate</button>
+      </div>
+
+      <div class="phase-bar">
+        <div class="phase fast-p">1 · Jugadores rápidos</div>
+        <div class="phase fast-e">2 · Enemigos rápidos</div>
+        <div class="phase slow-p">3 · Jugadores lentos</div>
+        <div class="phase slow-e">4 · Enemigos lentos</div>
+      </div>
+
+      <div class="section-label collapsible" id="playersToggle" onclick="toggleSection('combatPlayers','playersToggle','Jugadores')">▾ Jugadores</div>
+      <div class="grid" id="combatPlayers"></div>
+      <div class="section-label">Enemigos y mascotas (orden de turno)</div>
+      <div class="row" style="margin-bottom:10px">
+        <span style="font-size:13px;color:var(--text2)">Sumar al combate:</span>
+        <select class="fi" id="addEnemySelect" style="max-width:240px"></select>
+        <input class="fi" type="number" id="addEnemyQty" value="1" min="1" style="width:64px" title="Cantidad"/>
+        <button class="btn accent sm" onclick="addEnemyToCombat()">+ Agregar</button>
+      </div>
+      <div id="combatEnemies"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════ JUGADORES (miembros de la campaña) ═══════════ -->
+  <div id="tab-jugadores" style="display:none">
+    <div class="row">
+      <div class="section-label" style="margin-bottom:0">Jugadores de la campaña</div>
+      <div class="sep"></div>
+      <input class="fi" id="inviteUser" placeholder="usuario a invitar" style="max-width:220px"/>
+      <button class="btn accent" onclick="invitePlayer()">Invitar</button>
+    </div>
+    <div class="grid" id="membersGrid"></div>
+    <div class="empty" id="membersEmpty">Sin jugadores todavía. Invitá a alguien por su nombre de usuario.</div>
+  </div>
+
+  <!-- ═══════════ BESTIARIO ═══════════ -->
+  <div id="tab-bestiario" style="display:none">
+    <div class="row">
+      <div class="section-label" style="margin-bottom:0">Fichas de enemigos</div>
+      <div class="sep"></div>
+      <button class="btn accent" onclick="toggleForm('importForm')">⭳ Importar desde código</button>
+      <button class="btn" onclick="toggleForm('enemyForm')">+ Agregar enemigo</button>
+    </div>
+    <div class="form-wrap" id="importForm" style="display:none">
+      <div class="form-title">Importar ficha desde código</div>
+      <div class="import-hint">Pegá el statblock en formato Cosmere RPG (YAML) y el sistema arma la ficha completa.</div>
+      <textarea class="import-ta" id="importCode" placeholder="layout: Cosmere RPG&#10;name: &quot;Archer&quot;&#10;tier: &quot;Tier 1 Minion – Medium Humanoid&quot;&#10;str: 2&#10;pdef: 13&#10;..."></textarea>
+      <div class="form-actions" style="margin-top:10px">
+        <button class="btn ghost" onclick="toggleForm('importForm')">Cancelar</button>
+        <button class="btn accent" onclick="importEnemy()">Importar</button>
+      </div>
+    </div>
+    <div class="form-wrap" id="enemyForm" style="display:none">
+      <div class="form-title" id="enemyFormTitle">Nuevo enemigo</div>
+      <input type="hidden" id="efId" value=""/>
+      <input type="hidden" id="efColor" value=""/>
+      <div class="fg" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr">
+        <div><div class="fl">Nombre</div><input class="fi" id="efName"/></div>
+        <div><div class="fl">Tipo</div><input class="fi" id="efTipo" placeholder="Ej: Portador de esquirla"/></div>
+        <div><div class="fl">Vida máx</div><input class="fi" id="efVida" type="number" value="20"/></div>
+        <div><div class="fl">Focus máx</div><input class="fi" id="efFocus" type="number" value="10"/></div>
+        <div><div class="fl">Investidura</div><input class="fi" id="efInv" type="number" value="0"/></div>
+      </div>
+      <div class="fg" style="grid-template-columns:1fr 2fr">
+        <div><div class="fl">Clase</div>
+          <select class="fi" id="efClase">
+            <option value="minion">Minion</option>
+            <option value="rival" selected>Rival</option>
+            <option value="boss">Boss (turno rápido + lento)</option>
+          </select>
+        </div>
+        <div><div class="fl">Color (para diferenciarlos en combate)</div>
+          <div class="color-swatches" id="efColors"></div>
+        </div>
+      </div>
+      <div class="fl" style="margin-top:6px">Acciones / Habilidades</div>
+      <div id="efAcciones"></div>
+      <button class="btn ghost" style="margin-bottom:10px" onclick="addAccionRow()">+ Agregar acción</button>
+      <div class="fg"><div><div class="fl">Notas</div><textarea class="fta" id="efNotas"></textarea></div></div>
+      <div class="form-actions">
+        <button class="btn ghost" onclick="toggleForm('enemyForm')">Cancelar</button>
+        <button class="btn accent" onclick="saveEnemy()">Guardar</button>
+      </div>
+    </div>
+    <div class="grid" id="enemiesGrid"></div>
+    <div class="empty" id="enemiesEmpty">Sin enemigos en el bestiario.</div>
+  </div>
+
+  <!-- ═══════════ ENCUENTROS ═══════════ -->
+  <div id="tab-encuentros" style="display:none">
+    <div class="row">
+      <div class="section-label" style="margin-bottom:0">Encuentros preparados</div>
+      <div class="sep"></div>
+      <button class="btn" onclick="toggleForm('encForm')">+ Armar encuentro</button>
+    </div>
+    <div class="form-wrap" id="encForm" style="display:none">
+      <div class="form-title">Nuevo encuentro</div>
+      <div class="fg" style="grid-template-columns:1fr 2fr">
+        <div><div class="fl">Nombre</div><input class="fi" id="encfName"/></div>
+        <div><div class="fl">Descripción</div><input class="fi" id="encfDesc"/></div>
+      </div>
+      <div class="fl" style="margin-top:6px">Enemigos</div>
+      <div id="encfEnemies"></div>
+      <button class="btn ghost" style="margin-bottom:10px" onclick="addEncEnemyRow()">+ Agregar enemigo</button>
+      <div class="form-actions">
+        <button class="btn ghost" onclick="toggleForm('encForm')">Cancelar</button>
+        <button class="btn accent" onclick="saveEncounter()">Guardar encuentro</button>
+      </div>
+    </div>
+    <div class="grid" id="encountersGrid"></div>
+    <div class="empty" id="encountersEmpty">Sin encuentros preparados.</div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+// ═══════════ campaña + estado ═══════════
+var CID=parseInt(location.pathname.split('/').filter(Boolean).pop());
+var API='/api/campaigns/'+CID;
+var enemies=[], encounters=[], combat={active:false,participants:[]};
+var POS=['Determined','Enhanced','Empowered','Focus'];
+var NEG=['Restrained','Surprised','Stunned','Slowed','Disoriented','Prone','Exhausted','Unconscious','Immobilized','Afflicted'];
+var SC={Determined:'#5aaa70',Enhanced:'#6aaae8',Empowered:'#e8c840',Focus:'#aa8aec',Restrained:'#e07070',Surprised:'#e8a840',Stunned:'#c87830',Slowed:'#a09070',Disoriented:'#e07070',Prone:'#c84040',Exhausted:'#bf4a20',Unconscious:'#804040',Immobilized:'#aa8aec',Afflicted:'#5aaa70'};
+
+// ═══════════ API helpers ═══════════
+async function api(path, method, body){
+  var opts={method:method||'GET',headers:{'Content-Type':'application/json'}};
+  if(body) opts.body=JSON.stringify(body);
+  var r=await fetch(path,opts);
+  if(r.status===401){location.href='/login';throw new Error('401');}
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'}});alert(e.detail||'Error');throw new Error(e.detail);}
+  return r.status===204?null:r.json();
+}
+async function loadCampaign(){
+  try{
+    var c=await api(API);
+    document.getElementById('campName').textContent=c.name;
+    if(!c.is_dm){alert('Esta campaña no es tuya.');location.href='/';}
+  }catch(e){}
+}
+
+// ═══════════ WebSocket (por campaña) ═══════════
+function connectWS(){
+  var proto=location.protocol==='https:'?'wss':'ws';
+  var ws=new WebSocket(proto+'://'+location.host+'/ws/'+CID);
+  ws.onopen=function(){document.getElementById('connStatus').textContent='● Conectado';document.getElementById('connStatus').classList.add('ok');};
+  ws.onmessage=function(ev){
+    var msg=JSON.parse(ev.data);
+    if(msg.type==='combat'){combat=msg.data;renderCombat();}
+  };
+  ws.onclose=function(){
+    document.getElementById('connStatus').textContent='Desconectado — reintentando...';
+    document.getElementById('connStatus').classList.remove('ok');
+    setTimeout(connectWS,2000);
+  };
+}
+
+// ═══════════ tabs ═══════════
+function showTab(t){
+  ['combate','jugadores','bestiario','encuentros'].forEach(function(x){
+    document.getElementById('tab-'+x).style.display=x===t?'':'none';
+  });
+  document.querySelectorAll('.tab').forEach(function(el){
+    el.classList.toggle('active',el.dataset.tab===t);
+  });
+  if(t==='jugadores')loadMembers();
+  if(t==='bestiario')loadEnemies();
+  if(t==='encuentros')loadEncounters();
+  if(t==='combate')loadEncountersForSelect();
+}
+function toggleForm(id){
+  var f=document.getElementById(id);
+  f.style.display=f.style.display==='none'?'block':'none';
+}
+
+// ═══════════ JUGADORES (miembros de la campaña) ═══════════
+async function loadMembers(){
+  var members=await api(API+'/members');
+  var g=document.getElementById('membersGrid');
+  document.getElementById('membersEmpty').style.display=members.length?'none':'block';
+  g.innerHTML=members.map(function(m){
+    var acc=m.status==='accepted';
+    var estado=acc?(m.character_name?'Personaje: <b style="color:var(--gold2)">'+esc(m.character_name)+'</b>':'Aceptó, sin personaje')
+                  :'<span style="color:#e8a860">Invitación pendiente</span>';
+    return '<div class="card">'
+      +'<div class="card-head"><span class="cname">'+esc(m.username)+'</span>'
+      +'<button class="del-btn" onclick="kickMember('+m.user_id+')" title="Sacar de la campaña">✕</button></div>'
+      +'<div class="cmeta">'+estado+'</div>'
+      +(acc&&m.character_id?'<div class="card-actions">'
+          +'<button class="btn sm" onclick="viewMemberSheet('+m.user_id+')">Ver ficha</button>'
+          +(m.has_pdf?'<a class="btn sm" href="/api/characters/'+m.character_id+'/pdf" target="_blank">PDF</a>':'')
+        +'</div>':'')
+      +'</div>';
+  }).join('');
+}
+async function invitePlayer(){
+  var u=document.getElementById('inviteUser').value.trim();
+  if(!u){alert('Escribí un nombre de usuario.');return;}
+  await api(API+'/invite','POST',{username:u});
+  document.getElementById('inviteUser').value='';
+  loadMembers();
+}
+async function kickMember(uid){
+  if(!confirm('¿Sacar a este jugador de la campaña?'))return;
+  await api(API+'/members/'+uid,'DELETE');
+  loadMembers();
+}
+async function viewMemberSheet(uid){
+  var ch=await api(API+'/members/'+uid+'/sheet');
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'+sheetHTML(ch);
+  document.getElementById('overlay').classList.add('on');
+}
+function closeModal(){document.getElementById('overlay').classList.remove('on');}
+function sheetHTML(c){
+  var s=c.sheet||{};var a=s.attributes||{};var d=s.defenses||{};
+  var h='<div class="cname" style="font-size:18px">'+esc(c.name)+'</div>';
+  if(s.paths||s.ancestry||s.level) h+='<div class="cmeta">'+[s.ancestry,s.paths,(s.level?'Nivel '+s.level:'')].filter(Boolean).map(esc).join(' · ')+'</div>';
+  if(a.STR!=null){
+    h+='<div class="sb-attrs" style="margin-top:10px">'
+      +'<div class="sb-col"><div class="sb-col-h">Físico</div>'+_at('STR',a.STR)+_at('DEF',d.physical)+_at('SPD',a.SPD)+'</div>'
+      +'<div class="sb-col"><div class="sb-col-h">Cognitivo</div>'+_at('INT',a.INT)+_at('DEF',d.cognitive)+_at('WIL',a.WIL)+'</div>'
+      +'<div class="sb-col"><div class="sb-col-h">Espiritual</div>'+_at('AWA',a.AWA)+_at('DEF',d.spiritual)+_at('PRE',a.PRE)+'</div>'
+      +'</div>';
+  }
+  h+='<div class="sb-res"><span>Vida <b style="color:#e05050">'+c.vida_max+'</b></span>'
+    +'<span>Focus <b style="color:#6aaae8">'+c.focus_max+'</b></span>'
+    +(c.inv_max?'<span>Investidura <b style="color:#aa8aec">'+c.inv_max+'</b></span>':'')+'</div>';
+  h+=_ln('Movimiento',s.movement)+_ln('Sentidos',s.senses)+_ln('Deflect',s.deflect)+_ln('Expertise',s.expertise);
+  var sk=s.skills||{};
+  ['physical','cognitive','spiritual'].forEach(function(cat){
+    var arr=sk[cat]||[];
+    if(arr.length){h+='<div class="sb-h">Habilidades '+({physical:'físicas',cognitive:'cognitivas',spiritual:'espirituales'}[cat])+'</div>'
+      +'<div class="chips">'+arr.map(function(x){return '<span class="chip">'+esc(x.name)+' +'+x.value+'</span>';}).join('')+'</div>';}
+  });
+  if((s.talents||[]).length){h+='<div class="sb-h">Talentos</div>'+s.talents.map(function(t){return '<div class="sb-item"><span class="n">'+esc(t.name)+'</span>'+(t.desc?'<div>'+esc(t.desc)+'</div>':'')+'</div>';}).join('');}
+  if((s.weapons||[]).length){h+='<div class="sb-h">Armas</div>'+s.weapons.map(function(w){return '<div class="sb-item">'+esc(w)+'</div>';}).join('');}
+  if((s.equipment||[]).length){h+='<div class="sb-h">Equipo</div><div class="chips">'+s.equipment.map(function(e){return '<span class="chip">'+esc(e)+'</span>';}).join('')+'</div>';}
+  return h;
+}
+function _at(l,v){return '<div class="sb-attr"><span class="sb-attr-l">'+l+'</span><span class="sb-attr-v">'+(v==null?'—':v)+'</span></div>';}
+function _ln(l,v){return (v&&v!=='-')?'<div class="sb-line"><span class="l">'+l+':</span> '+esc(v)+'</div>':'';}
+
+// ═══════════ BESTIARIO ═══════════
+var accionCounter=0;
+var editingStats={};   // conserva la ficha completa al editar un enemigo importado
+
+// clases y colores
+var CLASES={minion:'Minion',rival:'Rival',boss:'Boss'};
+var PALETTE=['#e05050','#c87830','#e8c840','#5aaa70','#4a8ac8','#aa8aec','#d060a0','#8a8a8a','#e8dcc8'];
+function claseLabel(c){return CLASES[c]||'Rival';}
+function claseBadge(c){c=c||'rival';return '<span class="clase-badge clase-'+c+'">'+claseLabel(c)+'</span>';}
+function buildSwatches(containerId,hiddenId){
+  var cont=document.getElementById(containerId);
+  cont.innerHTML=PALETTE.map(function(c){
+    return '<button type="button" class="swatch" data-c="'+c+'" style="background:'+c+'" onclick="pickColor(\''+containerId+'\',\''+hiddenId+'\',\''+c+'\')"></button>';
+  }).join('')+'<button type="button" class="swatch none" data-c="" onclick="pickColor(\''+containerId+'\',\''+hiddenId+'\',\'\')">✕</button>';
+}
+function pickColor(containerId,hiddenId,c){
+  document.getElementById(hiddenId).value=c;
+  document.querySelectorAll('#'+containerId+' .swatch').forEach(function(s){s.classList.toggle('sel',s.dataset.c===c);});
+}
+
+// helpers de render
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function md(s){return esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');}  // negritas **x**
+
+function renderEntries(list,cls){
+  return (list||[]).map(function(x){
+    return '<div class="sb-entry'+(cls?' '+cls:'')+'">'
+      +'<span class="sb-entry-n">'+esc(x.name)+'</span>'
+      +(x.desc?'<div class="sb-entry-d">'+md(x.desc)+'</div>':'')+'</div>';
+  }).join('');
+}
+
+function renderStatblock(e,skipActions){
+  var s=e.stats||{};
+  if(!s.physical) return '';  // enemigo sin ficha completa
+  var p=s.physical,c=s.cognitive||{},sp=s.spiritual||{};
+  function cell(l,v){return '<div class="sb-attr"><span class="sb-attr-l">'+l+'</span><span class="sb-attr-v">'+(v==null?'—':v)+'</span></div>';}
+  var attrs='<div class="sb-attrs">'
+    +'<div class="sb-col"><div class="sb-col-h">Físico</div>'+cell('STR',p.str)+cell('DEF',p.def)+cell('SPD',p.spd)+'</div>'
+    +'<div class="sb-col"><div class="sb-col-h">Cognitivo</div>'+cell('INT',c.int)+cell('DEF',c.def)+cell('WIL',c.wil)+'</div>'
+    +'<div class="sb-col"><div class="sb-col-h">Espiritual</div>'+cell('AWA',sp.awa)+cell('DEF',sp.def)+cell('PRE',sp.pre)+'</div>'
+    +'</div>';
+  var res='<div class="sb-res"><span>Vida <b>'+e.vida_max+'</b></span>'
+    +'<span>Focus <b>'+e.focus_max+'</b></span>'
+    +(e.inv_max?'<span>Investidura <b>'+e.inv_max+'</b></span>':'')+'</div>';
+  function ln(l,v){return (v&&v!=='-')?'<div class="sb-line"><span class="sb-line-l">'+l+':</span> '+esc(v)+'</div>':'';}
+  var lines=ln('Movimiento',s.movement)+ln('Sentidos',s.senses)+ln('Deflect',s.deflect)+ln('Idiomas',s.languages);
+  var sk=s.skills||{};
+  var skills=ln('Habilidades físicas',sk.physical)+ln('Cognitivas',sk.cognitive)+ln('Espirituales',sk.spiritual)+ln('Surgebinding',sk.surge);
+  var traits=(s.traits&&s.traits.length)?'<div class="sb-section-h">Rasgos</div>'+renderEntries(s.traits,'trait'):'';
+  var actions=(!skipActions&&s.actions&&s.actions.length)?'<div class="sb-section-h">Acciones</div>'+renderEntries(s.actions):'';
+  var opps=(s.opportunities&&s.opportunities.length)?'<div class="sb-section-h">Oportunidades</div>'+renderEntries(s.opportunities,'opp'):'';
+  return '<div class="sb">'+attrs+res+lines+skills+traits+actions+opps+'</div>';
+}
+
+function addAccionRow(nombre,coste,desc){
+  accionCounter++;
+  var d=document.createElement('div');
+  d.className='accion-row';d.id='ar-'+accionCounter;
+  d.innerHTML='<input class="fi" placeholder="Nombre" value="'+(nombre||'')+'"/>'
+    +'<input class="fi" placeholder="Coste (ej: 2 acciones)" value="'+(coste||'')+'"/>'
+    +'<input class="fi" placeholder="Descripción" value="'+(desc||'')+'"/>'
+    +'<button class="del-btn" onclick="this.parentElement.remove()">✕</button>';
+  document.getElementById('efAcciones').appendChild(d);
+}
+async function loadEnemies(){
+  enemies=await api(API+'/enemies');
+  var g=document.getElementById('enemiesGrid');
+  document.getElementById('enemiesEmpty').style.display=enemies.length?'none':'block';
+  g.innerHTML=enemies.map(function(e){
+    var sb=renderStatblock(e);
+    // fallback para enemigos sin ficha completa: acciones simples
+    var accFallback=sb?'':(e.acciones||[]).map(function(a){
+      return '<div class="accion-item"><span class="accion-nombre">'+esc(a.nombre)+'</span>'
+        +(a.coste?'<span class="accion-coste">['+esc(a.coste)+']</span>':'')
+        +(a.descripcion?'<div class="accion-desc">'+esc(a.descripcion)+'</div>':'')+'</div>';
+    }).join('');
+    var col=e.faction_color||'';
+    return '<div class="card"'+(col?' style="border-left:3px solid '+col+'"':'')+'>'
+      +'<div class="card-head"><span class="cname">'+(col?'<span class="color-dot" style="background:'+col+'"></span>':'')+esc(e.name)+'</span>'
+      +'<div><button class="edit-btn" onclick="editEnemy('+e.id+')">editar</button> '
+      +'<button class="del-btn" onclick="delEnemy('+e.id+')">✕</button></div></div>'
+      +'<div style="margin-bottom:6px">'+claseBadge(e.clase)+'</div>'
+      +(e.tipo?'<div class="ctype">'+esc(e.tipo)+'</div>':'')
+      +(sb?sb:'<div class="cstats">Vida: '+e.vida_max+' · Focus: '+e.focus_max+(e.inv_max?' · Investidura: '+e.inv_max:'')+'</div>')
+      +(accFallback?'<div style="margin-top:8px">'+accFallback+'</div>':'')
+      +(e.notas?'<div class="cstats" style="font-style:italic;margin-top:6px">'+esc(e.notas)+'</div>':'')
+      +'</div>';
+  }).join('');
+  populateAddEnemySelect();
+}
+async function importEnemy(){
+  var code=document.getElementById('importCode').value.trim();
+  if(!code){alert('Pegá el código de la ficha.');return;}
+  var res=await api(API+'/enemies/import','POST',{code:code});
+  document.getElementById('importCode').value='';
+  toggleForm('importForm');
+  await loadEnemies();
+  alert('Importado: '+res.name);
+}
+function editEnemy(id){
+  var e=enemies.find(function(x){return x.id===id;});
+  if(!e)return;
+  editingStats=e.stats||{};
+  document.getElementById('efId').value=e.id;
+  document.getElementById('efName').value=e.name;
+  document.getElementById('efTipo').value=e.tipo||'';
+  document.getElementById('efClase').value=e.clase||'rival';
+  pickColor('efColors','efColor',e.faction_color||'');
+  document.getElementById('efVida').value=e.vida_max;
+  document.getElementById('efFocus').value=e.focus_max;
+  document.getElementById('efInv').value=e.inv_max;
+  document.getElementById('efNotas').value=e.notas||'';
+  document.getElementById('efAcciones').innerHTML='';
+  (e.acciones||[]).forEach(function(a){addAccionRow(a.nombre,a.coste,a.descripcion);});
+  document.getElementById('enemyFormTitle').textContent='Editar enemigo';
+  document.getElementById('enemyForm').style.display='block';
+}
+async function saveEnemy(){
+  var id=document.getElementById('efId').value;
+  var acciones=[];
+  document.querySelectorAll('#efAcciones .accion-row').forEach(function(row){
+    var inputs=row.querySelectorAll('input');
+    if(inputs[0].value.trim()) acciones.push({nombre:inputs[0].value.trim(),coste:inputs[1].value.trim(),descripcion:inputs[2].value.trim()});
+  });
+  var body={
+    name:document.getElementById('efName').value.trim(),
+    tipo:document.getElementById('efTipo').value.trim(),
+    clase:document.getElementById('efClase').value,
+    vida_max:parseInt(document.getElementById('efVida').value)||20,
+    focus_max:parseInt(document.getElementById('efFocus').value)||10,
+    inv_max:parseInt(document.getElementById('efInv').value)||0,
+    acciones:acciones,
+    notas:document.getElementById('efNotas').value.trim(),
+    faction_color:document.getElementById('efColor').value,
+    stats:editingStats||{}
+  };
+  if(!body.name){alert('Poné un nombre.');return;}
+  if(id) await api(API+'/enemies/'+id,'PUT',body);
+  else await api('/api/enemies','POST',body);
+  ['efId','efName','efTipo','efNotas'].forEach(function(x){document.getElementById(x).value='';});
+  document.getElementById('efVida').value='20';
+  document.getElementById('efFocus').value='10';
+  document.getElementById('efInv').value='0';
+  document.getElementById('efClase').value='rival';
+  pickColor('efColors','efColor','');
+  document.getElementById('efAcciones').innerHTML='';
+  editingStats={};
+  document.getElementById('enemyFormTitle').textContent='Nuevo enemigo';
+  toggleForm('enemyForm');
+  loadEnemies();
+}
+async function delEnemy(id){
+  if(!confirm('¿Eliminar este enemigo del bestiario?'))return;
+  await api(API+'/enemies/'+id,'DELETE');
+  loadEnemies();
+}
+
+// ═══════════ ENCUENTROS ═══════════
+var encRowCounter=0;
+async function addEncEnemyRow(){
+  if(!enemies.length) enemies=await api(API+'/enemies');
+  encRowCounter++;
+  var opts=enemies.map(function(e){return '<option value="'+e.id+'">'+e.name+'</option>';}).join('');
+  var d=document.createElement('div');
+  d.className='enc-enemy-pick';d.id='eer-'+encRowCounter;
+  d.innerHTML='<select class="fi">'+opts+'</select>'
+    +'<input class="fi" type="number" value="1" min="1" max="20"/>'
+    +'<button class="del-btn" onclick="this.parentElement.remove()">✕</button>';
+  document.getElementById('encfEnemies').appendChild(d);
+}
+async function loadEncounters(){
+  encounters=await api(API+'/encounters');
+  var g=document.getElementById('encountersGrid');
+  document.getElementById('encountersEmpty').style.display=encounters.length?'none':'block';
+  g.innerHTML=encounters.map(function(enc){
+    var list=enc.enemies.map(function(e){return '<div class="cstats">'+e.cantidad+'x '+e.name+'</div>';}).join('');
+    return '<div class="card">'
+      +'<div class="card-head"><span class="cname">'+enc.name+'</span>'
+      +'<button class="del-btn" onclick="delEncounter('+enc.id+')">✕</button></div>'
+      +(enc.descripcion?'<div class="ctype">'+enc.descripcion+'</div>':'')
+      +list+'</div>';
+  }).join('');
+}
+async function saveEncounter(){
+  var name=document.getElementById('encfName').value.trim();
+  if(!name){alert('Poné un nombre.');return;}
+  var enemiesList=[];
+  document.querySelectorAll('#encfEnemies .enc-enemy-pick').forEach(function(row){
+    var sel=row.querySelector('select');
+    var qty=row.querySelector('input');
+    enemiesList.push({enemy_id:parseInt(sel.value),cantidad:parseInt(qty.value)||1});
+  });
+  if(!enemiesList.length){alert('Agregá al menos un enemigo.');return;}
+  await api(API+'/encounters','POST',{name:name,descripcion:document.getElementById('encfDesc').value.trim(),enemies:enemiesList});
+  document.getElementById('encfName').value='';
+  document.getElementById('encfDesc').value='';
+  document.getElementById('encfEnemies').innerHTML='';
+  toggleForm('encForm');
+  loadEncounters();
+}
+async function delEncounter(id){
+  if(!confirm('¿Eliminar este encuentro?'))return;
+  await api(API+'/encounters/'+id,'DELETE');
+  loadEncounters();
+}
+
+// ═══════════ COMBATE ═══════════
+async function loadEncountersForSelect(){
+  encounters=await api(API+'/encounters');
+  var sel=document.getElementById('encounterSelect');
+  sel.innerHTML=encounters.length
+    ? encounters.map(function(e){return '<option value="'+e.id+'">'+e.name+'</option>';}).join('')
+    : '<option value="">— Sin encuentros —</option>';
+}
+async function startCombat(){
+  var id=document.getElementById('encounterSelect').value;
+  if(!id){alert('Armá un encuentro primero en la pestaña Encuentros.');return;}
+  await api(API+'/combat/start/'+id,'POST');
+}
+async function nextRound(){await api(API+'/combat/next_round','POST');}
+function populateAddEnemySelect(){
+  var sel=document.getElementById('addEnemySelect');
+  if(!sel)return;
+  var prev=sel.value;
+  sel.innerHTML=enemies.length
+    ? enemies.map(function(e){return '<option value="'+e.id+'">'+esc(e.name)+'</option>';}).join('')
+    : '<option value="">— Bestiario vacío —</option>';
+  if(prev)sel.value=prev;
+}
+async function addEnemyToCombat(){
+  var id=document.getElementById('addEnemySelect').value;
+  if(!id){alert('Cargá enemigos en el Bestiario primero.');return;}
+  var qty=Math.max(1,parseInt(document.getElementById('addEnemyQty').value)||1);
+  await api(API+'/combat/add_enemy','POST',{enemy_id:parseInt(id),cantidad:qty});
+}
+async function endCombat(){
+  if(!confirm('¿Terminar el combate?'))return;
+  await api(API+'/combat/end','POST');
+}
+async function chStat(uid,stat,sign,inputEl){
+  var val=Math.max(1,parseInt(inputEl.value)||1);
+  await api(API+'/combat/stat','POST',{uid:uid,stat:stat,delta:sign*val});
+}
+async function chStatus(uid,status){await api(API+'/combat/status','POST',{uid:uid,status:status});}
+async function rmStatus(uid,status){await api(API+'/combat/status/remove_one','POST',{uid:uid,status:status});}
+async function chTurn(uid,turn){await api(API+'/combat/turn','POST',{uid:uid,turn:turn});}
+async function chActed(uid,slow){await api(API+'/combat/acted/'+uid+(slow?'?slow=true':''),'POST');}
+async function chHidden(uid){await api(API+'/combat/hidden/'+uid,'POST');}
+async function chColor(uid,color){await api(API+'/combat/color','POST',{uid:uid,color:color});}
+
+function statBlock(p,stat,color,lblPlus,lblMinus,clsPlus,clsMinus){
+  var mx=p[stat+'_max'];
+  if(stat!=='vida'&&mx===0)return '';
+  var pct=mx>0?Math.round(p[stat]/mx*100):0;
+  return '<div class="stat-line"><span class="stat-lbl">'+(stat==='vida'?'Vida':stat==='focus'?'Focus':'Investidura')+'</span>'
+    +'<span class="stat-val" style="color:'+color+'">'+p[stat]+' <span style="font-size:11px;color:var(--text3)">/ '+mx+'</span></span></div>'
+    +'<div class="bar"><div class="bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
+    +'<div class="adj">'
+    +'<button class="'+clsMinus+'" onclick="chStat(\''+p.uid+'\',\''+stat+'\',-1,document.getElementById(\'i-'+p.uid+'-'+stat+'\'))">'+lblMinus+'</button>'
+    +'<input type="number" placeholder="1" min="1" id="i-'+p.uid+'-'+stat+'"/>'
+    +'<button class="'+clsPlus+'" onclick="chStat(\''+p.uid+'\',\''+stat+'\',1,document.getElementById(\'i-'+p.uid+'-'+stat+'\'))">'+lblPlus+'</button>'
+    +'</div>';
+}
+
+// colores comunes para pintar rápido una copia de enemigo en combate
+var COMMON_COLORS=[
+  {n:'Rojo',c:'#e05050'},{n:'Naranja',c:'#e0842e'},{n:'Amarillo',c:'#e8c840'},
+  {n:'Verde',c:'#5aaa70'},{n:'Turquesa',c:'#3aa89a'},{n:'Azul',c:'#4a8ac8'},
+  {n:'Morado',c:'#a06ad0'},{n:'Rosa',c:'#d060a0'},{n:'Gris',c:'#8a8a8a'},{n:'Blanco',c:'#e8dcc8'}
+];
+function colorRow(p){
+  var cur=(p.faction_color||'').toLowerCase();
+  var sw=COMMON_COLORS.map(function(o){
+    var sel=cur===o.c.toLowerCase();
+    return '<button class="cswatch'+(sel?' sel':'')+'" style="background:'+o.c+'" title="'+o.n+'" onclick="chColor(\''+p.uid+'\',\''+o.c+'\')"></button>';
+  }).join('');
+  // swatch arcoíris = selector preciso (cualquier color)
+  var custom='<input type="color" class="cswatch cswatch-custom" value="'+(p.faction_color||'#8a8a8a')+'" title="Color preciso (cualquier color)" onchange="chColor(\''+p.uid+'\',this.value)">';
+  return '<div class="color-row">'+sw+custom+'</div>';
+}
+
+function participantCard(p){
+  var statusBtns='';
+  POS.concat(NEG).forEach(function(s){
+    var cnt=p.statuses.filter(function(x){return x===s;}).length;
+    var on=cnt>0; var col=SC[s];
+    // Exhausted apilable: botón "−" para quitar una carga (funciona con tap en el celu)
+    if(s==='Exhausted'&&cnt>0){
+      var lbl='Exhausted'+(cnt>1?' x'+cnt:'');
+      statusBtns+='<span class="spill-group" style="border-color:'+col+'">'
+        +'<button class="spill on" style="background:'+col+'22;color:'+col+'" onclick="chStatus(\''+p.uid+'\',\'Exhausted\')" title="Sumar una carga">'+lbl+'</button>'
+        +'<button class="spill-minus" style="color:'+col+'" onclick="rmStatus(\''+p.uid+'\',\'Exhausted\')" title="Quitar una carga">−</button>'
+        +'</span>';
+      return;
+    }
+    statusBtns+='<button class="spill'+(on?' on':'')+'" style="'+(on?'background:'+col+'22;color:'+col+';border-color:'+col:'')+'" '
+      +'onclick="chStatus(\''+p.uid+'\',\''+s+'\')">'+s+'</button>';
+  });
+  var acciones='';
+  if(p.acciones&&p.acciones.length){
+    acciones='<div class="acciones-toggle" onclick="var d=this.nextElementSibling;d.style.display=d.style.display===\'none\'?\'\':\'none\'">▸ Ver acciones ('+p.acciones.length+')</div>'
+      +'<div style="display:none;margin-top:5px">'
+      +p.acciones.map(function(a){
+        return '<div class="accion-item"><span class="accion-nombre">'+esc(a.nombre)+'</span>'
+          +(a.coste?'<span class="accion-coste">['+esc(a.coste)+']</span>':'')
+          +(a.descripcion?'<div class="accion-desc">'+md(a.descripcion)+'</div>':'')+'</div>';
+      }).join('')+'</div>';
+  }
+  var ficha='';
+  var sbCombat=renderStatblock(p,true);  // sin acciones (ya están arriba)
+  if(sbCombat){
+    ficha='<div class="acciones-toggle" onclick="var d=this.nextElementSibling;d.style.display=d.style.display===\'none\'?\'\':\'none\'">▸ Ver ficha</div>'
+      +'<div style="display:none">'+sbCombat+'</div>';
+  }
+  var isEnemy=p.kind==='enemy';
+  var isBoss=p.turn==='both';
+  var col=isEnemy?(p.faction_color||''):'';
+  // control de turno
+  var turnCtl;
+  if(isBoss){
+    turnCtl='<span class="turn-both">⚡ Rápido + Lento</span>';
+  }else{
+    turnCtl='<div class="turn-toggle">'
+      +'<button class="turn-opt'+(p.turn==='fast'?' active-fast':'')+'" onclick="chTurn(\''+p.uid+'\',\'fast\')">Rápido</button>'
+      +'<button class="turn-opt'+(p.turn==='slow'?' active-slow':'')+'" onclick="chTurn(\''+p.uid+'\',\'slow\')">Lento</button></div>';
+  }
+  // control de actuado (doble para bosses)
+  var actedCtl;
+  if(isBoss){
+    actedCtl='<div class="acted-dual">'
+      +'<button class="acted-btn'+(p.acted?' done':'')+'" onclick="chActed(\''+p.uid+'\',false)">'+(p.acted?'✓ Rápido':'Rápido')+'</button>'
+      +'<button class="acted-btn'+(p.acted_slow?' done':'')+'" onclick="chActed(\''+p.uid+'\',true)">'+(p.acted_slow?'✓ Lento':'Lento')+'</button></div>';
+  }else{
+    actedCtl='<button class="acted-btn'+(p.acted?' done':'')+'" onclick="chActed(\''+p.uid+'\',false)">'+(p.acted?'✓ Ya actuó':'Marcar como actuado')+'</button>';
+  }
+  var fullyActed=isBoss?(p.acted&&p.acted_slow):p.acted;
+  var eyeBtn=isEnemy?'<button class="eye-btn'+(p.hidden?' off':'')+'" title="'+(p.hidden?'Oculto para los jugadores':'Visible para los jugadores')+'" onclick="chHidden(\''+p.uid+'\')">'+(p.hidden?'🚫':'👁')+'</button>':'';
+  var isPet=p.kind==='pet';
+  return '<div class="pcard'+(fullyActed?' acted':'')+(p.defeated?' defeated':'')+(p.kind==='player'?' player-kind':'')+(isPet?' pet-ally':'')+(p.hidden?' hidden-enemy':'')+((isEnemy||isPet)?' turn-'+(isBoss?'both':p.turn)+'-card':'')+'"'
+    +(col?' style="border-left:3px solid '+col+'"':'')+'>'
+    +'<div class="card-head"><span class="cname">'+(col?'<span class="color-dot" style="background:'+col+'"></span>':'')+esc(p.name)+'</span>'
+    +'<div style="display:flex;gap:6px;align-items:center">'+eyeBtn+turnCtl+'</div></div>'
+    +(isEnemy?'<div style="margin-bottom:6px">'+claseBadge(p.clase)+'</div>'+colorRow(p):'')
+    +(p.kind==='pet'?'<div style="margin-bottom:6px"><span class="clase-badge" style="color:#7ac88c;border-color:#7ac88c">🐾 Mascota'+(p.owner_name?' de '+esc(p.owner_name):'')+'</span></div>':'')
+    +(p.tipo?'<div class="ctype">'+esc(p.tipo)+'</div>':'')
+    +(p.hidden?'<div class="hidden-mark">Oculto a jugadores</div>':'')
+    +statBlock(p,'vida','#e05050','+HP','−HP','heal','dmg')
+    +statBlock(p,'focus','#6aaae8','+F','−F','heal','fu')
+    +statBlock(p,'inv','#aa8aec','+I','−I','heal','iu')
+    +'<div class="spills">'+statusBtns+'</div>'
+    +ficha
+    +acciones
+    +actedCtl
+    +'</div>';
+}
+
+function renderCombat(){
+  var active=combat.active;
+  document.getElementById('noCombat').style.display=active?'none':'';
+  document.getElementById('activeCombat').style.display=active?'':'none';
+  if(!active)return;
+  document.getElementById('roundNum').textContent=combat.round;
+  document.getElementById('encName').textContent=combat.encounter_name||'';
+  populateAddEnemySelect();
+  var pl=combat.participants.filter(function(p){return p.kind==='player';});
+  var en=combat.participants.filter(function(p){return p.kind==='enemy'||p.kind==='pet';});
+  pl.sort(function(a,b){return (a.turn==='slow'?1:0)-(b.turn==='slow'?1:0);});
+  document.getElementById('combatPlayers').innerHTML=pl.map(participantCard).join('');
+  renderEnemies(en);
+}
+
+// speed (SPD) del participante, para ordenar el turno
+function speedOf(p){var ph=(p.stats||{}).physical||{};return typeof ph.spd==='number'?ph.spd:-1;}
+// Enemigos + mascotas agrupados por turno, ordenados por speed (mayor→menor)
+function renderEnemies(en){
+  var groups=[
+    {key:'fast',cls:'fast',label:'⚡ Rápidos'},
+    {key:'both',cls:'both',label:'⚡ Boss (rápido + lento)'},
+    {key:'slow',cls:'slow',label:'🐢 Lentos'}
+  ];
+  var html='';
+  groups.forEach(function(g){
+    var arr=en.filter(function(p){return p.turn===g.key;});
+    if(!arr.length)return;
+    arr.sort(function(a,b){return speedOf(b)-speedOf(a);});  // más speed primero
+    html+='<div class="enemy-group-h '+g.cls+'">'+g.label+' ('+arr.length+')</div>'
+      +'<div class="grid wide">'+arr.map(participantCard).join('')+'</div>';
+  });
+  document.getElementById('combatEnemies').innerHTML=html||'<div class="empty">Sin enemigos ni mascotas.</div>';
+}
+
+// Colapsar/expandir una sección del combate
+function toggleSection(gridId,toggleId,label){
+  var g=document.getElementById(gridId);
+  var hidden=g.style.display!=='none';
+  g.style.display=hidden?'none':'';
+  document.getElementById(toggleId).textContent=(hidden?'▸ ':'▾ ')+label;
+}
+
+// init
+buildSwatches('efColors','efColor');
+loadCampaign();
+connectWS();
+loadEncountersForSelect();
+loadEnemies();
+</script>
+</body>
+</html>

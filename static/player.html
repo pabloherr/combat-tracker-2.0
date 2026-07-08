@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
+<title>Cosmere — Combate</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#211f1c;--bg2:#2c2924;--bg3:#353129;--bg4:#413c33;
+  --border:rgba(224,189,124,.14);--border2:rgba(224,189,124,.28);
+  --gold:#e0bd7c;--gold2:#f4d9a0;
+  --text:#efece4;--text2:#c1baa9;--text3:#948d7b;
+  --r:10px;--rl:14px;
+  --shadow:0 2px 10px rgba(0,0,0,.28);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,serif;font-size:16px;line-height:1.55;
+  background-image:radial-gradient(120% 60% at 50% -10%, rgba(224,189,124,.05), transparent 60%);}
+.app{max-width:680px;margin:0 auto;padding:1rem .9rem 4rem;}
+.header{text-align:center;padding-bottom:.9rem;margin-bottom:1rem;border-bottom:.5px solid var(--border2);}
+.title{font-family:'Cinzel',serif;font-size:18px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;}
+.round-block{display:inline-flex;align-items:center;gap:8px;margin-top:10px;background:var(--bg3);border:.5px solid var(--border2);border-radius:30px;padding:5px 16px;}
+.round-label{font-size:11px;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;}
+.round-num{font-family:'Cinzel',serif;font-size:18px;color:var(--gold);}
+.live-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:4px;background:#804040;}
+.live-dot.on{background:#5aaa70;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+.phase-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-bottom:1.1rem;}
+.phase{font-family:'Cinzel',serif;font-size:8px;letter-spacing:.04em;text-transform:uppercase;text-align:center;padding:6px 2px;border-radius:var(--r);border:.5px solid var(--border);color:var(--text3);}
+.phase.p1{border-color:#5aaa70;color:#5aaa70;}
+.phase.p2{border-color:#e05050;color:#e05050;}
+.phase.p3{border-color:#4a8ac8;color:#6aaae8;}
+.phase.p4{border-color:#c87830;color:#c87830;}
+
+.section-lbl{font-family:'Cinzel',serif;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin:1rem 0 8px;padding-bottom:5px;border-bottom:.5px solid var(--border);}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:.85rem;box-shadow:var(--shadow);}
+.card.defeated{opacity:.35;}
+.card.acted{opacity:.6;}
+.cname{font-family:'Cinzel',serif;font-size:13px;color:var(--gold2);letter-spacing:.05em;margin-bottom:2px;}
+.ctype{font-size:11px;color:var(--text3);font-style:italic;margin-bottom:6px;}
+.turn-tag{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:1px 7px;border-radius:20px;border:.5px solid;display:inline-block;margin-bottom:6px;}
+.turn-fast{color:#5aaa70;border-color:#5aaa70;}
+.turn-slow{color:#6aaae8;border-color:#4a8ac8;}
+.turn-both{color:#e8a860;border-color:#c87830;}
+.color-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;}
+.health-text{font-family:'Cinzel',serif;font-size:13px;display:block;margin-bottom:4px;}
+.hbar{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-bottom:6px;}
+.hbar-fill{height:100%;width:100%;border-radius:3px;transition:background .5s;}
+.stags{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;}
+.stag{font-size:10px;padding:2px 7px;border-radius:20px;border:.5px solid;font-family:'Cinzel',serif;}
+.empty-msg{text-align:center;color:var(--text3);font-style:italic;padding:2.5rem 0;font-size:14px;}
+.acted-mark{font-size:10px;color:var(--text3);font-style:italic;margin-top:4px;}
+
+/* elegir personaje */
+.me-select{background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--rl);padding:1.1rem;text-align:center;}
+.me-q{font-family:'Cinzel',serif;font-size:13px;color:var(--gold);letter-spacing:.06em;margin-bottom:12px;}
+.me-opts{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
+.btn-pj{font-family:'Cinzel',serif;font-size:12px;letter-spacing:.05em;padding:8px 16px;border-radius:var(--r);cursor:pointer;border:.5px solid var(--border2);background:transparent;color:var(--gold2);}
+.btn-pj:hover{background:rgba(200,169,110,.14);border-color:var(--gold);}
+
+/* mi personaje */
+.me-card{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:1.1rem;box-shadow:0 3px 16px rgba(0,0,0,.32);}
+.me-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.me-name{font-family:'Cinzel',serif;font-size:18px;color:var(--gold2);letter-spacing:.04em;}
+.me-change{background:transparent;border:none;color:var(--text3);font-size:13px;font-style:italic;font-family:'Crimson Pro',serif;cursor:pointer;}
+.me-change:hover{color:var(--gold);}
+.me-turn-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+.me-turn-lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);}
+.turn-toggle{display:inline-flex;border:1px solid var(--border2);border-radius:24px;overflow:hidden;}
+.turn-opt{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:7px 16px;cursor:pointer;background:transparent;border:none;color:var(--text3);}
+.turn-opt.on-fast{background:rgba(90,170,112,.22);color:#7ac88c;}
+.turn-opt.on-slow{background:rgba(74,138,200,.22);color:#7ab6e8;}
+.mstat{margin-bottom:12px;}
+.mstat-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+.mstat-l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);}
+.mstat-v{font-family:'Cinzel',serif;font-size:16px;}
+.mbar{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-bottom:7px;}
+.mbar-fill{height:100%;border-radius:3px;transition:width .3s;}
+.madj{display:flex;gap:8px;align-items:stretch;}
+.madj input{flex:1;background:var(--bg3);border:.5px solid var(--border);border-radius:var(--r);padding:8px;color:var(--text);font-size:16px;text-align:center;outline:none;min-width:0;}
+.madj-btn{width:52px;border:.5px solid var(--border);border-radius:var(--r);font-family:'Cinzel',serif;font-size:20px;cursor:pointer;background:var(--bg3);}
+.madj-btn.minus{color:#e05050;border-color:rgba(200,64,64,.35);}
+.madj-btn.plus{color:#4a9a60;border-color:rgba(74,154,96,.35);}
+.madj-btn:active{background:var(--bg4);}
+.mstatuses{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;}
+.spill{font-size:11px;letter-spacing:.04em;padding:5px 10px;border-radius:20px;cursor:pointer;border:.5px solid var(--border);color:var(--text3);background:transparent;font-family:'Cinzel',serif;}
+.spill.on{border-color:currentColor;}
+.spill-group{display:inline-flex;align-items:stretch;border:.5px solid;border-radius:20px;overflow:hidden;}
+.spill-group .spill{border:none;border-radius:0;}
+.spill-minus{border:none;border-left:.5px solid;background:rgba(0,0,0,.28);cursor:pointer;padding:0 12px;font-size:16px;font-family:'Cinzel',serif;line-height:1;}
+.pet-tag{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:20px;border:1px solid #7ac88c;color:#7ac88c;margin-left:8px;vertical-align:middle;}
+.me-sheet-row{display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
+.btn-sheet{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:8px 14px;border-radius:var(--r);cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--gold2);text-decoration:none;display:inline-block;}
+.btn-sheet:hover{background:rgba(224,189,124,.12);border-color:var(--gold);}
+/* modal ficha */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow:auto;z-index:50;}
+.overlay.on{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:1.3rem;max-width:560px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.5);}
+.modal-close{float:right;background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;}
+.sh-name{font-family:'Cinzel',serif;font-size:18px;color:var(--gold2);}
+.sh-meta{font-size:13px;color:var(--text3);margin-top:2px;}
+.sh-attrs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0;}
+.sh-col{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:7px;}
+.sh-col-h{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);text-align:center;margin-bottom:5px;}
+.sh-attr{display:flex;justify-content:space-between;padding:1px 5px;font-size:13px;}
+.sh-attr .l{color:var(--text3);font-size:11px;}
+.sh-res{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;margin:8px 0;padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.sh-res b{font-family:'Cinzel',serif;}
+.sh-line{font-size:13px;color:var(--text2);margin-bottom:3px;}
+.sh-line .l{color:var(--text3);}
+.sh-h{font-family:'Cinzel',serif;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin:12px 0 5px;}
+.sh-item{background:var(--bg3);border-left:2px solid var(--gold);border-radius:0 var(--r) var(--r) 0;padding:5px 10px;margin-bottom:5px;font-size:13px;}
+.sh-item.opp{border-left-color:#6aaae8;}
+.sh-item .n{font-family:'Cinzel',serif;color:var(--gold2);font-size:12px;}
+.sh-item.opp .n{color:#8ac0f0;}
+.sh-item .n b{color:var(--gold2);font-weight:500;}
+.chips{display:flex;flex-wrap:wrap;gap:5px;}
+.chip{font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:2px 9px;color:var(--text2);}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <a href="/" style="float:left;color:var(--text3);font-size:13px;font-style:italic;text-decoration:none">← Inicio</a>
+    <div class="title"><span class="live-dot" id="liveDot"></span>Cosmere Combat</div>
+    <div class="round-block">
+      <span class="round-label">Ronda</span>
+      <span class="round-num" id="roundNum">—</span>
+    </div>
+  </div>
+
+  <div id="noCombat" class="empty-msg">Esperando que el DM inicie el combate...</div>
+
+  <div id="activeCombat" style="display:none">
+    <div class="phase-bar">
+      <div class="phase p1">1 · PJ rápidos</div>
+      <div class="phase p2">2 · Enemigos rápidos</div>
+      <div class="phase p3">3 · PJ lentos</div>
+      <div class="phase p4">4 · Enemigos lentos</div>
+    </div>
+
+    <div id="mePanel"></div>
+
+    <div class="section-lbl" id="playersLbl">Personajes</div>
+    <div class="grid" id="playersGrid"></div>
+
+    <div class="section-lbl">Enemigos</div>
+    <div class="grid" id="enemiesGrid"></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+var SC={Determined:'#5aaa70',Enhanced:'#6aaae8',Empowered:'#e8c840',Focus:'#aa8aec',
+  Restrained:'#e07070',Surprised:'#e8a840',Stunned:'#c87830',Slowed:'#a09070',
+  Disoriented:'#e07070',Prone:'#c84040',Exhausted:'#bf4a20',
+  Unconscious:'#804040',Immobilized:'#aa8aec',Afflicted:'#5aaa70'};
+
+var POS=['Determined','Enhanced','Empowered','Focus'];
+var NEG=['Restrained','Surprised','Stunned','Slowed','Disoriented','Prone','Exhausted','Unconscious','Immobilized','Afflicted'];
+var COMBAT=null;
+var MY_UID=null;   // id de mi usuario (para reconocer mi personaje en el combate)
+var CID=parseInt(location.pathname.split('/').filter(Boolean).pop());
+var API='/api/campaigns/'+CID;
+
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+async function api(path,method,body){
+  var opts={method:method||'GET',headers:{'Content-Type':'application/json'}};
+  if(body) opts.body=JSON.stringify(body);
+  var r=await fetch(path,opts);
+  if(r.status===401){location.href='/login';throw new Error('401');}
+  if(!r.ok) throw new Error('err');
+  return r.status===204?null:r.json();
+}
+async function chStat(uid,stat,sign){
+  var el=document.getElementById('mi-'+stat);
+  var val=Math.max(1,parseInt(el&&el.value)||1);
+  await api(API+'/combat/stat','POST',{uid:uid,stat:stat,delta:sign*val});
+}
+async function chStatus(uid,status){await api(API+'/combat/status','POST',{uid:uid,status:status});}
+async function rmStatus(uid,status){await api(API+'/combat/status/remove_one','POST',{uid:uid,status:status});}
+async function chTurn(uid,turn){await api(API+'/combat/turn','POST',{uid:uid,turn:turn});}
+
+// control de un stat: [−] a la izquierda, [+] a la derecha
+function statCtl(p,stat,label,color){
+  var v=p[stat],mx=p[stat+'_max'];
+  var pct=mx>0?Math.round(v/mx*100):0;
+  return '<div class="mstat">'
+    +'<div class="mstat-head"><span class="mstat-l">'+label+'</span>'
+    +'<span class="mstat-v" style="color:'+color+'">'+v+' <span style="font-size:12px;color:var(--text3)">/ '+mx+'</span></span></div>'
+    +'<div class="mbar"><div class="mbar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
+    +'<div class="madj">'
+    +'<button class="madj-btn minus" onclick="chStat(\''+p.uid+'\',\''+stat+'\',-1)">−</button>'
+    +'<input type="number" id="mi-'+stat+'" value="1" min="1"/>'
+    +'<button class="madj-btn plus" onclick="chStat(\''+p.uid+'\',\''+stat+'\',1)">+</button>'
+    +'</div></div>';
+}
+function statusPanel(p){
+  var btns=POS.concat(NEG).map(function(s){
+    var cnt=(p.statuses||[]).filter(function(x){return x===s;}).length;
+    var on=cnt>0,col=SC[s]||'#a09070';
+    // Exhausted es apilable: cuando tiene cargas, muestra un botón "−" para quitar una (funciona con tap)
+    if(s==='Exhausted'&&cnt>0){
+      var lbl='Exhausted'+(cnt>1?' x'+cnt:'');
+      return '<span class="spill-group" style="border-color:'+col+'">'
+        +'<button class="spill on" style="color:'+col+';background:'+col+'22" onclick="chStatus(\''+p.uid+'\',\'Exhausted\')" title="Sumar una carga">'+lbl+'</button>'
+        +'<button class="spill-minus" style="color:'+col+'" onclick="rmStatus(\''+p.uid+'\',\'Exhausted\')" title="Quitar una carga">−</button>'
+        +'</span>';
+    }
+    return '<button class="spill'+(on?' on':'')+'" style="'+(on?'border-color:'+col+';color:'+col+';background:'+col+'22':'')+'" '
+      +'onclick="chStatus(\''+p.uid+'\',\''+s+'\')">'+s+'</button>';
+  }).join('');
+  return '<div class="mstatuses">'+btns+'</div>';
+}
+function meControls(p){
+  return statCtl(p,'vida','Vida','#e05050')
+    +statCtl(p,'focus','Focus','#6aaae8')
+    +(p.inv_max>0?statCtl(p,'inv','Investidura','#aa8aec'):'')
+    +statusPanel(p);
+}
+// tarjeta con controles (personaje propio o mascota propia)
+function controlCard(p,tagHTML,turnLabel,isPet){
+  var turnCtl;
+  if(isPet){
+    // las mascotas toman turno al azar: se muestra pero no se edita
+    var ti=turnInfo(p);
+    turnCtl='<span class="turn-tag '+ti.cls+'">'+ti.lbl+'</span>';
+  }else{
+    turnCtl='<div class="turn-toggle">'
+      +'<button class="turn-opt'+(p.turn==='fast'?' on-fast':'')+'" onclick="chTurn(\''+p.uid+'\',\'fast\')">Rápido</button>'
+      +'<button class="turn-opt'+(p.turn==='slow'?' on-slow':'')+'" onclick="chTurn(\''+p.uid+'\',\'slow\')">Lento</button></div>';
+  }
+  var sheetRow='<div class="me-sheet-row">'
+    +'<button class="btn-sheet" onclick="openSheet(\''+p.uid+'\')">Ver ficha</button>'
+    +(p.kind==='player'&&p.has_pdf?'<a class="btn-sheet" href="/api/characters/'+p.char_id+'/pdf" target="_blank">Ver PDF</a>':'')
+    +'</div>';
+  return '<div class="me-card">'
+    +'<div class="me-head"><span class="me-name">'+esc(p.name)+(tagHTML||'')+'</span></div>'
+    +'<div class="me-turn-row"><span class="me-turn-lbl">'+(turnLabel||'Turno')+'</span>'+turnCtl+'</div>'
+    +meControls(p)+sheetRow+'</div>';
+}
+// mi personaje + mis mascotas. Devuelve mi user_id (o null si no tengo nada en combate).
+function renderMe(combat){
+  var mp=document.getElementById('mePanel');
+  var me=combat.participants.find(function(p){return p.kind==='player'&&p.user_id===MY_UID;});
+  var pets=combat.participants.filter(function(p){return p.kind==='pet'&&p.user_id===MY_UID;});
+  if(!me&&!pets.length){
+    mp.innerHTML='<div class="me-select"><div class="me-q">Tu personaje todavía no está en el combate.</div></div>';
+    return null;
+  }
+  var html='';
+  if(me) html+='<div class="section-lbl">Mi personaje</div>'+controlCard(me,'','Tu turno',false);
+  if(pets.length) html+='<div class="section-lbl">Mis mascotas</div>'
+    +pets.map(function(pt){return controlCard(pt,' <span class="pet-tag">Mascota</span>','Turno',true);}).join('');
+  mp.innerHTML=html;
+  return me?me.user_id:MY_UID;
+}
+
+// ─── Modal de ficha (personaje y mascotas) ───
+function md(s){return esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');}
+function shAt(l,v){return '<div class="sh-attr"><span class="l">'+l+'</span><span>'+(v==null?'—':v)+'</span></div>';}
+function shLn(l,v){return (v&&v!=='-')?'<div class="sh-line"><span class="l">'+l+':</span> '+esc(v)+'</div>':'';}
+function shItem(x,cls){return '<div class="sh-item'+(cls?' '+cls:'')+'"><span class="n">'+esc(x.name)+'</span>'+(x.desc?'<div>'+md(x.desc)+'</div>':'')+'</div>';}
+function closeModal(){document.getElementById('overlay').classList.remove('on');}
+function openSheet(uid){
+  if(!COMBAT)return;
+  var p=COMBAT.participants.find(function(x){return x.uid===uid;});
+  if(!p)return;
+  var html=p.kind==='pet'?petSheetHTML(p):charSheetHTML(p);
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'+html;
+  document.getElementById('overlay').classList.add('on');
+}
+function shRes(p){
+  return '<div class="sh-res"><span>Vida <b style="color:#e05050">'+p.vida_max+'</b></span>'
+    +'<span>Focus <b style="color:#6aaae8">'+p.focus_max+'</b></span>'
+    +(p.inv_max?'<span>Investidura <b style="color:#aa8aec">'+p.inv_max+'</b></span>':'')+'</div>';
+}
+// ficha de personaje (formato PDF)
+function charSheetHTML(c){
+  var s=c.stats||{},a=s.attributes||{},d=s.defenses||{};
+  var h='<div class="sh-name">'+esc(c.name)+'</div>';
+  if(s.paths||s.ancestry||s.level) h+='<div class="sh-meta">'+[s.ancestry,s.paths,(s.level?'Nivel '+s.level:'')].filter(Boolean).map(esc).join(' · ')+'</div>';
+  if(a.STR!=null) h+='<div class="sh-attrs">'
+    +'<div class="sh-col"><div class="sh-col-h">Físico</div>'+shAt('STR',a.STR)+shAt('DEF',d.physical)+shAt('SPD',a.SPD)+'</div>'
+    +'<div class="sh-col"><div class="sh-col-h">Cognitivo</div>'+shAt('INT',a.INT)+shAt('DEF',d.cognitive)+shAt('WIL',a.WIL)+'</div>'
+    +'<div class="sh-col"><div class="sh-col-h">Espiritual</div>'+shAt('AWA',a.AWA)+shAt('DEF',d.spiritual)+shAt('PRE',a.PRE)+'</div></div>';
+  h+=shRes(c);
+  h+=shLn('Movimiento',s.movement)+shLn('Sentidos',s.senses)+shLn('Deflect',s.deflect)+shLn('Expertise',s.expertise);
+  var sk=s.skills||{};
+  ['physical','cognitive','spiritual'].forEach(function(cat){
+    var arr=sk[cat]||[];
+    if(arr.length) h+='<div class="sh-h">Habilidades '+({physical:'físicas',cognitive:'cognitivas',spiritual:'espirituales'}[cat])+'</div>'
+      +'<div class="chips">'+arr.map(function(x){return '<span class="chip">'+esc(x.name)+' +'+x.value+'</span>';}).join('')+'</div>';
+  });
+  if((s.talents||[]).length) h+='<div class="sh-h">Talentos</div>'+s.talents.map(function(t){return shItem(t,'');}).join('');
+  if((s.weapons||[]).length) h+='<div class="sh-h">Armas</div>'+s.weapons.map(function(w){return '<div class="sh-item">'+esc(w)+'</div>';}).join('');
+  if((s.equipment||[]).length) h+='<div class="sh-h">Equipo</div><div class="chips">'+s.equipment.map(function(e){return '<span class="chip">'+esc(e)+'</span>';}).join('')+'</div>';
+  if(a.STR==null&&!(s.talents||[]).length) h+='<div class="sh-meta" style="margin-top:12px">Sin ficha cargada. Subí un PDF desde el inicio para verla completa.</div>';
+  return h;
+}
+// ficha de mascota (formato statblock, como los enemigos)
+function petSheetHTML(p){
+  var s=p.stats||{},ph=s.physical||{},cg=s.cognitive||{},sp=s.spiritual||{};
+  var h='<div class="sh-name">'+esc(p.name)+'</div>';
+  if(s.tier) h+='<div class="sh-meta">'+esc(s.tier)+'</div>';
+  if(ph.str!=null||ph.def!=null) h+='<div class="sh-attrs">'
+    +'<div class="sh-col"><div class="sh-col-h">Físico</div>'+shAt('STR',ph.str)+shAt('DEF',ph.def)+shAt('SPD',ph.spd)+'</div>'
+    +'<div class="sh-col"><div class="sh-col-h">Cognitivo</div>'+shAt('INT',cg.int)+shAt('DEF',cg.def)+shAt('WIL',cg.wil)+'</div>'
+    +'<div class="sh-col"><div class="sh-col-h">Espiritual</div>'+shAt('AWA',sp.awa)+shAt('DEF',sp.def)+shAt('PRE',sp.pre)+'</div></div>';
+  h+=shRes(p);
+  h+=shLn('Movimiento',s.movement)+shLn('Sentidos',s.senses)+shLn('Deflect',s.deflect);
+  var sk=s.skills||{};
+  h+=shLn('Habilidades físicas',sk.physical)+shLn('Cognitivas',sk.cognitive)+shLn('Espirituales',sk.spiritual);
+  if((s.traits||[]).length) h+='<div class="sh-h">Rasgos</div>'+s.traits.map(function(t){return shItem(t,'');}).join('');
+  if(p.acciones&&p.acciones.length) h+='<div class="sh-h">Acciones</div>'+p.acciones.map(function(a){return '<div class="sh-item"><span class="n">'+esc(a.nombre)+(a.coste?' <b>['+esc(a.coste)+']</b>':'')+'</span>'+(a.descripcion?'<div>'+md(a.descripcion)+'</div>':'')+'</div>';}).join('');
+  if((s.opportunities||[]).length) h+='<div class="sh-h">Oportunidades</div>'+s.opportunities.map(function(o){return shItem(o,'opp');}).join('');
+  return h;
+}
+
+function hl(pct){
+  if(pct>=100)return{t:'Intacto',c:'#5aaa70'};
+  if(pct>=75)return{t:'Levemente herido',c:'#8acc60'};
+  if(pct>=50)return{t:'Dañado',c:'#e8c040'};
+  if(pct>=25)return{t:'Malherido',c:'#e89030'};
+  if(pct>0)return{t:'Al borde',c:'#e05050'};
+  return{t:'Caído',c:'#804040'};
+}
+
+function mkTags(statuses){
+  var c={};(statuses||[]).forEach(function(s){c[s]=(c[s]||0)+1;});
+  return Object.keys(c).map(function(s){
+    var col=SC[s]||'#a09070';
+    var lbl=c[s]>1?s+' x'+c[s]:s;
+    return '<span class="stag" style="border-color:'+col+';color:'+col+'">'+lbl+'</span>';
+  }).join('');
+}
+
+function turnInfo(p){
+  if(p.turn==='both')return{cls:'turn-both',lbl:'Rápido + Lento'};
+  if(p.turn==='fast')return{cls:'turn-fast',lbl:'Rápido'};
+  return{cls:'turn-slow',lbl:'Lento'};
+}
+// enemyView: en los enemigos NO se muestra su turno ni su tier/tipo
+function card(p,enemyView){
+  var pct=p.vida_max>0?Math.round(p.vida/p.vida_max*100):0;
+  var h=hl(pct);
+  var t=mkTags(p.statuses);
+  var acted=p.turn==='both'?(p.acted&&p.acted_slow):p.acted;
+  var ti=turnInfo(p);
+  var col=p.faction_color||'';
+  return '<div class="card'+(p.defeated?' defeated':'')+(acted?' acted':'')+'"'+(col?' style="border-left:3px solid '+col+'"':'')+'>'
+    +'<div class="cname">'+(col?'<span class="color-dot" style="background:'+col+'"></span>':'')+esc(p.name)+'</div>'
+    +(p.kind==='pet'?'<div class="ctype">🐾 mascota'+(p.owner_name?' de '+esc(p.owner_name):'')+'</div>':'')
+    +(enemyView?'':(p.tipo?'<div class="ctype">'+esc(p.tipo)+'</div>':''))
+    +(enemyView?'':'<span class="turn-tag '+ti.cls+'">'+ti.lbl+'</span>')
+    +'<div class="health-text" style="color:'+h.c+'">'+h.t+'</div>'
+    +'<div class="hbar"><div class="hbar-fill" style="background:'+h.c+'"></div></div>'
+    +(t?'<div class="stags">'+t+'</div>':'')
+    +(acted?'<div class="acted-mark">✓ Ya actuó esta ronda</div>':'')
+    +'</div>';
+}
+
+function render(combat){
+  COMBAT=combat;
+  var active=combat&&combat.active;
+  document.getElementById('noCombat').style.display=active?'none':'';
+  document.getElementById('activeCombat').style.display=active?'':'none';
+  document.getElementById('roundNum').textContent=active?combat.round:'—';
+  if(!active){document.getElementById('mePanel').innerHTML='';return;}
+  var myUid=renderMe(combat);
+  var pl=combat.participants.filter(function(p){return (p.kind==='player'||p.kind==='pet')&&p.user_id!==myUid;});
+  var en=combat.participants.filter(function(p){return p.kind==='enemy'&&!p.hidden;});
+  // los personajes se ordenan por turno; los enemigos quedan en orden fijo
+  // (no por turno) para no revelar quién es rápido o lento
+  pl.sort(function(a,b){return (a.turn==='slow'?1:0)-(b.turn==='slow'?1:0);});
+  document.getElementById('playersLbl').style.display=pl.length?'':'none';
+  document.getElementById('playersGrid').innerHTML=pl.map(card).join('');
+  document.getElementById('enemiesGrid').innerHTML=en.map(function(p){return card(p,true);}).join('');
+}
+
+function connect(){
+  var proto=location.protocol==='https:'?'wss':'ws';
+  var ws=new WebSocket(proto+'://'+location.host+'/ws/'+CID);
+  ws.onopen=function(){document.getElementById('liveDot').classList.add('on');};
+  ws.onmessage=function(ev){
+    var msg=JSON.parse(ev.data);
+    if(msg.type==='combat') render(msg.data);
+  };
+  ws.onclose=function(){
+    document.getElementById('liveDot').classList.remove('on');
+    setTimeout(connect,2000);
+  };
+}
+async function init(){
+  try{ var me=await api('/api/auth/me'); MY_UID=me.id; }
+  catch(e){ return; }   // 401 ya redirige a /login
+  connect();
+}
+init();
+</script>
+</body>
+</html>

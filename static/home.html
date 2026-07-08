@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cosmere Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#211f1c;--bg2:#2c2924;--bg3:#353129;--bg4:#413c33;
+  --border:rgba(224,189,124,.14);--border2:rgba(224,189,124,.28);
+  --gold:#e0bd7c;--gold2:#f4d9a0;
+  --text:#efece4;--text2:#c1baa9;--text3:#948d7b;
+  --r:10px;--rl:14px;--shadow:0 2px 10px rgba(0,0,0,.28);
+  --green:#5aaa70;--blue:#6aaae8;--purple:#aa8aec;--red:#e05050;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,serif;font-size:16px;line-height:1.55;
+  background-image:radial-gradient(120% 45% at 50% -8%, rgba(224,189,124,.05), transparent 60%);}
+.app{max-width:1000px;margin:0 auto;padding:1.25rem 1rem 3rem;}
+.topbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--border2);padding-bottom:1rem;margin-bottom:1.4rem;}
+.app-title{font-family:'Cinzel',serif;font-size:17px;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;}
+.who{font-size:13px;color:var(--text2);}
+.who b{color:var(--gold2);}
+.modeswitch{display:inline-flex;border:1px solid var(--border2);border-radius:24px;overflow:hidden;}
+.ms-opt{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:6px 14px;color:var(--text3);text-decoration:none;}
+.ms-opt.on{background:rgba(224,189,124,.16);color:var(--gold2);}
+.fl-lbl{font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin:10px 0 4px;display:block;}
+.section{margin-bottom:2rem;}
+.section-h{font-family:'Cinzel',serif;font-size:13px;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem;}
+.section-sub{font-size:13px;color:var(--text3);font-style:italic;margin-bottom:.9rem;}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem;}
+.sep{flex:1;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:1rem;box-shadow:var(--shadow);}
+.cname{font-family:'Cinzel',serif;font-size:15px;color:var(--gold2);letter-spacing:.03em;}
+.cmeta{font-size:13px;color:var(--text2);margin-top:4px;}
+.card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;}
+.btn{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.06em;padding:7px 13px;border-radius:var(--r);cursor:pointer;text-transform:uppercase;border:1px solid var(--border2);background:transparent;color:var(--gold2);}
+.btn:hover{background:rgba(224,189,124,.12);border-color:var(--gold);}
+.btn.accent{background:var(--gold);color:#1c1915;border-color:var(--gold);font-weight:600;}
+.btn.accent:hover{background:var(--gold2);}
+.btn.sm{padding:5px 10px;font-size:10px;}
+.btn.danger{color:#e88;border-color:rgba(200,80,80,.35);}
+.btn.danger:hover{background:rgba(200,64,64,.14);}
+.btn.link{border:none;background:transparent;color:var(--text3);font-family:'Crimson Pro',serif;font-size:13px;text-transform:none;letter-spacing:0;font-style:italic;padding:4px 6px;}
+.btn.link:hover{color:var(--gold);}
+.fi{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px 11px;color:var(--text);font-family:'Crimson Pro',serif;font-size:15px;outline:none;}
+.fi:focus{border-color:var(--gold);}
+.empty{color:var(--text3);font-style:italic;font-size:14px;padding:.6rem 0;}
+.pill{display:inline-block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:20px;border:1px solid var(--border2);color:var(--text3);font-family:'Cinzel',serif;}
+.pill.pdf{color:var(--green);border-color:var(--green);}
+.inv-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;}
+/* modal */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow:auto;z-index:50;}
+.overlay.on{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:1.4rem;max-width:640px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.5);}
+.modal-close{float:right;background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;}
+.sb-attrs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0;}
+.sb-col{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:7px;}
+.sb-col-h{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);text-align:center;margin-bottom:5px;}
+.sb-attr{display:flex;justify-content:space-between;padding:1px 5px;font-size:13px;}
+.sb-attr span:first-child{color:var(--text3);font-size:11px;}
+.sb-res{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;margin:8px 0;padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.sb-res b{font-family:'Cinzel',serif;}
+.sb-line{font-size:13px;color:var(--text2);margin-bottom:3px;}
+.sb-line .l{color:var(--text3);}
+.sb-h{font-family:'Cinzel',serif;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin:12px 0 5px;}
+.sb-item{background:var(--bg3);border-left:2px solid var(--gold);border-radius:0 var(--r) var(--r) 0;padding:5px 10px;margin-bottom:5px;font-size:13px;}
+.sb-item .n{font-family:'Cinzel',serif;color:var(--gold2);font-size:12px;}
+.chips{display:flex;flex-wrap:wrap;gap:5px;}
+.chip{font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:2px 9px;color:var(--text2);}
+.import-ta{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:'Courier New',monospace;font-size:12px;line-height:1.5;outline:none;resize:vertical;min-height:160px;white-space:pre;}
+.import-ta:focus{border-color:var(--gold);}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="app-title">Cosmere Combat Tracker</div>
+    <div class="row" style="margin:0;gap:10px">
+      <div class="modeswitch">
+        <a class="ms-opt" id="ms-dm" href="/dm">⚔ DM</a>
+        <a class="ms-opt" id="ms-player" href="/jugar">🛡 Jugador</a>
+      </div>
+      <span class="who">Hola, <b id="me">…</b></span>
+      <button class="btn sm" onclick="openAccount()">Cuenta</button>
+      <button class="btn sm" onclick="logout()">Salir</button>
+    </div>
+  </div>
+
+  <div id="dmMode">
+  <!-- ═══════ COMO DM ═══════ -->
+  <div class="section">
+    <div class="section-h">Como DM — tus campañas</div>
+    <div class="section-sub">Creá campañas, invitá jugadores y armá encuentros.</div>
+    <div class="row">
+      <input class="fi" id="campName" placeholder="Nombre de la campaña" style="min-width:240px"/>
+      <button class="btn accent" onclick="createCampaign()">+ Crear campaña</button>
+    </div>
+    <div class="grid" id="campGrid"></div>
+    <div class="empty" id="campEmpty" style="display:none">Todavía no creaste ninguna campaña.</div>
+  </div>
+  </div><!-- /dmMode -->
+
+  <div id="playerMode">
+  <!-- ═══════ COMO JUGADOR ═══════ -->
+  <div class="section">
+    <div class="section-h">Como jugador — tus personajes</div>
+    <div class="section-sub">Creá personajes o subí la ficha PDF (se leen vida, focus e investidura).</div>
+    <div class="row">
+      <button class="btn accent" onclick="document.getElementById('pdfInput').click()">⭳ Subir ficha PDF</button>
+      <input type="file" id="pdfInput" accept="application/pdf" style="display:none" onchange="uploadPDF(this)"/>
+      <input class="fi" id="charName" placeholder="…o crear manual: nombre"/>
+      <input class="fi" id="charVida" type="number" value="20" title="Vida máx" style="width:80px"/>
+      <input class="fi" id="charFocus" type="number" value="10" title="Focus máx" style="width:80px"/>
+      <input class="fi" id="charInv" type="number" value="0" title="Investidura máx" style="width:80px"/>
+      <button class="btn" onclick="createCharacter()">+ Crear</button>
+    </div>
+    <div class="grid" id="charGrid"></div>
+    <div class="empty" id="charEmpty" style="display:none">Todavía no tenés personajes.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-h">Invitaciones</div>
+    <div id="invList"></div>
+    <div class="empty" id="invEmpty" style="display:none">No tenés invitaciones pendientes.</div>
+  </div>
+
+  <div class="section">
+    <div class="section-h">Campañas donde jugás</div>
+    <div class="grid" id="joinedGrid"></div>
+    <div class="empty" id="joinedEmpty" style="display:none">No estás en ninguna campaña como jugador.</div>
+  </div>
+  </div><!-- /playerMode -->
+</div>
+
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+var CHARS=[];
+var ME=null;
+var MODE=location.pathname.indexOf('/jugar')===0?'player':'dm';
+async function api(path,method,body){
+  var opts={method:method||'GET',headers:{'Content-Type':'application/json'}};
+  if(body) opts.body=JSON.stringify(body);
+  var r=await fetch(path,opts);
+  if(r.status===401){location.href='/login';throw new Error('401');}
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'Error');throw new Error(e.detail);}
+  return r.status===204?null:r.json();
+}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+async function logout(){await fetch('/api/auth/logout',{method:'POST'});location.href='/login';}
+
+async function loadMe(){
+  ME=await api('/api/auth/me');
+  document.getElementById('me').textContent=ME.username;
+}
+function applyMode(){
+  document.getElementById('dmMode').style.display=MODE==='dm'?'':'none';
+  document.getElementById('playerMode').style.display=MODE==='player'?'':'none';
+  document.getElementById('ms-dm').classList.toggle('on',MODE==='dm');
+  document.getElementById('ms-player').classList.toggle('on',MODE==='player');
+}
+
+// ─── Menú de cuenta ───
+function openAccount(){
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cname" style="font-size:18px">Mi cuenta</div>'
+    +'<label class="fl-lbl">Usuario</label><input class="fi" id="acc-user" value="'+esc(ME.username)+'" style="width:100%"/>'
+    +'<label class="fl-lbl">Email</label><input class="fi" id="acc-email" type="email" value="'+esc(ME.email||'')+'" style="width:100%"/>'
+    +'<div style="border-top:1px solid var(--border);margin:16px 0 4px;padding-top:12px;font-size:13px;color:var(--text3);font-style:italic">Cambiar contraseña (dejá en blanco si no querés cambiarla)</div>'
+    +'<label class="fl-lbl">Contraseña actual</label><input class="fi" id="acc-cur" type="password" style="width:100%"/>'
+    +'<label class="fl-lbl">Nueva contraseña</label><input class="fi" id="acc-new" type="password" style="width:100%"/>'
+    +'<div id="acc-err" style="color:#e88;font-size:13px;min-height:18px;margin-top:8px;font-style:italic"></div>'
+    +'<div class="card-actions" style="justify-content:flex-end;margin-top:6px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="saveAccount()">Guardar</button></div>';
+  document.getElementById('overlay').classList.add('on');
+}
+async function saveAccount(){
+  var body={
+    username:document.getElementById('acc-user').value.trim(),
+    email:document.getElementById('acc-email').value.trim(),
+    current_password:document.getElementById('acc-cur').value,
+    new_password:document.getElementById('acc-new').value
+  };
+  var r=await fetch('/api/auth/account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});document.getElementById('acc-err').textContent=e.detail||'Error';return;}
+  ME=await r.json();
+  document.getElementById('me').textContent=ME.username;
+  closeModal();
+}
+
+// ─── DM: campañas ───
+async function createCampaign(){
+  var name=document.getElementById('campName').value.trim();
+  if(!name){alert('Poné un nombre.');return;}
+  await api('/api/campaigns','POST',{name:name});
+  document.getElementById('campName').value='';
+  loadCampaigns();
+}
+async function loadCampaigns(){
+  var camps=await api('/api/campaigns');
+  document.getElementById('campEmpty').style.display=camps.length?'none':'block';
+  document.getElementById('campGrid').innerHTML=camps.map(function(c){
+    return '<div class="card"><div class="cname">'+esc(c.name)+'</div>'
+      +'<div class="cmeta">'+c.players+' jugador(es)</div>'
+      +'<div class="card-actions">'
+      +'<a class="btn accent sm" href="/campaign/'+c.id+'">Abrir (DM)</a>'
+      +'<button class="btn danger sm" onclick="delCampaign('+c.id+')">Borrar</button>'
+      +'</div></div>';
+  }).join('');
+}
+async function delCampaign(id){
+  if(!confirm('¿Borrar la campaña y todo su contenido (encuentros, combate, membresías)?'))return;
+  await api('/api/campaigns/'+id,'DELETE');
+  loadCampaigns();
+}
+
+// ─── Jugador: personajes ───
+async function createCharacter(){
+  var name=document.getElementById('charName').value.trim();
+  if(!name){alert('Poné un nombre al personaje.');return;}
+  await api('/api/characters','POST',{
+    name:name,
+    vida_max:parseInt(document.getElementById('charVida').value)||20,
+    focus_max:parseInt(document.getElementById('charFocus').value)||10,
+    inv_max:parseInt(document.getElementById('charInv').value)||0
+  });
+  document.getElementById('charName').value='';
+  loadCharacters();
+}
+async function uploadPDF(input){
+  if(!input.files||!input.files[0])return;
+  var fd=new FormData(); fd.append('file',input.files[0]);
+  input.value='';
+  var r=await fetch('/api/characters/import-pdf',{method:'POST',body:fd});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo leer el PDF');return;}
+  var j=await r.json();
+  await loadCharacters();
+  alert('Ficha importada: '+j.name);
+}
+async function loadCharacters(){
+  CHARS=await api('/api/characters');
+  document.getElementById('charEmpty').style.display=CHARS.length?'none':'block';
+  document.getElementById('charGrid').innerHTML=CHARS.map(function(c){
+    return '<div class="card"><div class="cname">'+esc(c.name)+(c.has_pdf?' <span class="pill pdf">PDF</span>':'')+'</div>'
+      +'<div class="cmeta">Vida '+c.vida_max+' · Focus '+c.focus_max+(c.inv_max?' · Investidura '+c.inv_max:'')+'</div>'
+      +'<div class="card-actions">'
+      +'<button class="btn sm" onclick="viewSheet('+c.id+')">Ver ficha</button>'
+      +'<button class="btn sm" onclick="openEditChar('+c.id+')">✎ Actualizar</button>'
+      +'<button class="btn sm" onclick="openPets('+c.id+')">🐾 Mascotas</button>'
+      +(c.has_pdf?'<a class="btn sm" href="/api/characters/'+c.id+'/pdf" target="_blank">PDF</a>':'')
+      +'<button class="btn danger sm" onclick="delChar('+c.id+')">✕</button>'
+      +'</div></div>';
+  }).join('');
+}
+async function delChar(id){
+  if(!confirm('¿Borrar este personaje?'))return;
+  await api('/api/characters/'+id,'DELETE');
+  loadCharacters();
+}
+
+// ─── Actualizar personaje (a mano o reemplazando el PDF) ───
+function _num(id,v){return '<input class="fi" type="number" style="width:76px" id="'+id+'" value="'+v+'"/>';}
+function openEditChar(id){
+  var c=CHARS.find(function(x){return x.id===id;});
+  if(!c)return;
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cname" style="font-size:18px">✎ Actualizar '+esc(c.name)+'</div>'
+    +'<div class="section-sub">Editá los datos a mano, o reemplazá la ficha PDF (vuelve a leer vida, focus e investidura).</div>'
+    +'<div style="display:flex;flex-direction:column;gap:10px;margin-top:6px">'
+    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nombre</span>'
+      +'<input class="fi" id="ec-name" value="'+esc(c.name)+'" style="flex:1;max-width:260px"/></label>'
+    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Vida (actual / máx)</span>'
+      +'<span style="display:flex;gap:6px">'+_num('ec-vida',c.vida)+'<span style="color:var(--text3)">/</span>'+_num('ec-vidam',c.vida_max)+'</span></label>'
+    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Focus (actual / máx)</span>'
+      +'<span style="display:flex;gap:6px">'+_num('ec-focus',c.focus)+'<span style="color:var(--text3)">/</span>'+_num('ec-focusm',c.focus_max)+'</span></label>'
+    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Investidura (actual / máx)</span>'
+      +'<span style="display:flex;gap:6px">'+_num('ec-inv',c.inv)+'<span style="color:var(--text3)">/</span>'+_num('ec-invm',c.inv_max)+'</span></label>'
+    +'</div>'
+    +'<div class="card-actions" style="justify-content:space-between;margin-top:16px">'
+      +'<span><button class="btn" onclick="document.getElementById(\'ec-pdf\').click()">⭳ Reemplazar PDF</button>'
+      +'<input type="file" id="ec-pdf" accept="application/pdf" style="display:none" onchange="reimportPDF('+c.id+',this)"/></span>'
+      +'<button class="btn accent" onclick="saveEditChar('+c.id+')">Guardar</button>'
+    +'</div>';
+  document.getElementById('overlay').classList.add('on');
+}
+function _iv(id){var v=parseInt(document.getElementById(id).value);return isNaN(v)?null:v;}
+async function saveEditChar(id){
+  var c=CHARS.find(function(x){return x.id===id;});
+  await api('/api/characters/'+id,'PUT',{
+    name:document.getElementById('ec-name').value.trim()||'Personaje',
+    vida_max:_iv('ec-vidam')||0, focus_max:_iv('ec-focusm')||0, inv_max:_iv('ec-invm')||0,
+    vida:_iv('ec-vida'), focus:_iv('ec-focus'), inv:_iv('ec-inv'),
+    sheet:(c&&c.sheet)||{}
+  });
+  closeModal();
+  loadCharacters();
+}
+async function reimportPDF(id,input){
+  if(!input.files||!input.files[0])return;
+  var fd=new FormData(); fd.append('file',input.files[0]); input.value='';
+  var r=await fetch('/api/characters/'+id+'/reimport-pdf',{method:'POST',body:fd});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo leer el PDF');return;}
+  var j=await r.json();
+  closeModal();
+  await loadCharacters();
+  alert('Ficha actualizada desde el PDF: '+j.name);
+}
+
+// ─── Mascotas (pets) ───
+function openPets(charId){
+  var c=CHARS.find(function(x){return x.id===charId;});
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cname" style="font-size:18px">🐾 Mascotas de '+esc(c?c.name:'')+'</div>'
+    +'<div class="section-sub">Cargá la ficha de la mascota (mismo formato de código que los enemigos).</div>'
+    +'<div id="petsList" style="margin-bottom:12px"></div>'
+    +'<textarea class="import-ta" id="petCode" placeholder="name: &quot;Axehound&quot;&#10;tier: &quot;Tier 1 Rival&quot;&#10;str: 3&#10;hp: 18&#10;actions:&#10;  - name: &quot;Bite&quot;&#10;    desc: &quot;Attack +4...&quot;"></textarea>'
+    +'<div class="card-actions" style="justify-content:flex-end;margin-top:10px"><button class="btn accent" onclick="importPet('+charId+')">Cargar mascota</button></div>';
+  document.getElementById('overlay').classList.add('on');
+  loadPetsInto(charId);
+}
+async function loadPetsInto(charId){
+  var pets=await api('/api/characters/'+charId+'/pets');
+  var el=document.getElementById('petsList');
+  if(!el)return;
+  el.innerHTML=pets.length?pets.map(function(p){
+    return '<div class="inv-row"><span><b style="color:var(--gold2)">'+esc(p.name)+'</b>'
+      +' <span style="color:var(--text3);font-size:12px">Vida '+p.vida_max+' · Focus '+p.focus_max+(p.inv_max?' · Inv '+p.inv_max:'')+'</span></span>'
+      +'<div class="sep"></div><button class="btn danger sm" onclick="delPet('+charId+','+p.id+')">✕</button></div>';
+  }).join(''):'<div class="empty">Todavía no tiene mascotas.</div>';
+}
+async function importPet(charId){
+  var code=document.getElementById('petCode').value.trim();
+  if(!code){alert('Pegá la ficha de la mascota.');return;}
+  var r=await fetch('/api/characters/'+charId+'/pets/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo leer la ficha');return;}
+  document.getElementById('petCode').value='';
+  loadPetsInto(charId);
+}
+async function delPet(charId,petId){
+  if(!confirm('¿Borrar esta mascota?'))return;
+  await api('/api/characters/'+charId+'/pets/'+petId,'DELETE');
+  loadPetsInto(charId);
+}
+
+// ─── Invitaciones ───
+async function loadInvitations(){
+  var invs=await api('/api/invitations');
+  document.getElementById('invEmpty').style.display=invs.length?'none':'block';
+  document.getElementById('invList').innerHTML=invs.map(function(iv){
+    var opts=CHARS.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>';}).join('');
+    return '<div class="inv-row"><span><b style="color:var(--gold2)">'+esc(iv.name)+'</b> — DM: '+esc(iv.dm)+'</span>'
+      +'<div class="sep"></div>'
+      +'<span style="font-size:12px;color:var(--text3)">Entrar con:</span>'
+      +'<select class="fi" id="inv-char-'+iv.campaign_id+'">'+(opts||'<option value="">— sin personajes —</option>')+'</select>'
+      +'<button class="btn accent sm" onclick="acceptInv('+iv.campaign_id+')">Aceptar</button>'
+      +'<button class="btn sm" onclick="declineInv('+iv.campaign_id+')">Rechazar</button>'
+      +'</div>';
+  }).join('');
+}
+async function acceptInv(cid){
+  var sel=document.getElementById('inv-char-'+cid);
+  var chid=parseInt(sel&&sel.value);
+  if(!chid){alert('Creá o elegí un personaje para entrar.');return;}
+  await api('/api/campaigns/'+cid+'/accept','POST',{character_id:chid});
+  await loadInvitations(); loadMyCampaigns();
+}
+async function declineInv(cid){
+  await api('/api/campaigns/'+cid+'/decline','POST');
+  loadInvitations();
+}
+
+// ─── Campañas donde juego ───
+async function loadMyCampaigns(){
+  var mine=await api('/api/my/campaigns');
+  document.getElementById('joinedEmpty').style.display=mine.length?'none':'block';
+  document.getElementById('joinedGrid').innerHTML=mine.map(function(c){
+    return '<div class="card"><div class="cname">'+esc(c.name)+'</div>'
+      +'<div class="cmeta">DM: '+esc(c.dm)+(c.character_name?' · '+esc(c.character_name):'')+'</div>'
+      +'<div class="card-actions">'
+      +'<a class="btn accent sm" href="/play/'+c.id+'">Jugar</a>'
+      +'<button class="btn danger sm" onclick="leave('+c.id+')">Salir</button>'
+      +'</div></div>';
+  }).join('');
+}
+async function leave(cid){
+  if(!confirm('¿Salir de esta campaña?'))return;
+  await api('/api/campaigns/'+cid+'/leave','POST');
+  loadMyCampaigns();
+}
+
+// ─── Modal ficha ───
+function closeModal(){document.getElementById('overlay').classList.remove('on');}
+function viewSheet(id){
+  var c=CHARS.find(function(x){return x.id===id;});
+  if(!c)return;
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'+sheetHTML(c);
+  document.getElementById('overlay').classList.add('on');
+}
+function sheetHTML(c){
+  var s=c.sheet||{};var a=s.attributes||{};var d=s.defenses||{};
+  var h='<div class="cname" style="font-size:18px">'+esc(c.name)+'</div>';
+  if(s.paths||s.ancestry||s.level) h+='<div class="cmeta">'+[s.ancestry,s.paths,(s.level?'Nivel '+s.level:'')].filter(Boolean).map(esc).join(' · ')+'</div>';
+  if(a.STR!=null){
+    h+='<div class="sb-attrs">'
+      +'<div class="sb-col"><div class="sb-col-h">Físico</div>'+attr('STR',a.STR)+attr('DEF',d.physical)+attr('SPD',a.SPD)+'</div>'
+      +'<div class="sb-col"><div class="sb-col-h">Cognitivo</div>'+attr('INT',a.INT)+attr('DEF',d.cognitive)+attr('WIL',a.WIL)+'</div>'
+      +'<div class="sb-col"><div class="sb-col-h">Espiritual</div>'+attr('AWA',a.AWA)+attr('DEF',d.spiritual)+attr('PRE',a.PRE)+'</div>'
+      +'</div>';
+  }
+  h+='<div class="sb-res"><span>Vida <b style="color:var(--red)">'+c.vida_max+'</b></span>'
+    +'<span>Focus <b style="color:var(--blue)">'+c.focus_max+'</b></span>'
+    +(c.inv_max?'<span>Investidura <b style="color:var(--purple)">'+c.inv_max+'</b></span>':'')+'</div>';
+  h+=line('Movimiento',s.movement)+line('Sentidos',s.senses)+line('Deflect',s.deflect)+line('Expertise',s.expertise);
+  var sk=s.skills||{};
+  ['physical','cognitive','spiritual'].forEach(function(cat){
+    var arr=sk[cat]||[];
+    if(arr.length){h+='<div class="sb-h">Habilidades '+({physical:'físicas',cognitive:'cognitivas',spiritual:'espirituales'}[cat])+'</div>'
+      +'<div class="chips">'+arr.map(function(x){return '<span class="chip">'+esc(x.name)+' +'+x.value+'</span>';}).join('')+'</div>';}
+  });
+  if((s.talents||[]).length){h+='<div class="sb-h">Talentos</div>'+s.talents.map(function(t){return '<div class="sb-item"><span class="n">'+esc(t.name)+'</span>'+(t.desc?'<div>'+esc(t.desc)+'</div>':'')+'</div>';}).join('');}
+  if((s.weapons||[]).length){h+='<div class="sb-h">Armas</div>'+s.weapons.map(function(w){return '<div class="sb-item">'+esc(w)+'</div>';}).join('');}
+  if((s.equipment||[]).length){h+='<div class="sb-h">Equipo</div><div class="chips">'+s.equipment.map(function(e){return '<span class="chip">'+esc(e)+'</span>';}).join('')+'</div>';}
+  return h;
+}
+function attr(l,v){return '<div class="sb-attr"><span>'+l+'</span><span>'+(v==null?'—':v)+'</span></div>';}
+function line(l,v){return (v&&v!=='-')?'<div class="sb-line"><span class="l">'+l+':</span> '+esc(v)+'</div>':'';}
+
+async function init(){
+  await loadMe();
+  applyMode();
+  if(MODE==='dm'){
+    await loadCampaigns();
+  }else{
+    await loadCharacters();
+    await loadInvitations();
+    await loadMyCampaigns();
+  }
+}
+init();
+</script>
+</body>
+</html>

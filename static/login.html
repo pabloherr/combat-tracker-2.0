@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cosmere Tracker — Entrar</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#211f1c;--bg2:#2c2924;--bg3:#353129;--bg4:#413c33;
+  --border:rgba(224,189,124,.14);--border2:rgba(224,189,124,.28);
+  --gold:#e0bd7c;--gold2:#f4d9a0;
+  --text:#efece4;--text2:#c1baa9;--text3:#948d7b;
+  --r:10px;--rl:14px;--shadow:0 2px 10px rgba(0,0,0,.28);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,serif;font-size:16px;line-height:1.55;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem;
+  background-image:radial-gradient(120% 60% at 50% -10%, rgba(224,189,124,.06), transparent 60%);}
+.card{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:2rem 1.8rem;width:100%;max-width:400px;box-shadow:var(--shadow);}
+.title{font-family:'Cinzel',serif;font-size:19px;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;text-align:center;}
+.subtitle{text-align:center;font-size:12px;color:var(--text3);letter-spacing:.05em;margin-bottom:1.3rem;}
+.role{display:flex;gap:6px;margin-bottom:1.2rem;}
+.role-opt{flex:1;font-family:'Cinzel',serif;font-size:12px;letter-spacing:.05em;text-transform:uppercase;padding:11px;cursor:pointer;border:1px solid var(--border2);border-radius:var(--r);background:transparent;color:var(--text3);}
+.role-opt.on{background:rgba(224,189,124,.15);border-color:var(--gold);color:var(--gold2);}
+.role-lbl{font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;text-align:center;margin-bottom:6px;}
+.tabs{display:flex;gap:4px;margin-bottom:1.2rem;border-bottom:1px solid var(--border);}
+.tab{flex:1;font-family:'Cinzel',serif;font-size:12px;letter-spacing:.05em;text-transform:uppercase;padding:9px;cursor:pointer;border:none;background:transparent;color:var(--text3);border-bottom:2px solid transparent;margin-bottom:-1px;}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold);}
+.fl{font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;display:block;}
+.fi{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:'Crimson Pro',serif;font-size:16px;outline:none;margin-bottom:14px;}
+.fi:focus{border-color:var(--gold);}
+.btn{width:100%;font-family:'Cinzel',serif;font-size:13px;letter-spacing:.06em;text-transform:uppercase;padding:11px;border-radius:var(--r);cursor:pointer;border:1px solid var(--gold);background:var(--gold);color:#1c1915;font-weight:600;}
+.btn:hover{background:var(--gold2);border-color:var(--gold2);}
+.link{display:block;text-align:center;margin-top:12px;color:var(--text3);font-size:13px;font-style:italic;cursor:pointer;}
+.link:hover{color:var(--gold);}
+.err{color:#e88;font-size:13px;text-align:center;min-height:20px;margin-top:8px;font-style:italic;}
+.hint{font-size:12px;color:var(--text3);text-align:center;margin-bottom:12px;font-style:italic;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="title">Cosmere Tracker</div>
+  <div class="subtitle">Combate en tiempo real</div>
+
+  <!-- selector de rol -->
+  <div id="roleBox">
+    <div class="role-lbl">Entrar como</div>
+    <div class="role">
+      <button class="role-opt on" id="role-dm" onclick="setRole('dm')">⚔ Director (DM)</button>
+      <button class="role-opt" id="role-player" onclick="setRole('player')">🛡 Jugador</button>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" id="tab-login" onclick="setMode('login')">Entrar</button>
+    <button class="tab" id="tab-reg" onclick="setMode('reg')">Crear cuenta</button>
+  </div>
+
+  <div id="resetHint" class="hint" style="display:none">Recuperá tu contraseña con el email de tu cuenta.</div>
+
+  <div id="f-username"><label class="fl">Usuario</label><input class="fi" id="username" autocomplete="username"/></div>
+  <div id="f-email" style="display:none"><label class="fl">Email</label><input class="fi" id="email" type="email" autocomplete="email"/></div>
+  <div id="f-password"><label class="fl" id="lbl-password">Contraseña</label><input class="fi" id="password" type="password" onkeydown="if(event.key==='Enter')submit()"/></div>
+  <div id="f-password2" style="display:none"><label class="fl">Confirmar contraseña</label><input class="fi" id="password2" type="password" onkeydown="if(event.key==='Enter')submit()"/></div>
+
+  <button class="btn" id="submitBtn" onclick="submit()">Entrar</button>
+  <div class="err" id="err"></div>
+  <span class="link" id="forgot" onclick="setMode('reset')">¿Olvidaste tu contraseña?</span>
+  <span class="link" id="backLink" style="display:none" onclick="setMode('login')">← Volver</span>
+</div>
+<script>
+var mode='login', role='dm';
+function setRole(r){
+  role=r;
+  document.getElementById('role-dm').classList.toggle('on',r==='dm');
+  document.getElementById('role-player').classList.toggle('on',r==='player');
+}
+function show(id,on){document.getElementById(id).style.display=on?'':'none';}
+function setMode(m){
+  mode=m;
+  var reg=m==='reg', reset=m==='reset', login=m==='login';
+  document.getElementById('tab-login').classList.toggle('active',login);
+  document.getElementById('tab-reg').classList.toggle('active',reg);
+  show('tabs',!reset); show('roleBox',!reset); show('resetHint',reset);
+  show('f-email', reg||reset);
+  show('f-password2', reg||reset);
+  show('forgot', login);
+  show('backLink', reset);
+  document.getElementById('lbl-password').textContent=reset?'Nueva contraseña':'Contraseña';
+  document.getElementById('submitBtn').textContent=login?'Entrar':(reg?'Crear cuenta':'Restablecer contraseña');
+  document.getElementById('err').textContent='';
+}
+function val(id){return document.getElementById(id).value;}
+async function post(path,body){
+  var r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.ok) return true;
+  var e=await r.json().catch(function(){return{detail:'Error'};});
+  document.getElementById('err').textContent=e.detail||'Error';
+  return false;
+}
+async function submit(){
+  var u=val('username').trim(), p=val('password');
+  document.getElementById('err').textContent='';
+  if(mode==='login'){
+    if(!u||!p){return err('Completá usuario y contraseña.');}
+    if(await post('/api/auth/login',{username:u,password:p})) go();
+  }else if(mode==='reg'){
+    var em=val('email').trim(), p2=val('password2');
+    if(!u||!em||!p){return err('Completá todos los campos.');}
+    if(p!==p2){return err('Las contraseñas no coinciden.');}
+    if(await post('/api/auth/register',{username:u,email:em,password:p})) go();
+  }else{ // reset
+    var em2=val('email').trim(), p2b=val('password2');
+    if(!u||!em2||!p){return err('Completá todos los campos.');}
+    if(p!==p2b){return err('Las contraseñas no coinciden.');}
+    if(await post('/api/auth/reset',{username:u,email:em2,password:p})){
+      setMode('login'); document.getElementById('err').style.color='#8ac88c'; document.getElementById('err').textContent='Contraseña cambiada. Entrá con la nueva.';
+    }
+  }
+}
+function err(m){document.getElementById('err').textContent=m;}
+function go(){location.href=role==='dm'?'/dm':'/jugar';}
+</script>
+</body>
+</html>
