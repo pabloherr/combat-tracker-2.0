@@ -314,9 +314,10 @@ function petSheetHTML(p){
     +'<div class="sh-col"><div class="sh-col-h">Cognitivo</div>'+shAt('INT',cg.int)+shAt('DEF',cg.def)+shAt('WIL',cg.wil)+'</div>'
     +'<div class="sh-col"><div class="sh-col-h">Espiritual</div>'+shAt('AWA',sp.awa)+shAt('DEF',sp.def)+shAt('PRE',sp.pre)+'</div></div>';
   h+=shRes(p);
-  h+=shLn('Movimiento',s.movement)+shLn('Sentidos',s.senses)+shLn('Deflect',s.deflect);
+  h+=shLn('Movimiento',s.movement)+shLn('Sentidos',s.senses)+shLn('Deflect',s.deflect)
+    +shLn('Inmunidades',s.immunities)+shLn('Resistencias',s.resistances)+shLn('Debilidades',s.weaknesses);
   var sk=s.skills||{};
-  h+=shLn('Habilidades físicas',sk.physical)+shLn('Cognitivas',sk.cognitive)+shLn('Espirituales',sk.spiritual);
+  h+=shLn('Habilidades físicas',sk.physical)+shLn('Cognitivas',sk.cognitive)+shLn('Espirituales',sk.spiritual)+shLn('Surgebinding',sk.surge);
   if((s.traits||[]).length) h+='<div class="sh-h">Rasgos</div>'+s.traits.map(function(t){return shItem(t,'');}).join('');
   if(p.acciones&&p.acciones.length) h+='<div class="sh-h">Acciones</div>'+p.acciones.map(function(a){return '<div class="sh-item"><span class="n">'+esc(a.nombre)+(a.coste?' <b>['+esc(a.coste)+']</b>':'')+'</span>'+(a.descripcion?'<div>'+md(a.descripcion)+'</div>':'')+'</div>';}).join('');
   if((s.opportunities||[]).length) h+='<div class="sh-h">Oportunidades</div>'+s.opportunities.map(function(o){return shItem(o,'opp');}).join('');

@@ -228,6 +228,9 @@ def _build_from_data(data: dict) -> dict:
         "deflect": str(data.get("deflect", "")).strip(),
         "movement": str(data.get("movement", "")).strip(),
         "senses": str(data.get("senses", "")).strip(),
+        "immunities": str(data.get("immunities", "")).strip(),
+        "resistances": str(data.get("resistances", "")).strip(),
+        "weaknesses": str(data.get("weaknesses", "")).strip(),
         "languages": str(data.get("languages", "")).strip(),
         "skills": {
             "physical": str(data.get("skills_p", "")).strip(),

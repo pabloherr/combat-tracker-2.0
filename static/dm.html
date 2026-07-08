@@ -372,6 +372,7 @@ select.fi{appearance:auto;}
       <div class="fl" style="margin-top:6px">Acciones / Habilidades</div>
       <div id="efAcciones"></div>
       <button class="btn ghost" style="margin-bottom:10px" onclick="addAccionRow()">+ Agregar acción</button>
+      <div class="fg"><div><div class="fl">Inmunidades (separadas por coma)</div><input class="fi" id="efImmun" placeholder="Ej: Stunned, Prone, Restrained"/></div></div>
       <div class="fg"><div><div class="fl">Notas</div><textarea class="fta" id="efNotas"></textarea></div></div>
       <div class="form-actions">
         <button class="btn ghost" onclick="toggleForm('enemyForm')">Cancelar</button>
@@ -682,7 +683,9 @@ function renderStatblock(e,skipActions){
     +'<span>Focus <b>'+e.focus_max+'</b></span>'
     +(e.inv_max?'<span>Investidura <b>'+e.inv_max+'</b></span>':'')+'</div>';
   function ln(l,v){return (v&&v!=='-')?'<div class="sb-line"><span class="sb-line-l">'+l+':</span> '+esc(v)+'</div>':'';}
-  var lines=ln('Movimiento',s.movement)+ln('Sentidos',s.senses)+ln('Deflect',s.deflect)+ln('Idiomas',s.languages);
+  var lines=ln('Movimiento',s.movement)+ln('Sentidos',s.senses)+ln('Deflect',s.deflect)
+    +ln('Inmunidades',s.immunities)+ln('Resistencias',s.resistances)+ln('Debilidades',s.weaknesses)
+    +ln('Idiomas',s.languages);
   var sk=s.skills||{};
   var skills=ln('Habilidades físicas',sk.physical)+ln('Cognitivas',sk.cognitive)+ln('Espirituales',sk.spiritual)+ln('Surgebinding',sk.surge);
   var traits=(s.traits&&s.traits.length)?'<div class="sb-section-h">Rasgos</div>'+renderEntries(s.traits,'trait'):'';
@@ -778,6 +781,7 @@ function editEnemy(id){
   document.getElementById('efSize').value=em.size||'';
   document.getElementById('efCType').value=em.ctype||'';
   document.getElementById('efClase').value=e.clase||'rival';
+  document.getElementById('efImmun').value=(e.stats&&e.stats.immunities)||'';
   pickColor('efColors','efColor',e.faction_color||'');
   document.getElementById('efVida').value=e.vida_max;
   document.getElementById('efFocus').value=e.focus_max;
@@ -800,6 +804,7 @@ async function saveEnemy(){
   stats.tier_num=isNaN(tv)?null:tv;
   stats.size=document.getElementById('efSize').value||null;
   stats.creature_type=document.getElementById('efCType').value.trim()||null;
+  stats.immunities=document.getElementById('efImmun').value.trim();
   var body={
     name:document.getElementById('efName').value.trim(),
     tipo:document.getElementById('efTipo').value.trim(),
@@ -815,7 +820,7 @@ async function saveEnemy(){
   if(!body.name){alert('Poné un nombre.');return;}
   if(id) await api(API+'/enemies/'+id,'PUT',body);
   else await api(API+'/enemies','POST',body);
-  ['efId','efName','efTipo','efNotas','efTier','efCType'].forEach(function(x){document.getElementById(x).value='';});
+  ['efId','efName','efTipo','efNotas','efTier','efCType','efImmun'].forEach(function(x){document.getElementById(x).value='';});
   document.getElementById('efSize').value='';
   document.getElementById('efVida').value='20';
   document.getElementById('efFocus').value='10';
