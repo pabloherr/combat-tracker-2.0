@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..access import require_dm
 from ..auth import current_user
-from ..cosmere_import import ImportError_, parse_statblock
+from ..cosmere_import import ImportError_, parse_statblock, parse_statblocks_bulk
 from ..database import db
 from ..models import EnemyImportIn, EnemyIn
 
@@ -59,6 +59,20 @@ def import_enemy(cid: int, payload: EnemyImportIn, user=Depends(current_user)):
         require_dm(conn, cid, user)
         eid = _insert_enemy(conn, user["id"], enemy)
     return {"id": eid, "name": enemy.name}
+
+
+@router.post("/import-bulk")
+def import_bulk(cid: int, payload: EnemyImportIn, user=Depends(current_user)):
+    """Importa muchas fichas de una vez (separadas por '---' o por 'layout:')."""
+    try:
+        parsed, errors = parse_statblocks_bulk(payload.code)
+    except ImportError_ as e:
+        raise HTTPException(400, str(e))
+    with db() as conn:
+        require_dm(conn, cid, user)
+        for p in parsed:
+            _insert_enemy(conn, user["id"], EnemyIn(**p))
+    return {"added": len(parsed), "errors": errors, "names": [p["name"] for p in parsed]}
 
 
 @router.put("/{eid}")

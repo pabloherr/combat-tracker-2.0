@@ -29,6 +29,10 @@ class AccountUpdate(BaseModel):
     new_password: str = ""
 
 
+class DeleteAccount(BaseModel):
+    password: str = ""       # contraseña actual, para confirmar el borrado
+
+
 # ── Campañas ───────────────────────────────────────────────
 
 class CampaignIn(BaseModel):

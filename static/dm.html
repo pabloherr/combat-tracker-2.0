@@ -147,6 +147,47 @@ select.fi{appearance:auto;}
 .clase-minion{color:#9a9a9a;border-color:#9a9a9a;}
 .clase-rival{color:#d89050;border-color:#d89050;}
 .clase-boss{color:#e05050;border-color:#e05050;background:rgba(224,80,80,.1);}
+
+/* filtros de bestiario/encuentros */
+.filter-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--rl);padding:10px 12px;margin-bottom:14px;}
+.filter-f{display:flex;flex-direction:column;gap:3px;}
+.filter-f .fl{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--text3);}
+.filter-f select{min-width:120px;}
+.filter-clear{margin-left:auto;align-self:center;}
+.meta-badges{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 2px;}
+.meta-badge{font-size:10px;letter-spacing:.03em;padding:1px 8px;border-radius:20px;border:.5px solid var(--border2);color:var(--text2);background:var(--bg3);}
+.meta-badge.tier{color:var(--gold2);border-color:var(--border2);}
+
+/* creador de encuentros visual */
+.enc-layout{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
+@media(max-width:820px){.enc-layout{grid-template-columns:1fr;}}
+.enc-col-h{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin:2px 0 8px;}
+.palette{display:flex;flex-direction:column;gap:8px;max-height:640px;overflow-y:auto;padding-right:4px;}
+.pal-card{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--r);padding:8px 10px;display:flex;align-items:center;gap:8px;}
+.pal-card .pc-main{flex:1;min-width:0;}
+.pal-card .pc-name{font-family:'Cinzel',serif;font-size:13px;color:var(--text);}
+.pal-add{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:5px 12px;border:.5px solid var(--border2);background:transparent;color:var(--gold);border-radius:var(--r);cursor:pointer;white-space:nowrap;}
+.pal-add:hover{background:rgba(224,189,124,.1);}
+.sel-card{background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--rl);padding:12px;margin-bottom:10px;}
+.sel-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+.sel-head .cname{flex:1;}
+.qty{display:flex;align-items:center;gap:0;border:.5px solid var(--border2);border-radius:var(--r);overflow:hidden;}
+.qty button{width:28px;height:28px;border:none;background:var(--bg3);color:var(--gold);font-size:16px;cursor:pointer;}
+.qty button:hover{background:var(--bg4);}
+.qty span{min-width:30px;text-align:center;font-family:'Cinzel',serif;font-size:13px;}
+
+/* medidor de dificultad */
+.diff-panel{background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--rl);padding:14px 16px;margin-bottom:14px;}
+.diff-top{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.diff-status{font-family:'Cinzel',serif;font-size:18px;letter-spacing:.06em;text-transform:uppercase;}
+.diff-total{font-size:13px;color:var(--text2);}
+.diff-total b{font-family:'Cinzel',serif;color:var(--gold2);font-size:16px;}
+.diff-track{position:relative;height:10px;border-radius:20px;background:var(--bg4);margin:12px 0 6px;overflow:hidden;}
+.diff-fill{position:absolute;top:0;left:0;bottom:0;border-radius:20px;transition:width .25s,background .25s;}
+.diff-scale{display:flex;justify-content:space-between;font-size:10px;color:var(--text3);letter-spacing:.03em;}
+.diff-note{font-size:11px;color:var(--text3);font-style:italic;margin-top:6px;}
+.party-cfg{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;margin-bottom:12px;}
+.party-cfg .filter-f select,.party-cfg .filter-f input{width:90px;}
 .color-swatches{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding-top:2px;}
 .swatch{width:22px;height:22px;border-radius:50%;border:2px solid var(--bg);cursor:pointer;outline:.5px solid var(--border2);padding:0;}
 .swatch.sel{outline:2px solid var(--gold2);outline-offset:1px;}
@@ -271,7 +312,23 @@ select.fi{appearance:auto;}
       <div class="section-label" style="margin-bottom:0">Fichas de enemigos</div>
       <div class="sep"></div>
       <button class="btn accent" onclick="toggleForm('importForm')">⭳ Importar desde código</button>
+      <button class="btn accent" onclick="toggleForm('bulkForm')">⭳⭳ Importar en bulk</button>
       <button class="btn" onclick="toggleForm('enemyForm')">+ Agregar enemigo</button>
+    </div>
+    <div class="form-wrap" id="bulkForm" style="display:none">
+      <div class="form-title">Importar muchas fichas de una vez</div>
+      <div class="import-hint">Pegá varias fichas separadas por una línea <b>---</b> (o subí un archivo .yaml/.txt). Cada ficha usa el mismo formato Cosmere RPG que la importación individual.</div>
+      <div class="row" style="margin-bottom:8px">
+        <button class="btn" onclick="document.getElementById('bulkFile').click()">⭳ Subir archivo</button>
+        <input type="file" id="bulkFile" accept=".yaml,.yml,.txt,.md,text/plain" style="display:none" onchange="bulkLoadFile(this)"/>
+        <span style="font-size:12px;color:var(--text3)" id="bulkFileName"></span>
+      </div>
+      <textarea class="import-ta" id="bulkCode" placeholder="layout: Cosmere RPG&#10;name: &quot;Archer&quot;&#10;tier: &quot;Tier 1 Minion – Medium Humanoid&quot;&#10;hp: 12&#10;---&#10;layout: Cosmere RPG&#10;name: &quot;Axehound&quot;&#10;tier: &quot;Tier 1 Minion – Small Animal&quot;&#10;hp: 12"></textarea>
+      <div id="bulkResult" style="font-size:12px;margin-top:8px"></div>
+      <div class="form-actions" style="margin-top:10px">
+        <button class="btn ghost" onclick="toggleForm('bulkForm')">Cerrar</button>
+        <button class="btn accent" onclick="bulkImport()">Importar todo</button>
+      </div>
     </div>
     <div class="form-wrap" id="importForm" style="display:none">
       <div class="form-title">Importar ficha desde código</div>
@@ -292,6 +349,13 @@ select.fi{appearance:auto;}
         <div><div class="fl">Vida máx</div><input class="fi" id="efVida" type="number" value="20"/></div>
         <div><div class="fl">Focus máx</div><input class="fi" id="efFocus" type="number" value="10"/></div>
         <div><div class="fl">Investidura</div><input class="fi" id="efInv" type="number" value="0"/></div>
+      </div>
+      <div class="fg" style="grid-template-columns:1fr 1fr 1fr">
+        <div><div class="fl">Tier (1-4, o el que sea)</div><input class="fi" id="efTier" type="number" min="1" placeholder="ej: 1"/></div>
+        <div><div class="fl">Tamaño</div>
+          <select class="fi" id="efSize"><option value="">—</option><option>Tiny</option><option>Small</option><option>Medium</option><option>Large</option><option>Huge</option><option>Gargantuan</option></select>
+        </div>
+        <div><div class="fl">Tipo de criatura</div><input class="fi" id="efCType" placeholder="Humanoid / Animal / Entity..."/></div>
       </div>
       <div class="fg" style="grid-template-columns:1fr 2fr">
         <div><div class="fl">Clase</div>
@@ -314,6 +378,7 @@ select.fi{appearance:auto;}
         <button class="btn accent" onclick="saveEnemy()">Guardar</button>
       </div>
     </div>
+    <div class="filter-bar" id="bfBar"></div>
     <div class="grid" id="enemiesGrid"></div>
     <div class="empty" id="enemiesEmpty">Sin enemigos en el bestiario.</div>
   </div>
@@ -323,7 +388,7 @@ select.fi{appearance:auto;}
     <div class="row">
       <div class="section-label" style="margin-bottom:0">Encuentros preparados</div>
       <div class="sep"></div>
-      <button class="btn" onclick="toggleForm('encForm')">+ Armar encuentro</button>
+      <button class="btn" onclick="openEncForm()">+ Armar encuentro</button>
     </div>
     <div class="form-wrap" id="encForm" style="display:none">
       <div class="form-title">Nuevo encuentro</div>
@@ -331,10 +396,18 @@ select.fi{appearance:auto;}
         <div><div class="fl">Nombre</div><input class="fi" id="encfName"/></div>
         <div><div class="fl">Descripción</div><input class="fi" id="encfDesc"/></div>
       </div>
-      <div class="fl" style="margin-top:6px">Enemigos</div>
-      <div id="encfEnemies"></div>
-      <button class="btn ghost" style="margin-bottom:10px" onclick="addEncEnemyRow()">+ Agregar enemigo</button>
-      <div class="form-actions">
+      <div class="party-cfg">
+        <div class="filter-f"><span class="fl">Jugadores</span><input class="fi" type="number" min="1" id="encPartySize" oninput="updateEncDiff()"/></div>
+        <div class="filter-f"><span class="fl">Tier del grupo</span><input class="fi" type="number" min="1" max="5" id="encPartyTier" oninput="updateEncDiff()"/></div>
+        <div style="font-size:11px;color:var(--text3);font-style:italic;flex:1;min-width:180px" id="encPartyHint"></div>
+      </div>
+      <div class="diff-panel" id="encDiffPanel"></div>
+      <div class="filter-bar" id="ecfBar"></div>
+      <div class="enc-layout">
+        <div><div class="enc-col-h">Bestiario (tocá para sumar)</div><div class="palette" id="ecfPalette"></div></div>
+        <div><div class="enc-col-h">En el encuentro</div><div id="ecfSelected"></div></div>
+      </div>
+      <div class="form-actions" style="margin-top:14px">
         <button class="btn ghost" onclick="toggleForm('encForm')">Cancelar</button>
         <button class="btn accent" onclick="saveEncounter()">Guardar encuentro</button>
       </div>
@@ -484,6 +557,94 @@ var CLASES={minion:'Minion',rival:'Rival',boss:'Boss'};
 var PALETTE=['#e05050','#c87830','#e8c840','#5aaa70','#4a8ac8','#aa8aec','#d060a0','#8a8a8a','#e8dcc8'];
 function claseLabel(c){return CLASES[c]||'Rival';}
 function claseBadge(c){c=c||'rival';return '<span class="clase-badge clase-'+c+'">'+claseLabel(c)+'</span>';}
+
+// ── Meta de enemigos: tier / tamaño / tipo de criatura ──
+function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1).toLowerCase():s;}
+var SIZE_ORDER=['Tiny','Small','Medium','Large','Huge','Gargantuan'];
+function enemyMeta(e){
+  var s=e.stats||{};
+  var tier=(typeof s.tier_num==='number')?s.tier_num:null;
+  var size=s.size||null, ctype=s.creature_type||null;
+  if(tier==null||size==null||ctype==null){       // fallback: parsear el texto del tier
+    var t=String(e.tipo||s.tier||'');
+    if(tier==null){var m=/tier\s*(\d+)/i.exec(t);if(m)tier=parseInt(m[1]);}
+    if(size==null){for(var i=0;i<SIZE_ORDER.length;i++){if(new RegExp('\\b'+SIZE_ORDER[i]+'\\b','i').test(t)){size=SIZE_ORDER[i];break;}}}
+    if(ctype==null){var parts=t.split(/[–—-]/);if(parts.length>1){var w=parts[parts.length-1].trim().split(/\s+/).filter(function(x){return x&&SIZE_ORDER.indexOf(cap(x))<0;});if(w.length)ctype=w.join(' ');}}
+  }
+  return {tier:tier, size:size?cap(size):null, ctype:ctype||null, role:e.clase||'rival'};
+}
+function metaBadges(e){
+  var m=enemyMeta(e),b=[];
+  if(m.tier!=null)b.push('<span class="meta-badge tier">Tier '+m.tier+'</span>');
+  if(m.size)b.push('<span class="meta-badge">'+esc(m.size)+'</span>');
+  if(m.ctype)b.push('<span class="meta-badge">'+esc(m.ctype)+'</span>');
+  return b.length?'<div class="meta-badges">'+b.join('')+'</div>':'';
+}
+
+// ── Filtros dinámicos (baseline + lo que exista en el bestiario) ──
+function metaOptions(list){
+  var tiers={},sizes={},types={},noT=false,noS=false,noC=false;
+  (list||[]).forEach(function(e){var m=enemyMeta(e);
+    if(m.tier!=null)tiers[m.tier]=1;else noT=true;
+    if(m.size)sizes[m.size]=1;else noS=true;
+    if(m.ctype)types[m.ctype]=1;else noC=true;
+  });
+  var tierList=[1,2,3,4];Object.keys(tiers).map(Number).forEach(function(t){if(tierList.indexOf(t)<0)tierList.push(t);});tierList.sort(function(a,b){return a-b;});
+  var typeList=['Humanoid','Animal','Entity'];Object.keys(types).forEach(function(t){if(typeList.indexOf(t)<0)typeList.push(t);});
+  var sizeList=Object.keys(sizes).sort(function(a,b){return SIZE_ORDER.indexOf(a)-SIZE_ORDER.indexOf(b);});
+  return {tiers:tierList,sizes:sizeList,types:typeList,noTier:noT,noSize:noS,noType:noC};
+}
+function renderFilterBar(containerId,prefix,list,fnName){
+  var o=metaOptions(list);
+  function sel(k,label,inner,addNone){
+    return '<div class="filter-f"><span class="fl">'+label+'</span><select class="fi" id="'+prefix+k+'" onchange="'+fnName+'()">'
+      +inner+(addNone?'<option value="__none__">Otro / sin dato</option>':'')+'</select></div>';
+  }
+  var tierInner='<option value="">Todos</option>'+o.tiers.map(function(t){return '<option value="'+t+'">Tier '+t+'</option>';}).join('');
+  var roleInner='<option value="">Todos</option><option value="minion">Minion</option><option value="rival">Rival</option><option value="boss">Boss</option>';
+  var sizeInner='<option value="">Todos</option>'+o.sizes.map(function(t){return '<option value="'+t+'">'+t+'</option>';}).join('');
+  var typeInner='<option value="">Todos</option>'+o.types.map(function(t){return '<option value="'+t+'">'+esc(t)+'</option>';}).join('');
+  document.getElementById(containerId).innerHTML=
+    sel('Tier','Tier',tierInner,o.noTier)+sel('Role','Rol',roleInner,false)
+    +sel('Size','Tamaño',sizeInner,o.noSize)+sel('Type','Tipo',typeInner,o.noType)
+    +'<button class="btn ghost sm filter-clear" onclick="clearFilters(\''+prefix+'\',\''+fnName+'\')">Limpiar</button>';
+}
+function clearFilters(prefix,fnName){
+  ['Tier','Role','Size','Type'].forEach(function(k){var el=document.getElementById(prefix+k);if(el)el.value='';});
+  if(fnName&&window[fnName])window[fnName]();
+}
+function enemyPasses(e,prefix){
+  var m=enemyMeta(e);
+  function chk(k,val){var el=document.getElementById(prefix+k);if(!el||!el.value)return true;
+    if(el.value==='__none__')return val==null;return String(val)===el.value;}
+  return chk('Tier',m.tier)&&chk('Role',m.role)&&chk('Size',m.size)&&chk('Type',m.ctype);
+}
+
+// ── Cálculo de dificultad del encuentro (reglas del libro) ──
+function levelToTier(lvl){lvl=parseInt(lvl)||0;if(lvl>=21)return 5;if(lvl<=0)return 1;return Math.min(4,Math.ceil(lvl/5));}
+function threatValue(pTier,eTier,role){
+  var d=pTier-eTier;
+  var tbl={'-3':{boss:32,rival:8,minion:4},'-2':{boss:16,rival:4,minion:2},'-1':{boss:8,rival:2,minion:1},
+           '0':{boss:4,rival:1,minion:0.5},'1':{boss:2,rival:0.5,minion:0.25},'2':{boss:1,rival:0.25,minion:0}};
+  var key=d<=-3?'-3':(d>=3?'3':String(d));
+  if(key==='3')return role==='boss'?0.5:0;
+  var row=tbl[key];return row[role]!=null?row[role]:0;
+}
+function computeDifficulty(items,partySize,partyTier){
+  var total=0,unknown=0;
+  items.forEach(function(it){if(it.tier==null){unknown+=it.qty;return;}total+=threatValue(partyTier,it.tier,it.role)*it.qty;});
+  total=Math.round(total*100)/100;
+  var easy=partySize*0.5,media=partySize,hard=partySize*1.5,status,color;
+  if(total<=easy){status='FÁCIL';color='#5aaa70';}
+  else if(total<=media){status='MEDIA';color='#e8c840';}
+  else if(total<=hard){status='DIFÍCIL';color='#e8a860';}
+  else{status='MORTAL';color='#e05050';}
+  return {total:total,status:status,color:color,easy:easy,media:media,hard:hard,unknown:unknown};
+}
+function diffBadge(items,size,tier){
+  var d=computeDifficulty(items,size,tier);
+  return '<span class="clase-badge" style="color:'+d.color+';border-color:'+d.color+'">'+d.status+' · '+d.total+'</span>';
+}
 function buildSwatches(containerId,hiddenId){
   var cont=document.getElementById(containerId);
   cont.innerHTML=PALETTE.map(function(c){
@@ -540,31 +701,39 @@ function addAccionRow(nombre,coste,desc){
     +'<button class="del-btn" onclick="this.parentElement.remove()">✕</button>';
   document.getElementById('efAcciones').appendChild(d);
 }
+async function ensureEnemies(){ if(!enemies.length) enemies=await api(API+'/enemies'); }
 async function loadEnemies(){
   enemies=await api(API+'/enemies');
+  renderFilterBar('bfBar','bf',enemies,'renderEnemyGrid');
+  renderEnemyGrid();
+  populateAddEnemySelect();
+}
+function enemyCard(e){
+  var sb=renderStatblock(e);
+  var accFallback=sb?'':(e.acciones||[]).map(function(a){
+    return '<div class="accion-item"><span class="accion-nombre">'+esc(a.nombre)+'</span>'
+      +(a.coste?'<span class="accion-coste">['+esc(a.coste)+']</span>':'')
+      +(a.descripcion?'<div class="accion-desc">'+esc(a.descripcion)+'</div>':'')+'</div>';
+  }).join('');
+  var col=e.faction_color||'';
+  return '<div class="card"'+(col?' style="border-left:3px solid '+col+'"':'')+'>'
+    +'<div class="card-head"><span class="cname">'+(col?'<span class="color-dot" style="background:'+col+'"></span>':'')+esc(e.name)+'</span>'
+    +'<div><button class="edit-btn" onclick="editEnemy('+e.id+')">editar</button> '
+    +'<button class="del-btn" onclick="delEnemy('+e.id+')">✕</button></div></div>'
+    +'<div style="margin-bottom:6px">'+claseBadge(e.clase)+'</div>'
+    +metaBadges(e)
+    +(e.tipo?'<div class="ctype">'+esc(e.tipo)+'</div>':'')
+    +(sb?sb:'<div class="cstats">Vida: '+e.vida_max+' · Focus: '+e.focus_max+(e.inv_max?' · Investidura: '+e.inv_max:'')+'</div>')
+    +(accFallback?'<div style="margin-top:8px">'+accFallback+'</div>':'')
+    +(e.notas?'<div class="cstats" style="font-style:italic;margin-top:6px">'+esc(e.notas)+'</div>':'')
+    +'</div>';
+}
+function renderEnemyGrid(){
   var g=document.getElementById('enemiesGrid');
   document.getElementById('enemiesEmpty').style.display=enemies.length?'none':'block';
-  g.innerHTML=enemies.map(function(e){
-    var sb=renderStatblock(e);
-    // fallback para enemigos sin ficha completa: acciones simples
-    var accFallback=sb?'':(e.acciones||[]).map(function(a){
-      return '<div class="accion-item"><span class="accion-nombre">'+esc(a.nombre)+'</span>'
-        +(a.coste?'<span class="accion-coste">['+esc(a.coste)+']</span>':'')
-        +(a.descripcion?'<div class="accion-desc">'+esc(a.descripcion)+'</div>':'')+'</div>';
-    }).join('');
-    var col=e.faction_color||'';
-    return '<div class="card"'+(col?' style="border-left:3px solid '+col+'"':'')+'>'
-      +'<div class="card-head"><span class="cname">'+(col?'<span class="color-dot" style="background:'+col+'"></span>':'')+esc(e.name)+'</span>'
-      +'<div><button class="edit-btn" onclick="editEnemy('+e.id+')">editar</button> '
-      +'<button class="del-btn" onclick="delEnemy('+e.id+')">✕</button></div></div>'
-      +'<div style="margin-bottom:6px">'+claseBadge(e.clase)+'</div>'
-      +(e.tipo?'<div class="ctype">'+esc(e.tipo)+'</div>':'')
-      +(sb?sb:'<div class="cstats">Vida: '+e.vida_max+' · Focus: '+e.focus_max+(e.inv_max?' · Investidura: '+e.inv_max:'')+'</div>')
-      +(accFallback?'<div style="margin-top:8px">'+accFallback+'</div>':'')
-      +(e.notas?'<div class="cstats" style="font-style:italic;margin-top:6px">'+esc(e.notas)+'</div>':'')
-      +'</div>';
-  }).join('');
-  populateAddEnemySelect();
+  var list=enemies.filter(function(e){return enemyPasses(e,'bf');});
+  if(enemies.length&&!list.length){g.innerHTML='<div class="empty">Ningún enemigo coincide con los filtros.</div>';return;}
+  g.innerHTML=list.map(enemyCard).join('');
 }
 async function importEnemy(){
   var code=document.getElementById('importCode').value.trim();
@@ -575,6 +744,28 @@ async function importEnemy(){
   await loadEnemies();
   alert('Importado: '+res.name);
 }
+function bulkLoadFile(input){
+  if(!input.files||!input.files[0])return;
+  var f=input.files[0];
+  document.getElementById('bulkFileName').textContent=f.name;
+  var rd=new FileReader();
+  rd.onload=function(){document.getElementById('bulkCode').value=rd.result;};
+  rd.readAsText(f);
+  input.value='';
+}
+async function bulkImport(){
+  var code=document.getElementById('bulkCode').value.trim();
+  if(!code){alert('Pegá o subí las fichas.');return;}
+  var res=await api(API+'/enemies/import-bulk','POST',{code:code});
+  var el=document.getElementById('bulkResult');
+  var msg='<span style="color:#7ac88c">Importadas '+res.added+' fichas.</span>';
+  if(res.errors&&res.errors.length){
+    msg+='<div style="color:#e8a860;margin-top:6px">'+res.errors.length+' con problemas:<ul style="margin:4px 0 0 18px">'
+      +res.errors.map(function(e){return '<li>'+esc(e)+'</li>';}).join('')+'</ul></div>';
+  }
+  el.innerHTML=msg;
+  await loadEnemies();
+}
 function editEnemy(id){
   var e=enemies.find(function(x){return x.id===id;});
   if(!e)return;
@@ -582,6 +773,10 @@ function editEnemy(id){
   document.getElementById('efId').value=e.id;
   document.getElementById('efName').value=e.name;
   document.getElementById('efTipo').value=e.tipo||'';
+  var em=enemyMeta(e);
+  document.getElementById('efTier').value=(em.tier!=null?em.tier:'');
+  document.getElementById('efSize').value=em.size||'';
+  document.getElementById('efCType').value=em.ctype||'';
   document.getElementById('efClase').value=e.clase||'rival';
   pickColor('efColors','efColor',e.faction_color||'');
   document.getElementById('efVida').value=e.vida_max;
@@ -600,6 +795,11 @@ async function saveEnemy(){
     var inputs=row.querySelectorAll('input');
     if(inputs[0].value.trim()) acciones.push({nombre:inputs[0].value.trim(),coste:inputs[1].value.trim(),descripcion:inputs[2].value.trim()});
   });
+  var stats=Object.assign({},editingStats||{});
+  var tv=parseInt(document.getElementById('efTier').value);
+  stats.tier_num=isNaN(tv)?null:tv;
+  stats.size=document.getElementById('efSize').value||null;
+  stats.creature_type=document.getElementById('efCType').value.trim()||null;
   var body={
     name:document.getElementById('efName').value.trim(),
     tipo:document.getElementById('efTipo').value.trim(),
@@ -610,12 +810,13 @@ async function saveEnemy(){
     acciones:acciones,
     notas:document.getElementById('efNotas').value.trim(),
     faction_color:document.getElementById('efColor').value,
-    stats:editingStats||{}
+    stats:stats
   };
   if(!body.name){alert('Poné un nombre.');return;}
   if(id) await api(API+'/enemies/'+id,'PUT',body);
-  else await api('/api/enemies','POST',body);
-  ['efId','efName','efTipo','efNotas'].forEach(function(x){document.getElementById(x).value='';});
+  else await api(API+'/enemies','POST',body);
+  ['efId','efName','efTipo','efNotas','efTier','efCType'].forEach(function(x){document.getElementById(x).value='';});
+  document.getElementById('efSize').value='';
   document.getElementById('efVida').value='20';
   document.getElementById('efFocus').value='10';
   document.getElementById('efInv').value='0';
@@ -634,45 +835,116 @@ async function delEnemy(id){
 }
 
 // ═══════════ ENCUENTROS ═══════════
-var encRowCounter=0;
-async function addEncEnemyRow(){
-  if(!enemies.length) enemies=await api(API+'/enemies');
-  encRowCounter++;
-  var opts=enemies.map(function(e){return '<option value="'+e.id+'">'+e.name+'</option>';}).join('');
-  var d=document.createElement('div');
-  d.className='enc-enemy-pick';d.id='eer-'+encRowCounter;
-  d.innerHTML='<select class="fi">'+opts+'</select>'
-    +'<input class="fi" type="number" value="1" min="1" max="20"/>'
-    +'<button class="del-btn" onclick="this.parentElement.remove()">✕</button>';
-  document.getElementById('encfEnemies').appendChild(d);
+var PARTY=[];              // jugadores aceptados con su nivel
+var encSel={};             // {enemyId: cantidad} del encuentro en construcción
+
+async function loadParty(){ try{ PARTY=await api(API+'/party'); }catch(e){ PARTY=[]; } return PARTY; }
+function partyDefaults(){
+  var size=PARTY.length||4, tier=1;
+  if(PARTY.length){var s=0;PARTY.forEach(function(p){s+=levelToTier(p.level);});tier=Math.max(1,Math.round(s/PARTY.length));}
+  return {size:size,tier:tier};
+}
+function partyHint(){
+  if(!PARTY.length)return 'No hay jugadores aceptados con personaje; poné los valores a mano.';
+  return PARTY.map(function(p){return esc(p.character_name||p.username)+' (Nvl '+(p.level||'?')+' → T'+levelToTier(p.level)+')';}).join(' · ');
+}
+
+async function openEncForm(){
+  await ensureEnemies();
+  await loadParty();
+  encSel={};
+  var d=partyDefaults();
+  document.getElementById('encfName').value='';
+  document.getElementById('encfDesc').value='';
+  document.getElementById('encPartySize').value=d.size;
+  document.getElementById('encPartyTier').value=d.tier;
+  document.getElementById('encPartyHint').textContent=partyHint();
+  renderFilterBar('ecfBar','ecf',enemies,'renderEncPalette');
+  renderEncPalette();
+  renderEncSelected();
+  updateEncDiff();
+  document.getElementById('encForm').style.display='block';
+}
+function renderEncPalette(){
+  var box=document.getElementById('ecfPalette');
+  if(!enemies.length){box.innerHTML='<div class="empty">Bestiario vacío. Cargá enemigos primero.</div>';return;}
+  var list=enemies.filter(function(e){return enemyPasses(e,'ecf');});
+  if(!list.length){box.innerHTML='<div class="empty">Nada coincide con los filtros.</div>';return;}
+  box.innerHTML=list.map(function(e){
+    var m=enemyMeta(e);
+    var sub=[claseLabel(e.clase),(m.tier!=null?'T'+m.tier:''),m.size,m.ctype].filter(Boolean).join(' · ');
+    return '<div class="pal-card">'
+      +'<div class="pc-main"><div class="pc-name">'+esc(e.name)+'</div>'
+      +'<div style="font-size:11px;color:var(--text3)">'+esc(sub)+'</div></div>'
+      +'<button class="pal-add" onclick="addToEnc('+e.id+')">+ agregar</button></div>';
+  }).join('');
+}
+function addToEnc(id){ encSel[id]=(encSel[id]||0)+1; renderEncSelected(); updateEncDiff(); }
+function incEnc(id,delta){ encSel[id]=(encSel[id]||0)+delta; if(encSel[id]<=0)delete encSel[id]; renderEncSelected(); updateEncDiff(); }
+function renderEncSelected(){
+  var box=document.getElementById('ecfSelected');
+  var ids=Object.keys(encSel);
+  if(!ids.length){box.innerHTML='<div class="empty">Todavía no agregaste enemigos.</div>';return;}
+  box.innerHTML=ids.map(function(id){
+    var e=enemies.find(function(x){return x.id===parseInt(id);});
+    if(!e)return '';
+    return '<div class="sel-card">'
+      +'<div class="sel-head"><span class="cname">'+esc(e.name)+'</span>'
+      +'<div class="qty"><button onclick="incEnc('+id+',-1)">−</button><span>'+encSel[id]+'</span><button onclick="incEnc('+id+',1)">+</button></div>'
+      +'<button class="del-btn" onclick="incEnc('+id+',-99)">✕</button></div>'
+      +'<div style="margin-bottom:4px">'+claseBadge(e.clase)+'</div>'
+      +metaBadges(e)+renderStatblock(e,true)+'</div>';
+  }).join('');
+}
+function encItems(){
+  return Object.keys(encSel).map(function(id){
+    var e=enemies.find(function(x){return x.id===parseInt(id);});
+    var m=e?enemyMeta(e):{tier:null,role:'rival'};
+    return {tier:m.tier,role:m.role,qty:encSel[id]};
+  });
+}
+function renderDiffPanel(elId,items,size,tier){
+  var d=computeDifficulty(items,size,tier);
+  var scaleMax=Math.max(d.hard*1.34,d.total,1);
+  var pct=Math.min(100,d.total/scaleMax*100);
+  var note=d.unknown?('⚠ '+d.unknown+' enemigo(s) sin tier reconocible: no cuentan en la amenaza. '):'';
+  document.getElementById(elId).innerHTML=
+    '<div class="diff-top"><span class="diff-status" style="color:'+d.color+'">'+d.status+'</span>'
+    +'<span class="diff-total">Amenaza total <b>'+d.total+'</b></span></div>'
+    +'<div class="diff-track"><div class="diff-fill" style="width:'+pct+'%;background:'+d.color+'"></div></div>'
+    +'<div class="diff-scale"><span>Fácil '+d.easy+'</span><span>Media '+d.media+'</span><span>Difícil '+d.hard+'</span><span>Mortal</span></div>'
+    +'<div class="diff-note">'+note+'Metas para '+size+' jugador(es): Fácil ≤'+d.easy+' · Media ≤'+d.media+' · Difícil ≤'+d.hard+' · Mortal ></div>';
+}
+function updateEncDiff(){
+  var size=Math.max(1,parseInt(document.getElementById('encPartySize').value)||1);
+  var tier=Math.max(1,parseInt(document.getElementById('encPartyTier').value)||1);
+  renderDiffPanel('encDiffPanel',encItems(),size,tier);
 }
 async function loadEncounters(){
+  await ensureEnemies();
+  await loadParty();
   encounters=await api(API+'/encounters');
   var g=document.getElementById('encountersGrid');
   document.getElementById('encountersEmpty').style.display=encounters.length?'none':'block';
+  var d=partyDefaults();
   g.innerHTML=encounters.map(function(enc){
-    var list=enc.enemies.map(function(e){return '<div class="cstats">'+e.cantidad+'x '+e.name+'</div>';}).join('');
+    var items=enc.enemies.map(function(x){var be=enemies.find(function(e){return e.id===x.enemy_id;});var m=be?enemyMeta(be):{tier:null,role:'rival'};return {tier:m.tier,role:m.role,qty:x.cantidad};});
+    var list=enc.enemies.map(function(e){return '<div class="cstats">'+e.cantidad+'x '+esc(e.name)+'</div>';}).join('');
     return '<div class="card">'
-      +'<div class="card-head"><span class="cname">'+enc.name+'</span>'
+      +'<div class="card-head"><span class="cname">'+esc(enc.name)+'</span>'
       +'<button class="del-btn" onclick="delEncounter('+enc.id+')">✕</button></div>'
-      +(enc.descripcion?'<div class="ctype">'+enc.descripcion+'</div>':'')
+      +(enc.descripcion?'<div class="ctype">'+esc(enc.descripcion)+'</div>':'')
+      +'<div style="margin:6px 0">'+diffBadge(items,d.size,d.tier)+'</div>'
       +list+'</div>';
   }).join('');
 }
 async function saveEncounter(){
   var name=document.getElementById('encfName').value.trim();
   if(!name){alert('Poné un nombre.');return;}
-  var enemiesList=[];
-  document.querySelectorAll('#encfEnemies .enc-enemy-pick').forEach(function(row){
-    var sel=row.querySelector('select');
-    var qty=row.querySelector('input');
-    enemiesList.push({enemy_id:parseInt(sel.value),cantidad:parseInt(qty.value)||1});
-  });
+  var enemiesList=Object.keys(encSel).map(function(id){return {enemy_id:parseInt(id),cantidad:encSel[id]};});
   if(!enemiesList.length){alert('Agregá al menos un enemigo.');return;}
   await api(API+'/encounters','POST',{name:name,descripcion:document.getElementById('encfDesc').value.trim(),enemies:enemiesList});
-  document.getElementById('encfName').value='';
-  document.getElementById('encfDesc').value='';
-  document.getElementById('encfEnemies').innerHTML='';
+  encSel={};
   toggleForm('encForm');
   loadEncounters();
 }

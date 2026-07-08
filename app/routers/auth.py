@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from ..auth import (COOKIE_NAME, create_session, current_user, delete_session,
                     hash_password, optional_user, public_user, verify_password)
 from ..database import db
-from ..models import AccountUpdate, LoginIn, RegisterIn, ResetIn
+from ..models import AccountUpdate, DeleteAccount, LoginIn, RegisterIn, ResetIn
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -70,6 +70,21 @@ def reset_password(r: ResetIn):
         conn.execute("UPDATE users SET pass_hash=?, salt=? WHERE id=?", (ph, salt, row["id"]))
         # invalida sesiones abiertas de esa cuenta
         conn.execute("DELETE FROM sessions WHERE user_id=?", (row["id"],))
+    return {"ok": True}
+
+
+@router.delete("/account")
+def delete_account(a: DeleteAccount, request: Request, response: Response, user=Depends(current_user)):
+    """Borra la cuenta del usuario y todo lo suyo (campañas, personajes, bestiario)."""
+    with db() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
+        if not verify_password(a.password, row["salt"], row["pass_hash"]):
+            raise HTTPException(400, "La contraseña es incorrecta")
+        # El bestiario cuelga del owner por una columna sin FK; lo borro a mano.
+        conn.execute("DELETE FROM enemies WHERE owner_id=?", (user["id"],))
+        # El resto (campañas, personajes, mascotas, membresías, sesiones) cae por cascada.
+        conn.execute("DELETE FROM users WHERE id=?", (user["id"],))
+    response.delete_cookie(COOKIE_NAME)
     return {"ok": True}
 
 

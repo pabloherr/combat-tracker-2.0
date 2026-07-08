@@ -175,8 +175,20 @@ function openAccount(){
     +'<label class="fl-lbl">Contraseña actual</label><input class="fi" id="acc-cur" type="password" style="width:100%"/>'
     +'<label class="fl-lbl">Nueva contraseña</label><input class="fi" id="acc-new" type="password" style="width:100%"/>'
     +'<div id="acc-err" style="color:#e88;font-size:13px;min-height:18px;margin-top:8px;font-style:italic"></div>'
-    +'<div class="card-actions" style="justify-content:flex-end;margin-top:6px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="saveAccount()">Guardar</button></div>';
+    +'<div class="card-actions" style="justify-content:flex-end;margin-top:6px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="saveAccount()">Guardar</button></div>'
+    +'<div style="border-top:1px solid var(--border);margin:18px 0 4px;padding-top:12px">'
+      +'<div style="font-size:13px;color:#e88;font-style:italic;margin-bottom:8px">Zona peligrosa — eliminar la cuenta borra tus campañas, personajes y bestiario. No se puede deshacer.</div>'
+      +'<button class="btn danger" onclick="deleteAccount()">Eliminar mi cuenta</button>'
+    +'</div>';
   document.getElementById('overlay').classList.add('on');
+}
+async function deleteAccount(){
+  var pw=prompt('Esto borra tu cuenta y TODO lo tuyo (campañas, personajes, bestiario) de forma permanente.\n\nEscribí tu contraseña para confirmar:');
+  if(pw==null)return;
+  var r=await fetch('/api/auth/account',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo eliminar la cuenta');return;}
+  alert('Cuenta eliminada.');
+  location.href='/login';
 }
 async function saveAccount(){
   var body={

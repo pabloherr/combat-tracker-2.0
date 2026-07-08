@@ -1,6 +1,7 @@
 """API: Campañas, membresías e invitaciones."""
 
 import json
+import re
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -117,6 +118,30 @@ def member_sheet(cid: int, uid: int, user=Depends(current_user)):
         d["statuses"] = json.loads(d.get("statuses") or "[]")
         d["sheet"] = json.loads(d.get("sheet") or "{}")
         return d
+
+
+@router.get("/campaigns/{cid}/party")
+def campaign_party(cid: int, user=Depends(current_user)):
+    """Jugadores aceptados con el nivel de su personaje (para calcular dificultad)."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+        rows = conn.execute(
+            "SELECT u.username, ch.name AS character_name, ch.sheet "
+            "FROM campaign_members m JOIN users u ON u.id=m.user_id "
+            "JOIN characters ch ON ch.id=m.character_id "
+            "WHERE m.campaign_id=? AND m.status='accepted' AND m.character_id IS NOT NULL "
+            "ORDER BY u.username",
+            (cid,),
+        ).fetchall()
+        out = []
+        for r in rows:
+            sheet = json.loads(r["sheet"] or "{}")
+            level = 0
+            m = re.search(r"\d+", str(sheet.get("level", "")))
+            if m:
+                level = int(m.group())
+            out.append({"username": r["username"], "character_name": r["character_name"], "level": level})
+        return out
 
 
 # ── Jugador: invitaciones y membresías ─────────────────────

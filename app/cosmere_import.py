@@ -89,6 +89,34 @@ def _detect_clase(data: dict, tier: str) -> str:
     return "rival"
 
 
+_SIZES = ["Tiny", "Small", "Medium", "Large", "Huge", "Gargantuan"]
+
+
+def _parse_tier_meta(tier: str) -> dict:
+    """Del texto del tier ('Tier 1 Minion – Medium Humanoid') saca datos estructurados.
+
+    Devuelve {tier_num, size, creature_type}; cada uno None si no se pudo deducir.
+    """
+    tier_num = None
+    m = re.search(r"tier\s*(\d+)", tier, re.IGNORECASE)
+    if m:
+        tier_num = int(m.group(1))
+    size = None
+    for s in _SIZES:
+        if re.search(r"\b" + s + r"\b", tier, re.IGNORECASE):
+            size = s
+            break
+    creature_type = None
+    # Tras el guion suele venir "Tamaño TipoDeCriatura" (ej: "Medium Humanoid").
+    parts = re.split(r"[–—-]", tier)
+    if len(parts) > 1:
+        tail_words = parts[-1].split()
+        rem = [w for w in tail_words if w.lower() not in (s.lower() for s in _SIZES)]
+        if rem:
+            creature_type = " ".join(rem).strip()
+    return {"tier_num": tier_num, "size": size, "creature_type": creature_type}
+
+
 def _action_to_accion(action: dict) -> dict:
     """Convierte una acción de la ficha al formato de acción de combate."""
     name = action["name"]
@@ -102,7 +130,7 @@ def _action_to_accion(action: dict) -> dict:
 
 def parse_statblock(code: str) -> dict:
     """
-    Parsea el bloque YAML y devuelve un dict con los campos del enemigo.
+    Parsea un bloque YAML y devuelve un dict con los campos del enemigo.
 
     Lanza ImportError_ con un mensaje claro si el texto no es válido.
     """
@@ -118,6 +146,48 @@ def parse_statblock(code: str) -> dict:
     if not isinstance(data, dict):
         raise ImportError_("El código no tiene el formato esperado (clave: valor).")
 
+    return _build_from_data(data)
+
+
+def parse_statblocks_bulk(code: str):
+    """
+    Parsea varias fichas de una sola vez.
+
+    Los bloques se separan con líneas `---` (documentos YAML), o si no las hay,
+    antes de cada `layout:` o `name:` al inicio de línea.
+
+    Devuelve (lista_de_enemigos, lista_de_errores). Cada error es un texto
+    legible con el número de bloque y el motivo, para reportárselo al usuario.
+    """
+    text = _strip_code_fence(code)
+    if not text.strip():
+        raise ImportError_("El texto está vacío.")
+
+    if re.search(r"^---\s*$", text, re.M):
+        raw_blocks = re.split(r"^---\s*$", text, flags=re.M)
+    elif re.search(r"(?m)^layout\s*:", text):
+        raw_blocks = re.split(r"(?m)^(?=layout\s*:)", text)
+    else:
+        raw_blocks = re.split(r"(?m)^(?=name\s*:)", text)
+
+    enemies, errors = [], []
+    idx = 0
+    for block in raw_blocks:
+        if not block.strip():
+            continue
+        idx += 1
+        try:
+            data = yaml.safe_load(block)
+            if not isinstance(data, dict):
+                raise ImportError_("no tiene formato clave: valor")
+            enemies.append(_build_from_data(data))
+        except (yaml.YAMLError, ImportError_) as e:
+            errors.append(f"Bloque {idx}: {e}")
+    return enemies, errors
+
+
+def _build_from_data(data: dict) -> dict:
+    """Construye el enemigo a partir del dict YAML ya cargado."""
     name = str(data.get("name", "")).strip()
     if not name:
         raise ImportError_("Falta el campo 'name'.")
@@ -130,8 +200,13 @@ def parse_statblock(code: str) -> dict:
     actions = _norm_entries(data.get("actions"))
     opportunities = _norm_entries(data.get("opportunities"))
 
+    meta = _parse_tier_meta(tier)
+
     stats = {
         "tier": tier,
+        "tier_num": meta["tier_num"],
+        "size": meta["size"],
+        "creature_type": meta["creature_type"],
         "health": health,
         "physical": {
             "str": _to_int(data.get("str")),
