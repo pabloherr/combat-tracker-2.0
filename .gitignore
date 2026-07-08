@@ -1,0 +1,17 @@
+# Bytecode / cache de Python
+__pycache__/
+*.pyc
+
+# Base de datos y backups (datos reales de la mesa, nunca al repo)
+*.db
+*.db-journal
+*.userbak
+*.premigbak
+
+# Configuración local/personal (no se comparte)
+.claude/settings.local.json
+.vscode/
+
+# Basura de SO/editor
+.DS_Store
+Thumbs.db
