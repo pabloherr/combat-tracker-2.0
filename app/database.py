@@ -139,6 +139,14 @@ def init_db():
             campaign_id INTEGER PRIMARY KEY REFERENCES campaigns(id) ON DELETE CASCADE,
             data TEXT NOT NULL
         );
+
+        -- ── Tracker de altas tormentas (por campaña) ───────
+        CREATE TABLE IF NOT EXISTS storm_tracker (
+            campaign_id INTEGER PRIMARY KEY REFERENCES campaigns(id) ON DELETE CASCADE,
+            day INTEGER NOT NULL DEFAULT 0,     -- días transcurridos en el ciclo actual
+            target INTEGER NOT NULL,            -- día en que cae la tormenta (8-12)
+            moment TEXT NOT NULL DEFAULT ''     -- momento del día (aleatorio)
+        );
         """)
 
         # Migración: email en usuarios (para recuperar contraseña).

@@ -1,6 +1,7 @@
 """API: Campañas, membresías e invitaciones."""
 
 import json
+import random
 import re
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,6 +12,40 @@ from ..database import db
 from ..models import AcceptIn, CampaignIn, InviteIn, LongRestIn
 
 router = APIRouter(prefix="/api", tags=["campaigns"])
+
+# ── Altas tormentas: cada 10±2 días (8-12), en un momento al azar ──
+STORM_MIN, STORM_MAX = 8, 12
+STORM_MOMENTS = ["al amanecer", "por la mañana", "al mediodía",
+                 "por la tarde", "al anochecer", "de madrugada"]
+
+
+def _get_storm(conn, cid: int):
+    row = conn.execute("SELECT * FROM storm_tracker WHERE campaign_id=?", (cid,)).fetchone()
+    if not row:
+        conn.execute(
+            "INSERT INTO storm_tracker (campaign_id, day, target, moment) VALUES (?,0,?,?)",
+            (cid, random.randint(STORM_MIN, STORM_MAX), random.choice(STORM_MOMENTS)),
+        )
+        row = conn.execute("SELECT * FROM storm_tracker WHERE campaign_id=?", (cid,)).fetchone()
+    return row
+
+
+def _advance_storm(conn, cid: int) -> dict:
+    """Pasa un día. Si toca, cae la tormenta y arranca un ciclo nuevo."""
+    row = _get_storm(conn, cid)
+    day = row["day"] + 1
+    stormed = False
+    storm_day, storm_moment = row["target"], row["moment"]
+    if day >= row["target"]:
+        stormed = True
+        day = 0
+        conn.execute(
+            "UPDATE storm_tracker SET day=?, target=?, moment=? WHERE campaign_id=?",
+            (day, random.randint(STORM_MIN, STORM_MAX), random.choice(STORM_MOMENTS), cid),
+        )
+    else:
+        conn.execute("UPDATE storm_tracker SET day=? WHERE campaign_id=?", (day, cid))
+    return {"stormed": stormed, "storm_day": storm_day, "storm_moment": storm_moment}
 
 
 # ── DM: campañas propias ───────────────────────────────────
@@ -223,7 +258,49 @@ def long_rest(cid: int, payload: LongRestIn, user=Depends(current_user)):
                 if it["days"] >= 0:      # al bajar de 0, la herida se curó
                     kept.append(it)
             conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(kept), ch["id"]))
-    return {"ok": True, "characters": done}
+        storm = _advance_storm(conn, cid)   # el día pasa para todos, con o sin descanso
+    return {"ok": True, "characters": done, "storm": storm}
+
+
+def _storm_view(row, is_dm: bool) -> dict:
+    """El DM ve el día y momento exactos; los jugadores solo la barra."""
+    base = {"day": row["day"], "min": STORM_MIN, "max": STORM_MAX}
+    if is_dm:
+        base["target"] = row["target"]
+        base["moment"] = row["moment"]
+    return base
+
+
+@router.get("/campaigns/{cid}/storm")
+def get_storm(cid: int, user=Depends(current_user)):
+    with db() as conn:
+        _, is_dm = require_access(conn, cid, user)
+        row = _get_storm(conn, cid)
+        return _storm_view(row, is_dm)
+
+
+@router.post("/campaigns/{cid}/storm/advance")
+def advance_storm(cid: int, user=Depends(current_user)):
+    """El DM adelanta un día suelto (viaje, etc.) sin descanso largo."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+        storm = _advance_storm(conn, cid)
+        row = _get_storm(conn, cid)
+    return {"ok": True, "storm": storm, "state": _storm_view(row, True)}
+
+
+@router.post("/campaigns/{cid}/storm/reset")
+def reset_storm(cid: int, user=Depends(current_user)):
+    """El DM reinicia el ciclo (nuevo día y momento al azar)."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+        _get_storm(conn, cid)   # asegura que exista la fila
+        conn.execute(
+            "UPDATE storm_tracker SET day=0, target=?, moment=? WHERE campaign_id=?",
+            (random.randint(STORM_MIN, STORM_MAX), random.choice(STORM_MOMENTS), cid),
+        )
+        row = _get_storm(conn, cid)
+    return {"ok": True, "state": _storm_view(row, True)}
 
 
 # ── Jugador: invitaciones y membresías ─────────────────────

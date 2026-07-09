@@ -250,6 +250,17 @@ select.fi{appearance:auto;}
 .sb-item .n{font-family:'Cinzel',serif;color:var(--gold2);font-size:12px;}
 .chips{display:flex;flex-wrap:wrap;gap:5px;}
 .chip{font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:2px 9px;color:var(--text2);}
+/* tracker de altas tormentas */
+.storm-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:6px 12px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--r);}
+.storm-lbl{font-family:'Cinzel',serif;letter-spacing:.06em;text-transform:uppercase;font-size:9px;color:var(--text3);white-space:nowrap;}
+.storm-cells{display:flex;gap:2px;flex:1;min-width:150px;max-width:320px;}
+.storm-cell{flex:1;height:9px;border-radius:2px;background:var(--bg4);}
+.storm-cell.danger{background:rgba(200,80,60,.20);}
+.storm-cell.past{background:var(--gold);}
+.storm-cell.current{outline:1.5px solid var(--gold2);outline-offset:1px;}
+.storm-cell.storm{background:#e05050;box-shadow:0 0 5px rgba(224,80,80,.7);}
+.storm-info{font-size:11px;color:var(--text3);font-style:italic;white-space:nowrap;}
+.storm-ctrl{display:flex;gap:4px;}
 </style>
 </head>
 <body>
@@ -260,6 +271,16 @@ select.fi{appearance:auto;}
       <span class="conn-status" id="connStatus">Conectando...</span>
       <a class="btn sm" href="/">← Inicio</a>
     </div>
+  </div>
+
+  <div class="storm-bar" id="stormBar" style="display:none">
+    <span class="storm-lbl">⚡ Alta tormenta</span>
+    <div class="storm-cells" id="stormCells"></div>
+    <span class="storm-info" id="stormInfo"></span>
+    <span class="storm-ctrl">
+      <button class="btn ghost sm" onclick="stormAdvance()" title="Pasar un día (sin descanso)">+1 día</button>
+      <button class="btn ghost sm" onclick="stormReset()" title="Reiniciar el ciclo">⟳</button>
+    </span>
   </div>
 
   <div class="tabs">
@@ -500,7 +521,38 @@ async function doLongRest(){
   var exclude=[].slice.call(document.querySelectorAll('.lr-chk:not(:checked)')).map(function(c){return parseInt(c.value);});
   var r=await api(API+'/long_rest','POST',{exclude:exclude});
   closeModal();
-  alert('Descanso largo aplicado a '+r.characters+' personaje(s).');
+  if(r.state) renderStorm(r.state); else loadStorm();
+  var msg='Descanso largo aplicado a '+r.characters+' personaje(s).';
+  if(r.storm&&r.storm.stormed) msg+='\n\n⚡ ¡Alta tormenta! Cayó el día '+r.storm.storm_day+' '+r.storm.storm_moment+'.';
+  alert(msg);
+}
+
+// ─── Tracker de altas tormentas (DM: ve día y momento exactos) ───
+function renderStorm(s){
+  if(!s)return;
+  var cells='';
+  for(var i=1;i<=s.max;i++){
+    var cls='storm-cell';
+    if(i===s.target) cls+=' storm';
+    else if(i<=s.day) cls+=' past';
+    else if(i>=s.min) cls+=' danger';
+    if(i===s.day) cls+=' current';
+    cells+='<div class="'+cls+'" title="Día '+i+'"></div>';
+  }
+  document.getElementById('stormCells').innerHTML=cells;
+  document.getElementById('stormInfo').textContent='Día '+s.day+' · cae el día '+s.target+' '+s.moment;
+  document.getElementById('stormBar').style.display='';
+}
+async function loadStorm(){ try{ renderStorm(await api(API+'/storm')); }catch(e){} }
+async function stormAdvance(){
+  var r=await api(API+'/storm/advance','POST');
+  renderStorm(r.state);
+  if(r.storm&&r.storm.stormed) alert('⚡ ¡Alta tormenta! Cayó el día '+r.storm.storm_day+' '+r.storm.storm_moment+'.');
+}
+async function stormReset(){
+  if(!confirm('¿Reiniciar el ciclo de tormentas? Se sortea un nuevo día y momento.'))return;
+  var r=await api(API+'/storm/reset','POST');
+  renderStorm(r.state);
 }
 async function invitePlayer(){
   var u=document.getElementById('inviteUser').value.trim();
@@ -1229,6 +1281,7 @@ loadCampaign();
 connectWS();
 renderCombatSetup();
 loadEnemies();
+loadStorm();
 </script>
 </body>
 </html>
