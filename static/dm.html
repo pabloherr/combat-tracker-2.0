@@ -655,15 +655,17 @@ function renderStatblock(e,skipActions){
     +'<span>Focus <b>'+e.focus_max+'</b></span>'
     +(e.inv_max?'<span>Investidura <b>'+e.inv_max+'</b></span>':'')+'</div>';
   function ln(l,v){return (v&&v!=='-')?'<div class="sb-line"><span class="sb-line-l">'+l+':</span> '+esc(v)+'</div>':'';}
-  var lines=ln('Movimiento',s.movement)+ln('Sentidos',s.senses)+ln('Deflect',s.deflect)
-    +ln('Inmunidades',s.immunities)+ln('Resistencias',s.resistances)+ln('Debilidades',s.weaknesses)
-    +ln('Idiomas',s.languages);
+  // orden del libro: Deflect, Movimiento, Sentidos, Inmunidades, (Resist/Debil),
+  // habilidades (Físicas, Cognitivas, Espirituales, Surge), y por último Idiomas.
   var sk=s.skills||{};
-  var skills=ln('Habilidades físicas',sk.physical)+ln('Cognitivas',sk.cognitive)+ln('Espirituales',sk.spiritual)+ln('Surgebinding',sk.surge);
+  var lines=ln('Deflect',s.deflect)+ln('Movimiento',s.movement)+ln('Sentidos',s.senses)
+    +ln('Inmunidades',s.immunities)+ln('Resistencias',s.resistances)+ln('Debilidades',s.weaknesses)
+    +ln('Habilidades físicas',sk.physical)+ln('Cognitivas',sk.cognitive)+ln('Espirituales',sk.spiritual)+ln('Surgebinding',sk.surge)
+    +ln('Idiomas',s.languages);
   var traits=(s.traits&&s.traits.length)?'<div class="sb-section-h">Rasgos</div>'+renderEntries(s.traits,'trait'):'';
   var actions=(!skipActions&&s.actions&&s.actions.length)?'<div class="sb-section-h">Acciones</div>'+renderEntries(s.actions):'';
   var opps=(s.opportunities&&s.opportunities.length)?'<div class="sb-section-h">Oportunidades</div>'+renderEntries(s.opportunities,'opp'):'';
-  return '<div class="sb">'+attrs+res+lines+skills+traits+actions+opps+'</div>';
+  return '<div class="sb">'+attrs+res+lines+traits+actions+opps+'</div>';
 }
 
 async function ensureEnemies(){ if(!enemies.length) enemies=await api(API+'/enemies'); }
