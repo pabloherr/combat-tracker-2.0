@@ -303,6 +303,15 @@ var SC={Determined:'#5aaa70',Enhanced:'#6aaae8',Empowered:'#e8c840',Focus:'#aa8a
 var POS=['Determined','Enhanced','Empowered','Focus'];
 var NEG=['Restrained','Surprised','Stunned','Slowed','Disoriented','Prone','Exhausted','Unconscious','Immobilized','Afflicted'];
 var INJURY_EFFECTS=['Exhausted [−1]','Exhausted [−2]','Slowed','Disoriented','Surprised','Can only use one hand'];
+// Heridas que imponen un estado: [estado, cargas]. Se fija mientras dure la herida.
+var INJURY_STATUS={'Exhausted [−1]':['Exhausted',1],'Exhausted [−2]':['Exhausted',2],
+  'Slowed':['Slowed',1],'Disoriented':['Disoriented',1],'Surprised':['Surprised',1]};
+function lockedCounts(injuries){
+  var m={};
+  (injuries||[]).forEach(function(it){var e=INJURY_STATUS[it.name];if(e)m[e[0]]=(m[e[0]]||0)+e[1];});
+  return m;
+}
+function injLockMsg(){ alert('Este estado lo fija una herida. Se quita al curar la herida.'); }
 var MANAGE_ID=null;
 
 function mStatBlock(target,stat,label,cur,mx,color){
@@ -317,13 +326,23 @@ function mStatBlock(target,stat,label,cur,mx,color){
     +'<input class="fi" type="number" min="1" value="1" id="'+iid+'"/>'
     +'<button class="btn sm" onclick="mStat(\''+target+'\',\''+stat+'\',1)">+</button></div></div>';
 }
-function mSpills(target,statuses){
+function mSpills(target,statuses,injuries){
+  var locked=lockedCounts(injuries);
   return POS.concat(NEG).map(function(s){
-    var cnt=statuses.filter(function(x){return x===s;}).length; var on=cnt>0; var col=SC[s]||'#8a8a8a';
-    if(s==='Exhausted'&&cnt>0){
+    var manual=statuses.filter(function(x){return x===s;}).length;
+    var lk=locked[s]||0; var cnt=manual+lk; var on=cnt>0; var col=SC[s]||'#8a8a8a';
+    if(s==='Exhausted'){
+      if(cnt===0)
+        return '<button class="spill" onclick="mStatus(\''+target+'\',\'Exhausted\')">Exhausted</button>';
+      var minus=manual>0
+        ? '<button class="spill-minus" style="color:'+col+'" onclick="mStatusRm(\''+target+'\',\'Exhausted\')" title="Quitar carga">−</button>'
+        : '<span class="spill-minus" style="color:'+col+';cursor:default" onclick="injLockMsg()" title="Fijado por una herida">🔒</span>';
       return '<span class="spill-group" style="border-color:'+col+'">'
         +'<button class="spill on" style="color:'+col+';background:'+col+'22" onclick="mStatus(\''+target+'\',\'Exhausted\')" title="Sumar carga">Exhausted'+(cnt>1?' x'+cnt:'')+'</button>'
-        +'<button class="spill-minus" style="color:'+col+'" onclick="mStatusRm(\''+target+'\',\'Exhausted\')" title="Quitar carga">−</button></span>';
+        +minus+'</span>';
+    }
+    if(lk>0){
+      return '<button class="spill on" style="border-color:'+col+';color:'+col+';background:'+col+'22;cursor:default" onclick="injLockMsg()" title="Fijado por una herida">'+s+' 🔒</button>';
     }
     return '<button class="spill'+(on?' on':'')+'" style="'+(on?'border-color:'+col+';color:'+col+';background:'+col+'22':'')+'" onclick="mStatus(\''+target+'\',\''+esc(s)+'\')">'+s+'</button>';
   }).join('');
@@ -333,7 +352,7 @@ function mgEntity(target,name,o){
     +mStatBlock(target,'vida','Vida',o.vida,o.vida_max,'#e05050')
     +mStatBlock(target,'focus','Focus',o.focus,o.focus_max,'#6aaae8')
     +mStatBlock(target,'inv','Investidura',o.inv,o.inv_max,'#aa8aec')
-    +'<div class="spills">'+mSpills(target,o.statuses||[])+'</div></div>';
+    +'<div class="spills">'+mSpills(target,o.statuses||[],o.injuries||[])+'</div></div>';
 }
 async function openManage(id){
   MANAGE_ID=id;

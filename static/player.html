@@ -414,6 +414,15 @@ function render(combat){
 // ─── Gestión fuera de combate (mi personaje/mascotas + ver al grupo) ───
 var ROSTER=null, MYCHAR=null;
 var INJURY_EFFECTS=['Exhausted [−1]','Exhausted [−2]','Slowed','Disoriented','Surprised','Can only use one hand'];
+// Heridas que imponen un estado: [estado, cargas]. Se fija mientras dure la herida.
+var INJURY_STATUS={'Exhausted [−1]':['Exhausted',1],'Exhausted [−2]':['Exhausted',2],
+  'Slowed':['Slowed',1],'Disoriented':['Disoriented',1],'Surprised':['Surprised',1]};
+function lockedCounts(injuries){
+  var m={};
+  (injuries||[]).forEach(function(it){var e=INJURY_STATUS[it.name];if(e)m[e[0]]=(m[e[0]]||0)+e[1];});
+  return m;
+}
+function injLockMsg(){ alert('Este estado lo fija una herida. Se quita al curar la herida.'); }
 
 async function loadRoster(){
   if(MY_UID==null)return;
@@ -457,11 +466,21 @@ function ocStatCtl(target,o,stat,label,color){
     +'<input type="number" id="oc-amt-'+target+'-'+stat+'" value="1" min="1"/>'
     +'<button class="madj-btn plus" onclick="ocStat(\''+target+'\',\''+stat+'\',1)">+</button></div></div>';
 }
-function ocStatuses(target,statuses){
+function ocStatuses(target,statuses,injuries){
+  var locked=lockedCounts(injuries);
   var btns=POS.concat(NEG).map(function(s){
-    var cnt=(statuses||[]).filter(function(x){return x===s;}).length; var on=cnt>0,col=SC[s]||'#a09070';
-    if(s==='Exhausted'&&cnt>0){
-      return '<span class="spill-group" style="border-color:'+col+'"><button class="spill on" style="color:'+col+';background:'+col+'22" onclick="ocStatus(\''+target+'\',\'Exhausted\')">Exhausted'+(cnt>1?' x'+cnt:'')+'</button><button class="spill-minus" style="color:'+col+'" onclick="ocStatusRm(\''+target+'\',\'Exhausted\')">−</button></span>';
+    var manual=(statuses||[]).filter(function(x){return x===s;}).length;
+    var lk=locked[s]||0; var cnt=manual+lk; var on=cnt>0,col=SC[s]||'#a09070';
+    if(s==='Exhausted'){
+      if(cnt===0)
+        return '<button class="spill" onclick="ocStatus(\''+target+'\',\'Exhausted\')">Exhausted</button>';
+      var minus=manual>0
+        ? '<button class="spill-minus" style="color:'+col+'" onclick="ocStatusRm(\''+target+'\',\'Exhausted\')">−</button>'
+        : '<span class="spill-minus" style="color:'+col+';cursor:default" onclick="injLockMsg()" title="Fijado por una herida">🔒</span>';
+      return '<span class="spill-group" style="border-color:'+col+'"><button class="spill on" style="color:'+col+';background:'+col+'22" onclick="ocStatus(\''+target+'\',\'Exhausted\')">Exhausted'+(cnt>1?' x'+cnt:'')+'</button>'+minus+'</span>';
+    }
+    if(lk>0){
+      return '<button class="spill on" style="border-color:'+col+';color:'+col+';background:'+col+'22;cursor:default" onclick="injLockMsg()" title="Fijado por una herida">'+s+' 🔒</button>';
     }
     return '<button class="spill'+(on?' on':'')+'" style="'+(on?'border-color:'+col+';color:'+col+';background:'+col+'22':'')+'" onclick="ocStatus(\''+target+'\',\''+s+'\')">'+s+'</button>';
   }).join('');
@@ -491,6 +510,28 @@ function ocInjuriesHTML(c){
     +'<div style="font-size:11px;color:var(--text3);margin-top:5px">0 días = se cura en el próximo descanso largo. Subí/bajá los días a mano.</div></div>';
 }
 function ocInjCustomToggle(){ var s=document.getElementById('ocInjEffect'); document.getElementById('ocInjCustom').style.display=s.value==='__custom'?'':'none'; }
+// Preserva lo que estás cargando en el form de heridas cuando el refresco de 5s
+// vuelve a dibujar el panel (si no, se te reinicia el tipo y los días a mitad de carga).
+function snapInjForm(){
+  var e=document.getElementById('ocInjEffect'); if(!e)return null;
+  var a=document.activeElement;
+  return {effect:e.value,
+    custom:(document.getElementById('ocInjCustom')||{}).value||'',
+    days:(document.getElementById('ocInjDaysN')||{}).value||'0',
+    perm:!!(document.getElementById('ocInjPerm')||{}).checked,
+    focus:(a&&a.id)?a.id:null,
+    selS:a?a.selectionStart:null, selE:a?a.selectionEnd:null};
+}
+function restoreInjForm(s){
+  if(!s)return;
+  var e=document.getElementById('ocInjEffect'); if(!e)return;
+  e.value=s.effect;
+  var c=document.getElementById('ocInjCustom'); if(c)c.value=s.custom;
+  ocInjCustomToggle();
+  var d=document.getElementById('ocInjDaysN'); if(d)d.value=s.days;
+  var p=document.getElementById('ocInjPerm'); if(p)p.checked=s.perm;
+  if(s.focus){var f=document.getElementById(s.focus); if(f){f.focus(); try{f.setSelectionRange(s.selS,s.selE);}catch(_){}}}
+}
 async function ocAddInjury(){
   var sel=document.getElementById('ocInjEffect');
   var name=sel.value==='__custom'?document.getElementById('ocInjCustom').value.trim():sel.value;
@@ -529,7 +570,7 @@ function renderRoster(){
       +'<div class="me-sheet-row"><button class="btn-sheet" onclick="openRosterSheet(\'c\')">Ver ficha</button>'
       +(c.has_pdf?'<a class="btn-sheet" href="/api/characters/'+c.id+'/pdf" target="_blank">Ver PDF</a>':'')+'</div>'
       +ocStatCtl('c',c,'vida','Vida','#e05050')+ocStatCtl('c',c,'focus','Focus','#6aaae8')+ocStatCtl('c',c,'inv','Investidura','#aa8aec')
-      +ocStatuses('c',c.statuses)+ocInjuriesHTML(c)+'</div>';
+      +ocStatuses('c',c.statuses,c.injuries)+ocInjuriesHTML(c)+'</div>';
     if(meM.pets&&meM.pets.length){
       html+='<div class="section-lbl">Mis mascotas</div>'+meM.pets.map(function(p){
         return '<div class="me-card"><div class="me-head"><span class="me-name">'+esc(p.name)+' <span class="pet-tag">Mascota</span></span></div>'
@@ -541,7 +582,9 @@ function renderRoster(){
   }else{
     html+='<div class="me-select"><div class="me-q">No tenés personaje en esta campaña.</div></div>';
   }
+  var injSnap=snapInjForm();
   mp.innerHTML=html;
+  restoreInjForm(injSnap);
   var os=ROSTER.members.filter(function(m){return m.user_id!==MY_UID&&m.character;});
   document.getElementById('ocOthersLbl').style.display=os.length?'':'none';
   document.getElementById('ocOthers').innerHTML=os.map(allyCard).join('');
