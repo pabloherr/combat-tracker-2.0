@@ -12,6 +12,26 @@ from .database import db
 EMPTY_COMBAT = {"active": False, "round": 1, "phase": "fast_players", "participants": []}
 
 
+def player_view(combat: dict) -> dict:
+    """Vista del combate para los jugadores.
+
+    - Mientras está en preparación (`staged`) o no hay combate activo, los
+      jugadores no ven nada (pantalla de espera).
+    - Con el combate ya enviado, se quitan los enemigos marcados como ocultos.
+    """
+    if not combat.get("active") or combat.get("staged"):
+        return {
+            "active": False,
+            "round": combat.get("round", 1),
+            "phase": combat.get("phase", "fast_players"),
+            "encounter_name": "",
+            "participants": [],
+        }
+    parts = [p for p in combat.get("participants", [])
+             if not (p.get("kind") == "enemy" and p.get("hidden"))]
+    return {**combat, "participants": parts}
+
+
 class CampaignCombats:
     def __init__(self):
         self._cache: dict[int, dict] = {}

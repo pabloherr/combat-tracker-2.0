@@ -237,6 +237,9 @@ select.fi{appearance:auto;}
 .ed-en-desc{width:100%;min-height:46px;resize:vertical;font-family:inherit;}
 .ed-add{font-size:11px;}
 .modal.wide{max-width:860px;}
+/* banner de preparación (staging) */
+.staging-banner{background:rgba(224,189,124,.1);border:1px solid var(--border2);border-left:3px solid var(--gold);border-radius:var(--r);padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--gold2);}
+.combat-setup-h{font-family:'Cinzel',serif;font-size:13px;letter-spacing:.05em;color:var(--gold);margin-bottom:12px;}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow:auto;z-index:50;}
 .overlay.on{display:flex;}
 .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:1.4rem;max-width:640px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.5);}
@@ -269,21 +272,20 @@ select.fi{appearance:auto;}
   <!-- ═══════════ COMBATE ═══════════ -->
   <div id="tab-combate">
     <div id="noCombat">
-      <div class="section-label">Iniciar combate</div>
-      <div class="row">
-        <select class="fi" id="encounterSelect" style="max-width:320px"></select>
-        <button class="btn accent" onclick="startCombat()">Iniciar</button>
-      </div>
-      <div class="empty">No hay combate activo. Elegí un encuentro para empezar.</div>
+      <div class="combat-setup-h">Elegí un encuentro para preparar el combate</div>
+      <div class="grid" id="combatSetup"></div>
+      <div class="empty" id="combatSetupEmpty">No hay encuentros preparados. Armá uno en la pestaña Encuentros.</div>
     </div>
 
     <div id="activeCombat" style="display:none">
+      <div class="staging-banner" id="stagingBanner" style="display:none">🔒 <b>Preparando el combate</b> — los jugadores no lo ven todavía. Ajustá colores, agregá o sacá enemigos (✕) y decidí quién es visible (👁 / 🚫). Cuando esté listo, tocá <b>Enviar a jugadores</b>.</div>
       <div class="combat-header">
         <span class="round-badge">Ronda <span id="roundNum">1</span></span>
         <span style="font-size:13px;color:var(--text2);font-style:italic" id="encName"></span>
         <div class="sep"></div>
-        <button class="btn" onclick="nextRound()">Siguiente ronda →</button>
-        <button class="btn danger" onclick="endCombat()">Terminar combate</button>
+        <button class="btn accent" id="revealBtn" onclick="revealCombat()" style="display:none">▶ Enviar a jugadores</button>
+        <button class="btn" id="nextRoundBtn" onclick="nextRound()">Siguiente ronda →</button>
+        <button class="btn danger" id="endBtn" onclick="endCombat()">Terminar combate</button>
       </div>
 
       <div class="phase-bar">
@@ -447,7 +449,7 @@ function showTab(t){
   if(t==='jugadores')loadMembers();
   if(t==='bestiario')loadEnemies();
   if(t==='encuentros')loadEncounters();
-  if(t==='combate')loadEncountersForSelect();
+  if(t==='combate')renderCombatSetup();
 }
 function toggleForm(id){
   var f=document.getElementById(id);
@@ -981,17 +983,34 @@ async function delEncounter(id){
 }
 
 // ═══════════ COMBATE ═══════════
-async function loadEncountersForSelect(){
+async function renderCombatSetup(){
+  await ensureEnemies();
+  await loadParty();
   encounters=await api(API+'/encounters');
-  var sel=document.getElementById('encounterSelect');
-  sel.innerHTML=encounters.length
-    ? encounters.map(function(e){return '<option value="'+e.id+'">'+e.name+'</option>';}).join('')
-    : '<option value="">— Sin encuentros —</option>';
+  var g=document.getElementById('combatSetup');
+  if(!g)return;
+  document.getElementById('combatSetupEmpty').style.display=encounters.length?'none':'block';
+  var d=partyDefaults();
+  g.innerHTML=encounters.map(function(enc){
+    var items=enc.enemies.map(function(x){var be=enemies.find(function(e){return e.id===x.enemy_id;});var m=be?enemyMeta(be):{tier:null,role:'rival'};return {tier:m.tier,role:m.role,qty:x.cantidad};});
+    var list=enc.enemies.map(function(e){return e.cantidad+'× '+esc(e.name);}).join(' · ');
+    return '<div class="card">'
+      +'<div class="cname">'+esc(enc.name)+'</div>'
+      +(enc.descripcion?'<div class="ctype">'+esc(enc.descripcion)+'</div>':'')
+      +'<div style="margin:8px 0">'+(items.length?diffBadge(items,d.size,d.tier):'')+'</div>'
+      +'<div class="cstats">'+(list||'sin enemigos')+'</div>'
+      +'<div class="card-actions" style="margin-top:10px"><button class="btn accent sm" onclick="stageCombat('+enc.id+')">Preparar combate ▶</button></div>'
+      +'</div>';
+  }).join('');
 }
-async function startCombat(){
-  var id=document.getElementById('encounterSelect').value;
-  if(!id){alert('Armá un encuentro primero en la pestaña Encuentros.');return;}
-  await api(API+'/combat/start/'+id,'POST');
+async function stageCombat(id){ await api(API+'/combat/stage/'+id,'POST'); }
+async function revealCombat(){
+  if(!confirm('¿Enviar el combate a los jugadores? Va a aparecer en su pantalla.'))return;
+  await api(API+'/combat/reveal','POST');
+}
+async function chRemove(uid){
+  if(!confirm('¿Sacar este enemigo del combate?'))return;
+  await api(API+'/combat/remove/'+uid,'POST');
 }
 async function nextRound(){await api(API+'/combat/next_round','POST');}
 function populateAddEnemySelect(){
@@ -1112,10 +1131,11 @@ function participantCard(p){
   var fullyActed=isBoss?(p.acted&&p.acted_slow):p.acted;
   var eyeBtn=isEnemy?'<button class="eye-btn'+(p.hidden?' off':'')+'" title="'+(p.hidden?'Oculto para los jugadores':'Visible para los jugadores')+'" onclick="chHidden(\''+p.uid+'\')">'+(p.hidden?'🚫':'👁')+'</button>':'';
   var isPet=p.kind==='pet';
+  var removeBtn=(isEnemy||isPet)?'<button class="eye-btn" title="Sacar del combate" onclick="chRemove(\''+p.uid+'\')">✕</button>':'';
   return '<div class="pcard'+(fullyActed?' acted':'')+(p.defeated?' defeated':'')+(p.kind==='player'?' player-kind':'')+(isPet?' pet-ally':'')+(p.hidden?' hidden-enemy':'')+((isEnemy||isPet)?' turn-'+(isBoss?'both':p.turn)+'-card':'')+'"'
     +(col?' style="border-left:3px solid '+col+'"':'')+'>'
     +'<div class="card-head"><span class="cname">'+(col?'<span class="color-dot" style="background:'+col+'"></span>':'')+esc(p.name)+'</span>'
-    +'<div style="display:flex;gap:6px;align-items:center">'+eyeBtn+turnCtl+'</div></div>'
+    +'<div style="display:flex;gap:6px;align-items:center">'+eyeBtn+removeBtn+turnCtl+'</div></div>'
     +(isEnemy?'<div style="margin-bottom:6px">'+claseBadge(p.clase)+'</div>'+colorRow(p):'')
     +(p.kind==='pet'?'<div style="margin-bottom:6px"><span class="clase-badge" style="color:#7ac88c;border-color:#7ac88c">🐾 Mascota'+(p.owner_name?' de '+esc(p.owner_name):'')+'</span></div>':'')
     +(p.tipo?'<div class="ctype">'+esc(p.tipo)+'</div>':'')
@@ -1134,7 +1154,12 @@ function renderCombat(){
   var active=combat.active;
   document.getElementById('noCombat').style.display=active?'none':'';
   document.getElementById('activeCombat').style.display=active?'':'none';
-  if(!active)return;
+  if(!active){renderCombatSetup();return;}
+  var staged=!!combat.staged;
+  document.getElementById('stagingBanner').style.display=staged?'':'none';
+  document.getElementById('revealBtn').style.display=staged?'':'none';
+  document.getElementById('nextRoundBtn').style.display=staged?'none':'';
+  document.getElementById('endBtn').textContent=staged?'Cancelar preparación':'Terminar combate';
   document.getElementById('roundNum').textContent=combat.round;
   document.getElementById('encName').textContent=combat.encounter_name||'';
   populateAddEnemySelect();
@@ -1176,7 +1201,7 @@ function toggleSection(gridId,toggleId,label){
 // init
 loadCampaign();
 connectWS();
-loadEncountersForSelect();
+renderCombatSetup();
 loadEnemies();
 </script>
 </body>

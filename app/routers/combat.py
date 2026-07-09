@@ -10,7 +10,7 @@ from ..access import require_access, require_dm
 from ..auth import current_user
 from ..database import db
 from ..models import AddEnemyIn, ColorChange, StatChange, StatusToggle, TurnChange
-from ..state import combats
+from ..state import combats, player_view
 from ..ws import push_state
 
 router = APIRouter(prefix="/api/campaigns/{cid}/combat", tags=["combat"])
@@ -88,73 +88,123 @@ def _guard_participant(is_dm: bool, p: dict, user: dict):
     raise HTTPException(403, "Solo podés modificar tu propio personaje o tus mascotas")
 
 
-@router.post("/start/{encounter_id}")
-async def start_combat(cid: int, encounter_id: int, user=Depends(current_user)):
-    """Inicia combate: personajes de los miembros aceptados + enemigos del encuentro."""
-    with db() as conn:
-        require_dm(conn, cid, user)
-        enc = conn.execute(
-            "SELECT * FROM encounters WHERE id=? AND campaign_id=?", (encounter_id, cid)
-        ).fetchone()
-        if not enc:
-            raise HTTPException(404, "Encuentro no encontrado")
+def _build_participants(conn, cid: int, encounter_id: int):
+    """Arma la lista de participantes: personajes aceptados (+ mascotas) + enemigos."""
+    participants = []
 
-        participants = []
-
-        # Jugadores: personaje que trajo cada miembro aceptado.
-        chars = conn.execute(
-            "SELECT m.user_id, ch.* FROM campaign_members m "
-            "JOIN characters ch ON ch.id = m.character_id "
-            "WHERE m.campaign_id=? AND m.status='accepted' AND m.character_id IS NOT NULL "
-            "ORDER BY ch.name",
-            (cid,),
-        ).fetchall()
-        for ch in chars:
+    # Jugadores: personaje que trajo cada miembro aceptado.
+    chars = conn.execute(
+        "SELECT m.user_id, ch.* FROM campaign_members m "
+        "JOIN characters ch ON ch.id = m.character_id "
+        "WHERE m.campaign_id=? AND m.status='accepted' AND m.character_id IS NOT NULL "
+        "ORDER BY ch.name",
+        (cid,),
+    ).fetchall()
+    for ch in chars:
+        participants.append(_mk_participant(
+            "player", ch["name"], ch["vida_max"], ch["focus_max"], ch["inv_max"],
+            cur_vida=ch["vida"], cur_focus=ch["focus"], cur_inv=ch["inv"],
+            statuses=json.loads(ch["statuses"] or "[]"),
+            stats=json.loads(ch["sheet"] or "{}"),
+            char_id=ch["id"], user_id=ch["user_id"], has_pdf=bool(ch["has_pdf"]),
+        ))
+        # Mascotas del personaje: entran como aliados que el jugador controla.
+        for pet in conn.execute("SELECT * FROM pets WHERE character_id=? ORDER BY name", (ch["id"],)):
             participants.append(_mk_participant(
-                "player", ch["name"], ch["vida_max"], ch["focus_max"], ch["inv_max"],
-                cur_vida=ch["vida"], cur_focus=ch["focus"], cur_inv=ch["inv"],
-                statuses=json.loads(ch["statuses"] or "[]"),
-                stats=json.loads(ch["sheet"] or "{}"),
-                char_id=ch["id"], user_id=ch["user_id"], has_pdf=bool(ch["has_pdf"]),
+                "pet", pet["name"], pet["vida_max"], pet["focus_max"], pet["inv_max"],
+                acciones=json.loads(pet["acciones"] or "[]"),
+                cur_vida=pet["vida"], cur_focus=pet["focus"], cur_inv=pet["inv"],
+                statuses=json.loads(pet["statuses"] or "[]"),
+                stats=json.loads(pet["stats"] or "{}"),
+                user_id=ch["user_id"], pet_id=pet["id"], owner_name=ch["name"],
             ))
-            # Mascotas del personaje: entran como aliados que el jugador controla.
-            for pet in conn.execute("SELECT * FROM pets WHERE character_id=? ORDER BY name", (ch["id"],)):
-                participants.append(_mk_participant(
-                    "pet", pet["name"], pet["vida_max"], pet["focus_max"], pet["inv_max"],
-                    acciones=json.loads(pet["acciones"] or "[]"),
-                    cur_vida=pet["vida"], cur_focus=pet["focus"], cur_inv=pet["inv"],
-                    statuses=json.loads(pet["statuses"] or "[]"),
-                    stats=json.loads(pet["stats"] or "{}"),
-                    user_id=ch["user_id"], pet_id=pet["id"], owner_name=ch["name"],
-                ))
 
-        # Enemigos del encuentro.
-        rows = conn.execute(
-            "SELECT ee.cantidad, e.* FROM encounter_enemies ee "
-            "JOIN enemies e ON e.id = ee.enemy_id WHERE ee.encounter_id=?",
-            (encounter_id,),
-        ).fetchall()
-        for r in rows:
-            acciones = json.loads(r["acciones"])
-            stats = json.loads(r["stats"] or "{}")
-            for i in range(1, r["cantidad"] + 1):
-                nm = r["name"] if r["cantidad"] == 1 else f'{r["name"]} {i}'
-                participants.append(_mk_participant(
-                    "enemy", nm, r["vida_max"], r["focus_max"], r["inv_max"],
-                    acciones=acciones, notas=r["notas"],
-                    faction_color=r["faction_color"], tipo=r["tipo"], stats=stats,
-                    clase=r["clase"],
-                ))
+    # Enemigos del encuentro.
+    rows = conn.execute(
+        "SELECT ee.cantidad, e.* FROM encounter_enemies ee "
+        "JOIN enemies e ON e.id = ee.enemy_id WHERE ee.encounter_id=?",
+        (encounter_id,),
+    ).fetchall()
+    for r in rows:
+        acciones = json.loads(r["acciones"])
+        stats = json.loads(r["stats"] or "{}")
+        for i in range(1, r["cantidad"] + 1):
+            nm = r["name"] if r["cantidad"] == 1 else f'{r["name"]} {i}'
+            participants.append(_mk_participant(
+                "enemy", nm, r["vida_max"], r["focus_max"], r["inv_max"],
+                acciones=acciones, notas=r["notas"],
+                faction_color=r["faction_color"], tipo=r["tipo"], stats=stats,
+                clase=r["clase"],
+            ))
+    return participants
 
-    combats.set(cid, {
+
+def _new_combat(conn, cid: int, encounter_id: int, staged: bool):
+    enc = conn.execute(
+        "SELECT * FROM encounters WHERE id=? AND campaign_id=?", (encounter_id, cid)
+    ).fetchone()
+    if not enc:
+        raise HTTPException(404, "Encuentro no encontrado")
+    return {
         "active": True,
+        "staged": staged,   # en preparación: el DM lo ve, los jugadores no
         "round": 1,
         "phase": "fast_players",
         "encounter_name": enc["name"],
-        "participants": participants,
-    })
+        "participants": _build_participants(conn, cid, encounter_id),
+    }
+
+
+@router.post("/stage/{encounter_id}")
+async def stage_combat(cid: int, encounter_id: int, user=Depends(current_user)):
+    """Prepara el combate en modo 'staging': el DM puede examinarlo y editarlo
+    (colores, agregar/quitar enemigos, visibilidad) antes de enviarlo a los jugadores."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+        combat = _new_combat(conn, cid, encounter_id, staged=True)
+    combats.set(cid, combat)
     await push_state(cid)
     return combats.get(cid)
+
+
+@router.post("/start/{encounter_id}")
+async def start_combat(cid: int, encounter_id: int, user=Depends(current_user)):
+    """Inicia combate directo (sin staging): visible a los jugadores de una."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+        combat = _new_combat(conn, cid, encounter_id, staged=False)
+    combats.set(cid, combat)
+    await push_state(cid)
+    return combats.get(cid)
+
+
+@router.post("/reveal")
+async def reveal_combat(cid: int, user=Depends(current_user)):
+    """Envía el combate preparado a los jugadores (sale del modo staging)."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+    combat = combats.get(cid)
+    if not combat.get("active"):
+        raise HTTPException(400, "No hay un combate preparado")
+    combat["staged"] = False
+    await push_state(cid)
+    return {"ok": True}
+
+
+@router.post("/remove/{uid}")
+async def remove_participant(cid: int, uid: str, user=Depends(current_user)):
+    """Saca un enemigo (o mascota) del combate. No se puede sacar a un jugador."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+    combat = combats.get(cid)
+    p = _find(cid, uid)
+    if not p:
+        raise HTTPException(404, "Participante no encontrado")
+    if p.get("kind") == "player":
+        raise HTTPException(400, "No podés sacar a un jugador del combate")
+    combat["participants"] = [x for x in combat["participants"] if x["uid"] != uid]
+    await push_state(cid)
+    return {"ok": True}
 
 
 @router.post("/add_enemy")
@@ -197,8 +247,9 @@ async def add_enemy(cid: int, payload: AddEnemyIn, user=Depends(current_user)):
 @router.get("")
 def get_combat(cid: int, user=Depends(current_user)):
     with db() as conn:
-        require_access(conn, cid, user)
-    return combats.get(cid)
+        _, is_dm = require_access(conn, cid, user)
+    combat = combats.get(cid)
+    return combat if is_dm else player_view(combat)
 
 
 @router.post("/stat")
