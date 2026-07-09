@@ -8,7 +8,7 @@ from fastapi.responses import Response
 from ..auth import current_user
 from ..cosmere_import import ImportError_, parse_statblock
 from ..database import db
-from ..models import CharacterIn, PetImportIn
+from ..models import CharacterIn, LiveStat, LiveStatus, PetImportIn
 from ..pdf_import import parse_character_pdf
 
 router = APIRouter(prefix="/api/characters", tags=["characters"])
@@ -166,6 +166,112 @@ def delete_pet(cid: int, pid: int, user=Depends(current_user)):
         _owned(conn, cid, user)
         conn.execute("DELETE FROM pets WHERE id=? AND character_id=?", (pid, cid))
     return {"ok": True}
+
+
+# ── Gestión en vivo (vida/focus/investidura/estados), dentro o fuera de combate ──
+
+_STATS = {"vida", "focus", "inv"}
+
+
+def _clamp_stat(row, stat: str, delta: int) -> int:
+    mx = row[f"{stat}_max"]
+    cur = row[stat] if row[stat] is not None else mx
+    return max(0, min(mx, cur + delta))
+
+
+def _toggle_status(st: list, status: str) -> list:
+    # Exhausted es apilable; el resto es on/off.
+    if status == "Exhausted" or status not in st:
+        st.append(status)
+    else:
+        st.remove(status)
+    return st
+
+
+def _owned_pet(conn, cid: int, pid: int, user: dict):
+    _owned(conn, cid, user)
+    r = conn.execute("SELECT * FROM pets WHERE id=? AND character_id=?", (pid, cid)).fetchone()
+    if not r:
+        raise HTTPException(404, "Mascota no encontrada")
+    return r
+
+
+@router.post("/{cid}/stat")
+def character_stat(cid: int, s: LiveStat, user=Depends(current_user)):
+    if s.stat not in _STATS:
+        raise HTTPException(400, "Stat inválido")
+    with db() as conn:
+        r = _owned(conn, cid, user)
+        val = _clamp_stat(r, s.stat, s.delta)
+        conn.execute(f"UPDATE characters SET {s.stat}=? WHERE id=?", (val, cid))
+    return {"ok": True, "value": val}
+
+
+@router.post("/{cid}/status")
+def character_status(cid: int, s: LiveStatus, user=Depends(current_user)):
+    with db() as conn:
+        r = _owned(conn, cid, user)
+        st = _toggle_status(json.loads(r["statuses"] or "[]"), s.status)
+        conn.execute("UPDATE characters SET statuses=? WHERE id=?", (json.dumps(st), cid))
+    return {"ok": True, "statuses": st}
+
+
+@router.post("/{cid}/status/remove_one")
+def character_status_remove(cid: int, s: LiveStatus, user=Depends(current_user)):
+    with db() as conn:
+        r = _owned(conn, cid, user)
+        st = json.loads(r["statuses"] or "[]")
+        if s.status in st:
+            st.remove(s.status)
+        conn.execute("UPDATE characters SET statuses=? WHERE id=?", (json.dumps(st), cid))
+    return {"ok": True, "statuses": st}
+
+
+@router.post("/{cid}/rest")
+def character_rest(cid: int, user=Depends(current_user)):
+    """Descanso completo: cura a full y limpia estados, del personaje y sus mascotas."""
+    with db() as conn:
+        _owned(conn, cid, user)
+        conn.execute(
+            "UPDATE characters SET vida=vida_max, focus=focus_max, inv=inv_max, statuses='[]' WHERE id=?",
+            (cid,),
+        )
+        conn.execute(
+            "UPDATE pets SET vida=vida_max, focus=focus_max, inv=inv_max, statuses='[]' WHERE character_id=?",
+            (cid,),
+        )
+    return {"ok": True}
+
+
+@router.post("/{cid}/pets/{pid}/stat")
+def pet_stat(cid: int, pid: int, s: LiveStat, user=Depends(current_user)):
+    if s.stat not in _STATS:
+        raise HTTPException(400, "Stat inválido")
+    with db() as conn:
+        r = _owned_pet(conn, cid, pid, user)
+        val = _clamp_stat(r, s.stat, s.delta)
+        conn.execute(f"UPDATE pets SET {s.stat}=? WHERE id=?", (val, pid))
+    return {"ok": True, "value": val}
+
+
+@router.post("/{cid}/pets/{pid}/status")
+def pet_status(cid: int, pid: int, s: LiveStatus, user=Depends(current_user)):
+    with db() as conn:
+        r = _owned_pet(conn, cid, pid, user)
+        st = _toggle_status(json.loads(r["statuses"] or "[]"), s.status)
+        conn.execute("UPDATE pets SET statuses=? WHERE id=?", (json.dumps(st), pid))
+    return {"ok": True, "statuses": st}
+
+
+@router.post("/{cid}/pets/{pid}/status/remove_one")
+def pet_status_remove(cid: int, pid: int, s: LiveStatus, user=Depends(current_user)):
+    with db() as conn:
+        r = _owned_pet(conn, cid, pid, user)
+        st = json.loads(r["statuses"] or "[]")
+        if s.status in st:
+            st.remove(s.status)
+        conn.execute("UPDATE pets SET statuses=? WHERE id=?", (json.dumps(st), pid))
+    return {"ok": True, "statuses": st}
 
 
 @router.get("/{cid}/pdf")

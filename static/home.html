@@ -72,6 +72,21 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .chip{font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:2px 9px;color:var(--text2);}
 .import-ta{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:'Courier New',monospace;font-size:12px;line-height:1.5;outline:none;resize:vertical;min-height:160px;white-space:pre;}
 .import-ta:focus{border-color:var(--gold);}
+/* gestión en vivo (vida/focus/estados) */
+.mg-block{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:12px;}
+.mg-name{font-family:'Cinzel',serif;color:var(--gold2);font-size:14px;margin-bottom:8px;}
+.mg-stat{margin-bottom:10px;}
+.mg-stat-top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;}
+.mbar{height:8px;border-radius:20px;background:var(--bg4,#413c33);overflow:hidden;}
+.mbar>div{height:100%;border-radius:20px;transition:width .2s;}
+.mg-adj{display:flex;gap:6px;align-items:center;margin-top:5px;}
+.mg-adj input{width:56px;text-align:center;padding:5px 6px;}
+.spills{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+.spill{font-size:11px;letter-spacing:.04em;padding:5px 10px;border-radius:20px;cursor:pointer;border:1px solid var(--border);color:var(--text3);background:transparent;font-family:'Cinzel',serif;}
+.spill.on{border-color:currentColor;}
+.spill-group{display:inline-flex;align-items:stretch;border:1px solid;border-radius:20px;overflow:hidden;}
+.spill-group .spill{border:none;border-radius:0;}
+.spill-minus{border:none;border-left:1px solid;background:rgba(0,0,0,.28);cursor:pointer;padding:0 12px;font-size:16px;font-family:'Cinzel',serif;line-height:1;}
 </style>
 </head>
 <body>
@@ -258,8 +273,9 @@ async function loadCharacters(){
   document.getElementById('charEmpty').style.display=CHARS.length?'none':'block';
   document.getElementById('charGrid').innerHTML=CHARS.map(function(c){
     return '<div class="card"><div class="cname">'+esc(c.name)+(c.has_pdf?' <span class="pill pdf">PDF</span>':'')+'</div>'
-      +'<div class="cmeta">Vida '+c.vida_max+' · Focus '+c.focus_max+(c.inv_max?' · Investidura '+c.inv_max:'')+'</div>'
+      +'<div class="cmeta">Vida '+(c.vida==null?c.vida_max:c.vida)+'/'+c.vida_max+' · Focus '+(c.focus==null?c.focus_max:c.focus)+'/'+c.focus_max+(c.inv_max?' · Inv '+(c.inv==null?c.inv_max:c.inv)+'/'+c.inv_max:'')+'</div>'
       +'<div class="card-actions">'
+      +'<button class="btn accent sm" onclick="openManage('+c.id+')">⚙ Gestionar</button>'
       +'<button class="btn sm" onclick="viewSheet('+c.id+')">Ver ficha</button>'
       +'<button class="btn sm" onclick="openEditChar('+c.id+')">✎ Actualizar</button>'
       +'<button class="btn sm" onclick="openPets('+c.id+')">🐾 Mascotas</button>'
@@ -272,6 +288,91 @@ async function delChar(id){
   if(!confirm('¿Borrar este personaje?'))return;
   await api('/api/characters/'+id,'DELETE');
   loadCharacters();
+}
+
+// ─── Gestión en vivo (vida/focus/investidura/estados), dentro o fuera de combate ───
+var SC={Determined:'#5aaa70',Enhanced:'#6aaae8',Empowered:'#e8c840',Focus:'#aa8aec',
+  Restrained:'#c87830',Surprised:'#d0a040',Stunned:'#e0a020',Slowed:'#c8a040',
+  Disoriented:'#e07070',Prone:'#c84040',Exhausted:'#bf4a20',
+  Unconscious:'#a03030',Immobilized:'#b06030',Afflicted:'#9040a0'};
+var POS=['Determined','Enhanced','Empowered','Focus'];
+var NEG=['Restrained','Surprised','Stunned','Slowed','Disoriented','Prone','Exhausted','Unconscious','Immobilized','Afflicted'];
+var MANAGE_ID=null;
+
+function mStatBlock(target,stat,label,cur,mx,color){
+  if(stat!=='vida'&&mx===0)return '';
+  cur=(cur==null)?mx:cur;
+  var pct=mx>0?Math.round(cur/mx*100):0;
+  var iid='amt-'+target+'-'+stat;
+  return '<div class="mg-stat"><div class="mg-stat-top"><span>'+label+'</span>'
+    +'<span style="color:'+color+'">'+cur+' <span style="color:var(--text3);font-size:11px">/ '+mx+'</span></span></div>'
+    +'<div class="mbar"><div style="width:'+pct+'%;background:'+color+'"></div></div>'
+    +'<div class="mg-adj"><button class="btn sm" onclick="mStat(\''+target+'\',\''+stat+'\',-1)">−</button>'
+    +'<input class="fi" type="number" min="1" value="1" id="'+iid+'"/>'
+    +'<button class="btn sm" onclick="mStat(\''+target+'\',\''+stat+'\',1)">+</button></div></div>';
+}
+function mSpills(target,statuses){
+  return POS.concat(NEG).map(function(s){
+    var cnt=statuses.filter(function(x){return x===s;}).length; var on=cnt>0; var col=SC[s]||'#8a8a8a';
+    if(s==='Exhausted'&&cnt>0){
+      return '<span class="spill-group" style="border-color:'+col+'">'
+        +'<button class="spill on" style="color:'+col+';background:'+col+'22" onclick="mStatus(\''+target+'\',\'Exhausted\')" title="Sumar carga">Exhausted'+(cnt>1?' x'+cnt:'')+'</button>'
+        +'<button class="spill-minus" style="color:'+col+'" onclick="mStatusRm(\''+target+'\',\'Exhausted\')" title="Quitar carga">−</button></span>';
+    }
+    return '<button class="spill'+(on?' on':'')+'" style="'+(on?'border-color:'+col+';color:'+col+';background:'+col+'22':'')+'" onclick="mStatus(\''+target+'\',\''+esc(s)+'\')">'+s+'</button>';
+  }).join('');
+}
+function mgEntity(target,name,o){
+  return '<div class="mg-block"><div class="mg-name">'+esc(name)+'</div>'
+    +mStatBlock(target,'vida','Vida',o.vida,o.vida_max,'#e05050')
+    +mStatBlock(target,'focus','Focus',o.focus,o.focus_max,'#6aaae8')
+    +mStatBlock(target,'inv','Investidura',o.inv,o.inv_max,'#aa8aec')
+    +'<div class="spills">'+mSpills(target,o.statuses||[])+'</div></div>';
+}
+async function openManage(id){
+  MANAGE_ID=id;
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cname" style="font-size:18px">⚙ Gestionar personaje</div>'
+    +'<div class="section-sub">Ajustá vida, focus, investidura y estados. Se guarda solo (sirve dentro y fuera de combate).</div>'
+    +'<div class="card-actions" style="margin:8px 0 12px"><button class="btn" onclick="mRest()">🛌 Descanso completo (curar todo)</button></div>'
+    +'<div id="manageBody"></div>';
+  document.getElementById('overlay').classList.add('on');
+  refreshManage();
+}
+async function refreshManage(){
+  CHARS=await api('/api/characters');
+  var c=CHARS.find(function(x){return x.id===MANAGE_ID;});
+  var body=document.getElementById('manageBody');
+  if(!c||!body){closeModal();return;}
+  var pets=await api('/api/characters/'+MANAGE_ID+'/pets');
+  var html=mgEntity('c',c.name,c);
+  if(pets.length){
+    html+='<div class="section-sub" style="margin:4px 0 8px">🐾 Mascotas</div>'
+      +pets.map(function(p){return mgEntity('p'+p.id,p.name,p);}).join('');
+  }
+  body.innerHTML=html;
+}
+function _mgUrl(target){
+  return target==='c' ? '/api/characters/'+MANAGE_ID
+                      : '/api/characters/'+MANAGE_ID+'/pets/'+target.slice(1);
+}
+async function mStat(target,stat,sign){
+  var amt=Math.max(1,parseInt(document.getElementById('amt-'+target+'-'+stat).value)||1);
+  await api(_mgUrl(target)+'/stat','POST',{stat:stat,delta:sign*amt});
+  refreshManage(); loadCharacters();
+}
+async function mStatus(target,status){
+  await api(_mgUrl(target)+'/status','POST',{status:status});
+  refreshManage();
+}
+async function mStatusRm(target,status){
+  await api(_mgUrl(target)+'/status/remove_one','POST',{status:status});
+  refreshManage();
+}
+async function mRest(){
+  if(!confirm('¿Curar a full y limpiar estados del personaje y sus mascotas?'))return;
+  await api('/api/characters/'+MANAGE_ID+'/rest','POST');
+  refreshManage(); loadCharacters();
 }
 
 // ─── Actualizar personaje (a mano o reemplazando el PDF) ───

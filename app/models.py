@@ -66,6 +66,15 @@ class PetImportIn(BaseModel):
     code: str                  # statblock YAML (mismo formato que los enemigos)
 
 
+class LiveStat(BaseModel):
+    stat: str                  # vida | focus | inv
+    delta: int
+
+
+class LiveStatus(BaseModel):
+    status: str
+
+
 class AccionIn(BaseModel):
     nombre: str
     coste: str = ""          # ej: "1 acción", "2 focus"
