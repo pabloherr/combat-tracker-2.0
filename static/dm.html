@@ -225,6 +225,18 @@ select.fi{appearance:auto;}
 /* miembros + modal de ficha */
 .cmeta{font-size:13px;color:var(--text2);margin-top:4px;}
 .card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+/* editor de enemigos (modal) */
+.ed-sec{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);margin:16px 0 8px;border-top:.5px solid var(--border);padding-top:12px;}
+.ed-row{display:grid;gap:8px;margin-bottom:8px;}
+.ed-attrs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.ed-attrs .sb-col-h{margin-bottom:4px;}
+.ed-attrs .fl{font-size:10px;}
+.ed-entry{background:var(--bg3);border:.5px solid var(--border);padding:8px;border-radius:var(--r);margin-bottom:8px;}
+.ed-en-top{display:flex;gap:6px;margin-bottom:6px;}
+.ed-en-top .ed-en-name{flex:1;}
+.ed-en-desc{width:100%;min-height:46px;resize:vertical;font-family:inherit;}
+.ed-add{font-size:11px;}
+.modal.wide{max-width:860px;}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow:auto;z-index:50;}
 .overlay.on{display:flex;}
 .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:1.4rem;max-width:640px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.5);}
@@ -313,7 +325,7 @@ select.fi{appearance:auto;}
       <div class="sep"></div>
       <button class="btn accent" onclick="toggleForm('importForm')">⭳ Importar desde código</button>
       <button class="btn accent" onclick="toggleForm('bulkForm')">⭳⭳ Importar en bulk</button>
-      <button class="btn" onclick="toggleForm('enemyForm')">+ Agregar enemigo</button>
+      <button class="btn" onclick="openEnemyEditor()">+ Agregar enemigo</button>
     </div>
     <div class="form-wrap" id="bulkForm" style="display:none">
       <div class="form-title">Importar muchas fichas de una vez</div>
@@ -337,46 +349,6 @@ select.fi{appearance:auto;}
       <div class="form-actions" style="margin-top:10px">
         <button class="btn ghost" onclick="toggleForm('importForm')">Cancelar</button>
         <button class="btn accent" onclick="importEnemy()">Importar</button>
-      </div>
-    </div>
-    <div class="form-wrap" id="enemyForm" style="display:none">
-      <div class="form-title" id="enemyFormTitle">Nuevo enemigo</div>
-      <input type="hidden" id="efId" value=""/>
-      <input type="hidden" id="efColor" value=""/>
-      <div class="fg" style="grid-template-columns:2fr 1.5fr 1fr 1fr 1fr">
-        <div><div class="fl">Nombre</div><input class="fi" id="efName"/></div>
-        <div><div class="fl">Tipo</div><input class="fi" id="efTipo" placeholder="Ej: Portador de esquirla"/></div>
-        <div><div class="fl">Vida máx</div><input class="fi" id="efVida" type="number" value="20"/></div>
-        <div><div class="fl">Focus máx</div><input class="fi" id="efFocus" type="number" value="10"/></div>
-        <div><div class="fl">Investidura</div><input class="fi" id="efInv" type="number" value="0"/></div>
-      </div>
-      <div class="fg" style="grid-template-columns:1fr 1fr 1fr">
-        <div><div class="fl">Tier (1-4, o el que sea)</div><input class="fi" id="efTier" type="number" min="1" placeholder="ej: 1"/></div>
-        <div><div class="fl">Tamaño</div>
-          <select class="fi" id="efSize"><option value="">—</option><option>Tiny</option><option>Small</option><option>Medium</option><option>Large</option><option>Huge</option><option>Gargantuan</option></select>
-        </div>
-        <div><div class="fl">Tipo de criatura</div><input class="fi" id="efCType" placeholder="Humanoid / Animal / Entity..."/></div>
-      </div>
-      <div class="fg" style="grid-template-columns:1fr 2fr">
-        <div><div class="fl">Clase</div>
-          <select class="fi" id="efClase">
-            <option value="minion">Minion</option>
-            <option value="rival" selected>Rival</option>
-            <option value="boss">Boss (turno rápido + lento)</option>
-          </select>
-        </div>
-        <div><div class="fl">Color (para diferenciarlos en combate)</div>
-          <div class="color-swatches" id="efColors"></div>
-        </div>
-      </div>
-      <div class="fl" style="margin-top:6px">Acciones / Habilidades</div>
-      <div id="efAcciones"></div>
-      <button class="btn ghost" style="margin-bottom:10px" onclick="addAccionRow()">+ Agregar acción</button>
-      <div class="fg"><div><div class="fl">Inmunidades (separadas por coma)</div><input class="fi" id="efImmun" placeholder="Ej: Stunned, Prone, Restrained"/></div></div>
-      <div class="fg"><div><div class="fl">Notas</div><textarea class="fta" id="efNotas"></textarea></div></div>
-      <div class="form-actions">
-        <button class="btn ghost" onclick="toggleForm('enemyForm')">Cancelar</button>
-        <button class="btn accent" onclick="saveEnemy()">Guardar</button>
       </div>
     </div>
     <div class="filter-bar" id="bfBar"></div>
@@ -519,7 +491,7 @@ async function viewMemberSheet(uid){
   document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'+sheetHTML(ch);
   document.getElementById('overlay').classList.add('on');
 }
-function closeModal(){document.getElementById('overlay').classList.remove('on');}
+function closeModal(){document.getElementById('overlay').classList.remove('on');var m=document.getElementById('modal');if(m)m.classList.remove('wide');}
 function sheetHTML(c){
   var s=c.sheet||{};var a=s.attributes||{};var d=s.defenses||{};
   var h='<div class="cname" style="font-size:18px">'+esc(c.name)+'</div>';
@@ -694,16 +666,6 @@ function renderStatblock(e,skipActions){
   return '<div class="sb">'+attrs+res+lines+skills+traits+actions+opps+'</div>';
 }
 
-function addAccionRow(nombre,coste,desc){
-  accionCounter++;
-  var d=document.createElement('div');
-  d.className='accion-row';d.id='ar-'+accionCounter;
-  d.innerHTML='<input class="fi" placeholder="Nombre" value="'+(nombre||'')+'"/>'
-    +'<input class="fi" placeholder="Coste (ej: 2 acciones)" value="'+(coste||'')+'"/>'
-    +'<input class="fi" placeholder="Descripción" value="'+(desc||'')+'"/>'
-    +'<button class="del-btn" onclick="this.parentElement.remove()">✕</button>';
-  document.getElementById('efAcciones').appendChild(d);
-}
 async function ensureEnemies(){ if(!enemies.length) enemies=await api(API+'/enemies'); }
 async function loadEnemies(){
   enemies=await api(API+'/enemies');
@@ -721,7 +683,7 @@ function enemyCard(e){
   var col=e.faction_color||'';
   return '<div class="card"'+(col?' style="border-left:3px solid '+col+'"':'')+'>'
     +'<div class="card-head"><span class="cname">'+(col?'<span class="color-dot" style="background:'+col+'"></span>':'')+esc(e.name)+'</span>'
-    +'<div><button class="edit-btn" onclick="editEnemy('+e.id+')">editar</button> '
+    +'<div><button class="edit-btn" onclick="openEnemyEditor('+e.id+')">editar</button> '
     +'<button class="del-btn" onclick="delEnemy('+e.id+')">✕</button></div></div>'
     +'<div style="margin-bottom:6px">'+claseBadge(e.clase)+'</div>'
     +metaBadges(e)
@@ -769,68 +731,125 @@ async function bulkImport(){
   el.innerHTML=msg;
   await loadEnemies();
 }
-function editEnemy(id){
-  var e=enemies.find(function(x){return x.id===id;});
-  if(!e)return;
-  editingStats=e.stats||{};
-  document.getElementById('efId').value=e.id;
-  document.getElementById('efName').value=e.name;
-  document.getElementById('efTipo').value=e.tipo||'';
-  var em=enemyMeta(e);
-  document.getElementById('efTier').value=(em.tier!=null?em.tier:'');
-  document.getElementById('efSize').value=em.size||'';
-  document.getElementById('efCType').value=em.ctype||'';
-  document.getElementById('efClase').value=e.clase||'rival';
-  document.getElementById('efImmun').value=(e.stats&&e.stats.immunities)||'';
-  pickColor('efColors','efColor',e.faction_color||'');
-  document.getElementById('efVida').value=e.vida_max;
-  document.getElementById('efFocus').value=e.focus_max;
-  document.getElementById('efInv').value=e.inv_max;
-  document.getElementById('efNotas').value=e.notas||'';
-  document.getElementById('efAcciones').innerHTML='';
-  (e.acciones||[]).forEach(function(a){addAccionRow(a.nombre,a.coste,a.descripcion);});
-  document.getElementById('enemyFormTitle').textContent='Editar enemigo';
-  document.getElementById('enemyForm').style.display='block';
+// ── Editor de enemigo (modal completo, edita toda la ficha) ──
+function escA(s){return esc(s).replace(/"/g,'&quot;');}
+function edEntryRow(en){
+  en=en||{name:'',desc:''};
+  return '<div class="ed-entry"><div class="ed-en-top">'
+    +'<input class="fi ed-en-name" placeholder="Nombre (con su símbolo de coste: ▶ ▶▶ ▷ ↻ ∞ ★)" value="'+escA(en.name)+'"/>'
+    +'<button class="del-btn" onclick="this.closest(\'.ed-entry\').remove()">✕</button></div>'
+    +'<textarea class="fi ed-en-desc" placeholder="Descripción">'+esc(en.desc)+'</textarea></div>';
 }
-async function saveEnemy(){
-  var id=document.getElementById('efId').value;
-  var acciones=[];
-  document.querySelectorAll('#efAcciones .accion-row').forEach(function(row){
-    var inputs=row.querySelectorAll('input');
-    if(inputs[0].value.trim()) acciones.push({nombre:inputs[0].value.trim(),coste:inputs[1].value.trim(),descripcion:inputs[2].value.trim()});
+function renderEntryRows(cid,list){document.getElementById(cid).innerHTML=(list||[]).map(edEntryRow).join('');}
+function addEntryRow(cid){document.getElementById(cid).insertAdjacentHTML('beforeend',edEntryRow());}
+function readEntries(cid){
+  var out=[];
+  document.querySelectorAll('#'+cid+' .ed-entry').forEach(function(row){
+    var n=row.querySelector('.ed-en-name').value.trim();
+    var d=row.querySelector('.ed-en-desc').value.trim();
+    if(n||d) out.push({name:n,desc:d});
   });
-  var stats=Object.assign({},editingStats||{});
-  var tv=parseInt(document.getElementById('efTier').value);
-  stats.tier_num=isNaN(tv)?null:tv;
-  stats.size=document.getElementById('efSize').value||null;
-  stats.creature_type=document.getElementById('efCType').value.trim()||null;
-  stats.immunities=document.getElementById('efImmun').value.trim();
+  return out;
+}
+function edNum(id){var v=document.getElementById(id).value.trim();return v===''?null:(parseInt(v)||0);}
+
+function openEnemyEditor(id){
+  var e=(id!=null)?enemies.find(function(x){return x.id===id;}):null;
+  var s=(e&&e.stats)?JSON.parse(JSON.stringify(e.stats)):{};
+  editingStats=s;
+  var ph=s.physical||{},cg=s.cognitive||{},sp=s.spiritual||{},sk=s.skills||{};
+  var m=e?enemyMeta(e):{tier:null,size:null,ctype:null};
+  function inp(iid,val,phh,type){return '<input class="fi" id="'+iid+'"'+(type?' type="'+type+'"':'')+' value="'+escA(val==null?'':val)+'"'+(phh?' placeholder="'+phh+'"':'')+'/>';}
+  function fld(lbl,inner){return '<div>'+(lbl?'<div class="fl">'+lbl+'</div>':'')+inner+'</div>';}
+  function attrCol(title,rows){
+    return '<div class="sb-col"><div class="sb-col-h">'+title+'</div>'
+      +rows.map(function(r){return '<div style="display:flex;align-items:center;gap:6px;margin:3px 4px"><span class="fl" style="width:32px;margin:0">'+r[0]+'</span><input class="fi" type="number" id="'+r[1]+'" value="'+(r[2]==null?'':r[2])+'" style="padding:4px 6px"/></div>';}).join('')+'</div>';
+  }
+  var claseOpts=[['minion','Minion'],['rival','Rival'],['boss','Boss (rápido + lento)']].map(function(o){
+    return '<option value="'+o[0]+'"'+((e?e.clase:'rival')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('');
+  var sizeOpts=['','Tiny','Small','Medium','Large','Huge','Gargantuan'].map(function(o){
+    return '<option value="'+o+'"'+((m.size||'')===o?' selected':'')+'>'+(o||'—')+'</option>';}).join('');
+  var html='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cname" style="font-size:18px">'+(e?'Editar '+esc(e.name):'Nuevo enemigo')+'</div>'
+    +'<input type="hidden" id="edId" value="'+(e?e.id:'')+'"/><input type="hidden" id="edColor" value="'+escA(e?e.faction_color||'':'')+'"/>'
+    +'<div class="ed-row" style="grid-template-columns:2fr 1fr">'+fld('Nombre',inp('edName',e?e.name:''))+fld('Clase','<select class="fi" id="edClase">'+claseOpts+'</select>')+'</div>'
+    +'<div class="ed-row">'+fld('Tier (texto que se muestra en la ficha)',inp('edTipo',e?e.tipo:'','Tier 1 Minion – Medium Humanoid'))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr">'+fld('Tier (número, para filtros)',inp('edTierNum',m.tier,'1','number'))+fld('Tamaño','<select class="fi" id="edSize">'+sizeOpts+'</select>')+fld('Tipo de criatura',inp('edCType',m.ctype,'Humanoid / Animal / Entity'))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr 2fr">'+fld('Vida máx',inp('edVida',e?e.vida_max:20,'','number'))+fld('Focus máx',inp('edFocus',e?e.focus_max:0,'','number'))+fld('Investidura máx',inp('edInv',e?e.inv_max:0,'','number'))+fld('Color','<div class="color-swatches" id="edColors"></div>')+'</div>'
+    +'<div class="ed-sec">Atributos <span style="text-transform:none;letter-spacing:0;color:var(--text3);font-family:inherit;font-size:11px">(dejalos vacíos si el enemigo no tiene ficha completa)</span></div>'
+    +'<div class="ed-attrs">'
+      +attrCol('Físico',[['STR','edStr',ph.str],['DEF','edPdef',ph.def],['SPD','edSpd',ph.spd]])
+      +attrCol('Cognitivo',[['INT','edInt',cg.int],['DEF','edCdef',cg.def],['WIL','edWil',cg.wil]])
+      +attrCol('Espiritual',[['AWA','edAwa',sp.awa],['DEF','edSdef',sp.def],['PRE','edPre',sp.pre]])
+    +'</div>'
+    +'<div class="ed-sec">Ficha</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr">'+fld('Movimiento',inp('edMove',s.movement,'25 ft.'))+fld('Sentidos',inp('edSenses',s.senses,'10 ft. (sight)'))+fld('Deflect',inp('edDeflect',s.deflect,'1 (leather)'))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr">'+fld('Inmunidades',inp('edImmun',s.immunities,'Stunned, Prone'))+fld('Resistencias',inp('edResist',s.resistances))+fld('Debilidades',inp('edWeak',s.weaknesses))+'</div>'
+    +'<div class="ed-row">'+fld('Idiomas',inp('edLang',s.languages))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr">'+fld('Habilidades físicas',inp('edSkP',sk.physical))+fld('Cognitivas',inp('edSkC',sk.cognitive))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr">'+fld('Espirituales',inp('edSkS',sk.spiritual))+fld('Surgebinding',inp('edSkSurge',sk.surge))+'</div>'
+    +'<div class="ed-sec">Rasgos</div><div id="edTraits"></div><button class="btn ghost sm ed-add" onclick="addEntryRow(\'edTraits\')">+ Agregar rasgo</button>'
+    +'<div class="ed-sec">Acciones</div>'
+    +'<div class="import-hint">El símbolo de coste va al principio del nombre: ▶ una acción, ▶▶ / ▶▶▶ varias, ▷ acción libre, ↻ reacción, ∞ pasiva, ★ oportunidad.</div>'
+    +'<div id="edActions"></div><button class="btn ghost sm ed-add" onclick="addEntryRow(\'edActions\')">+ Agregar acción</button>'
+    +'<div class="ed-sec">Oportunidades</div><div id="edOpps"></div><button class="btn ghost sm ed-add" onclick="addEntryRow(\'edOpps\')">+ Agregar oportunidad</button>'
+    +'<div class="ed-sec">Notas</div><textarea class="fta" id="edNotas" style="width:100%">'+esc(e?e.notas||'':'')+'</textarea>'
+    +'<div class="form-actions" style="margin-top:16px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="saveEnemyModal()">Guardar</button></div>';
+  var modal=document.getElementById('modal');
+  modal.classList.add('wide');
+  modal.innerHTML=html;
+  buildSwatches('edColors','edColor');
+  pickColor('edColors','edColor',e?e.faction_color||'':'');
+  var actsInit=(s.actions&&s.actions.length)?s.actions:((e&&e.acciones)?e.acciones.map(function(a){return {name:a.nombre,desc:a.descripcion};}):[]);
+  renderEntryRows('edTraits',s.traits||[]);
+  renderEntryRows('edActions',actsInit);
+  renderEntryRows('edOpps',s.opportunities||[]);
+  document.getElementById('overlay').classList.add('on');
+}
+
+async function saveEnemyModal(){
+  var name=document.getElementById('edName').value.trim();
+  if(!name){alert('Poné un nombre.');return;}
+  var s=Object.assign({},editingStats||{});
+  s.tier=document.getElementById('edTipo').value.trim();
+  var tn=parseInt(document.getElementById('edTierNum').value);
+  s.tier_num=isNaN(tn)?null:tn;
+  s.size=document.getElementById('edSize').value||null;
+  s.creature_type=document.getElementById('edCType').value.trim()||null;
+  var A=['edStr','edPdef','edSpd','edInt','edCdef','edWil','edAwa','edSdef','edPre'].map(edNum);
+  if(A.some(function(v){return v!=null;})){
+    s.physical={str:A[0]||0,def:A[1]||0,spd:A[2]||0};
+    s.cognitive={int:A[3]||0,def:A[4]||0,wil:A[5]||0};
+    s.spiritual={awa:A[6]||0,def:A[7]||0,pre:A[8]||0};
+  }else{delete s.physical;delete s.cognitive;delete s.spiritual;}
+  s.movement=document.getElementById('edMove').value.trim();
+  s.senses=document.getElementById('edSenses').value.trim();
+  s.deflect=document.getElementById('edDeflect').value.trim();
+  s.immunities=document.getElementById('edImmun').value.trim();
+  s.resistances=document.getElementById('edResist').value.trim();
+  s.weaknesses=document.getElementById('edWeak').value.trim();
+  s.languages=document.getElementById('edLang').value.trim();
+  s.skills={physical:document.getElementById('edSkP').value.trim(),cognitive:document.getElementById('edSkC').value.trim(),spiritual:document.getElementById('edSkS').value.trim(),surge:document.getElementById('edSkSurge').value.trim()};
+  s.traits=readEntries('edTraits');
+  s.actions=readEntries('edActions');
+  s.opportunities=readEntries('edOpps');
+  var acciones=s.actions.map(function(a){return {nombre:a.name,coste:'',descripcion:a.desc};});
   var body={
-    name:document.getElementById('efName').value.trim(),
-    tipo:document.getElementById('efTipo').value.trim(),
-    clase:document.getElementById('efClase').value,
-    vida_max:parseInt(document.getElementById('efVida').value)||20,
-    focus_max:parseInt(document.getElementById('efFocus').value)||10,
-    inv_max:parseInt(document.getElementById('efInv').value)||0,
+    name:name,
+    tipo:document.getElementById('edTipo').value.trim(),
+    clase:document.getElementById('edClase').value,
+    vida_max:parseInt(document.getElementById('edVida').value)||1,
+    focus_max:parseInt(document.getElementById('edFocus').value)||0,
+    inv_max:parseInt(document.getElementById('edInv').value)||0,
     acciones:acciones,
-    notas:document.getElementById('efNotas').value.trim(),
-    faction_color:document.getElementById('efColor').value,
-    stats:stats
+    notas:document.getElementById('edNotas').value.trim(),
+    faction_color:document.getElementById('edColor').value,
+    stats:s
   };
-  if(!body.name){alert('Poné un nombre.');return;}
+  var id=document.getElementById('edId').value;
   if(id) await api(API+'/enemies/'+id,'PUT',body);
   else await api(API+'/enemies','POST',body);
-  ['efId','efName','efTipo','efNotas','efTier','efCType','efImmun'].forEach(function(x){document.getElementById(x).value='';});
-  document.getElementById('efSize').value='';
-  document.getElementById('efVida').value='20';
-  document.getElementById('efFocus').value='10';
-  document.getElementById('efInv').value='0';
-  document.getElementById('efClase').value='rival';
-  pickColor('efColors','efColor','');
-  document.getElementById('efAcciones').innerHTML='';
-  editingStats={};
-  document.getElementById('enemyFormTitle').textContent='Nuevo enemigo';
-  toggleForm('enemyForm');
+  closeModal();
   loadEnemies();
 }
 async function delEnemy(id){
@@ -1153,7 +1172,6 @@ function toggleSection(gridId,toggleId,label){
 }
 
 // init
-buildSwatches('efColors','efColor');
 loadCampaign();
 connectWS();
 loadEncountersForSelect();
