@@ -119,6 +119,10 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .sh-item .n b{color:var(--gold2);font-weight:500;}
 .chips{display:flex;flex-wrap:wrap;gap:5px;}
 .chip{font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:2px 9px;color:var(--text2);}
+.oc-fi{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:14px;outline:none;}
+.oc-inj-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--border);}
+.oc-inj-name{flex:1;min-width:130px;}
+.oc-inj-add{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;}
 </style>
 </head>
 <body>
@@ -132,7 +136,12 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
     </div>
   </div>
 
-  <div id="noCombat" class="empty-msg">Esperando que el DM inicie el combate...</div>
+  <div id="outOfCombat">
+    <div class="empty-msg" id="ocNote" style="padding:10px 0;font-size:13px">Sin combate activo — podés gestionar tu personaje y ver al resto del grupo.</div>
+    <div id="ocMe"></div>
+    <div class="section-lbl" id="ocOthersLbl" style="display:none">Otros jugadores</div>
+    <div class="grid" id="ocOthers"></div>
+  </div>
 
   <div id="activeCombat" style="display:none">
     <div class="phase-bar">
@@ -373,10 +382,10 @@ function card(p,enemyView){
 function render(combat){
   COMBAT=combat;
   var active=combat&&combat.active;
-  document.getElementById('noCombat').style.display=active?'none':'';
+  document.getElementById('outOfCombat').style.display=active?'none':'';
   document.getElementById('activeCombat').style.display=active?'':'none';
   document.getElementById('roundNum').textContent=active?combat.round:'—';
-  if(!active){document.getElementById('mePanel').innerHTML='';return;}
+  if(!active){document.getElementById('mePanel').innerHTML='';loadRoster();return;}
   var myUid=renderMe(combat);
   var pl=combat.participants.filter(function(p){return (p.kind==='player'||p.kind==='pet')&&p.user_id!==myUid;});
   var en=combat.participants.filter(function(p){return p.kind==='enemy'&&!p.hidden;});
@@ -386,6 +395,142 @@ function render(combat){
   document.getElementById('playersLbl').style.display=pl.length?'':'none';
   document.getElementById('playersGrid').innerHTML=pl.map(card).join('');
   document.getElementById('enemiesGrid').innerHTML=en.map(function(p){return card(p,true);}).join('');
+}
+
+// ─── Gestión fuera de combate (mi personaje/mascotas + ver al grupo) ───
+var ROSTER=null, MYCHAR=null;
+var INJURY_EFFECTS=['Exhausted [−1]','Exhausted [−2]','Slowed','Disoriented','Surprised','Can only use one hand'];
+
+async function loadRoster(){
+  if(MY_UID==null)return;
+  try{ ROSTER=await api(API+'/roster'); }catch(e){ return; }
+  renderRoster();
+}
+function ocUrl(target){ return target==='c' ? '/api/characters/'+MYCHAR : '/api/characters/'+MYCHAR+'/pets/'+target.slice(1); }
+async function ocStat(target,stat,sign){
+  var el=document.getElementById('oc-amt-'+target+'-'+stat);
+  var val=Math.max(1,parseInt(el&&el.value)||1);
+  await api(ocUrl(target)+'/stat','POST',{stat:stat,delta:sign*val});
+  loadRoster();
+}
+async function ocStatus(target,status){ await api(ocUrl(target)+'/status','POST',{status:status}); loadRoster(); }
+async function ocStatusRm(target,status){ await api(ocUrl(target)+'/status/remove_one','POST',{status:status}); loadRoster(); }
+
+function ocStatCtl(target,o,stat,label,color){
+  if(stat!=='vida'&&o[stat+'_max']===0)return '';
+  var v=(o[stat]==null?o[stat+'_max']:o[stat]),mx=o[stat+'_max'];
+  var pct=mx>0?Math.round(v/mx*100):0;
+  return '<div class="mstat"><div class="mstat-head"><span class="mstat-l">'+label+'</span>'
+    +'<span class="mstat-v" style="color:'+color+'">'+v+' <span style="font-size:12px;color:var(--text3)">/ '+mx+'</span></span></div>'
+    +'<div class="mbar"><div class="mbar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
+    +'<div class="madj"><button class="madj-btn minus" onclick="ocStat(\''+target+'\',\''+stat+'\',-1)">−</button>'
+    +'<input type="number" id="oc-amt-'+target+'-'+stat+'" value="1" min="1"/>'
+    +'<button class="madj-btn plus" onclick="ocStat(\''+target+'\',\''+stat+'\',1)">+</button></div></div>';
+}
+function ocStatuses(target,statuses){
+  var btns=POS.concat(NEG).map(function(s){
+    var cnt=(statuses||[]).filter(function(x){return x===s;}).length; var on=cnt>0,col=SC[s]||'#a09070';
+    if(s==='Exhausted'&&cnt>0){
+      return '<span class="spill-group" style="border-color:'+col+'"><button class="spill on" style="color:'+col+';background:'+col+'22" onclick="ocStatus(\''+target+'\',\'Exhausted\')">Exhausted'+(cnt>1?' x'+cnt:'')+'</button><button class="spill-minus" style="color:'+col+'" onclick="ocStatusRm(\''+target+'\',\'Exhausted\')">−</button></span>';
+    }
+    return '<button class="spill'+(on?' on':'')+'" style="'+(on?'border-color:'+col+';color:'+col+';background:'+col+'22':'')+'" onclick="ocStatus(\''+target+'\',\''+s+'\')">'+s+'</button>';
+  }).join('');
+  return '<div class="mstatuses">'+btns+'</div>';
+}
+
+function ocInjuriesHTML(c){
+  var inj=c.injuries||[];
+  var list=inj.length?inj.map(function(it){
+    var dur=it.permanent?'<span style="color:#c84040">Permanente</span>':(it.days+' día'+(it.days===1?'':'s'));
+    var ctrl=it.permanent?'':'<button class="madj-btn minus" onclick="ocInjDays(\''+it.id+'\',-1)">−</button><button class="madj-btn plus" onclick="ocInjDays(\''+it.id+'\',1)">+</button>';
+    return '<div class="oc-inj-row"><span class="oc-inj-name">'+esc(it.name)+'</span>'
+      +'<span style="font-size:12px;color:var(--text2)">'+dur+'</span>'
+      +'<span style="display:flex;gap:4px;align-items:center">'+ctrl
+      +'<button class="spill" style="color:#e05050;border-color:#e05050" onclick="ocDelInjury(\''+it.id+'\')" title="Curada / borrar">✕</button></span></div>';
+  }).join(''):'<div style="font-size:12px;color:var(--text3)">Sin heridas.</div>';
+  var opts=INJURY_EFFECTS.map(function(e){return '<option value="'+esc(e)+'">'+esc(e)+'</option>';}).join('')+'<option value="__custom">Otra (escribir)…</option>';
+  return '<div class="mstat" style="margin-top:8px"><div class="mstat-l" style="margin-bottom:6px">🩹 Heridas (injuries)</div>'
+    +list
+    +'<div class="oc-inj-add">'
+      +'<select class="oc-fi" id="ocInjEffect" onchange="ocInjCustomToggle()">'+opts+'</select>'
+      +'<input class="oc-fi" id="ocInjCustom" placeholder="Escribí la herida" style="display:none;flex:1;min-width:140px"/>'
+      +'<input class="oc-fi" id="ocInjDaysN" type="number" min="0" value="0" style="width:64px" title="Días"/>'
+      +'<label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="ocInjPerm"/> Permanente</label>'
+      +'<button class="btn-sheet" onclick="ocAddInjury()">+ Agregar</button>'
+    +'</div>'
+    +'<div style="font-size:11px;color:var(--text3);margin-top:5px">0 días = se cura en el próximo descanso largo. Subí/bajá los días a mano.</div></div>';
+}
+function ocInjCustomToggle(){ var s=document.getElementById('ocInjEffect'); document.getElementById('ocInjCustom').style.display=s.value==='__custom'?'':'none'; }
+async function ocAddInjury(){
+  var sel=document.getElementById('ocInjEffect');
+  var name=sel.value==='__custom'?document.getElementById('ocInjCustom').value.trim():sel.value;
+  if(!name){alert('Elegí o escribí la herida.');return;}
+  var days=Math.max(0,parseInt(document.getElementById('ocInjDaysN').value)||0);
+  var perm=document.getElementById('ocInjPerm').checked;
+  await api('/api/characters/'+MYCHAR+'/injuries','POST',{name:name,days:days,permanent:perm});
+  loadRoster();
+}
+async function ocInjDays(iid,delta){ await api('/api/characters/'+MYCHAR+'/injuries/'+iid+'/days','POST',{delta:delta}); loadRoster(); }
+async function ocDelInjury(iid){ await api('/api/characters/'+MYCHAR+'/injuries/'+iid,'DELETE'); loadRoster(); }
+
+function allyCard(m){
+  var c=m.character;
+  var cur=(c.vida==null?c.vida_max:c.vida);
+  var pct=c.vida_max>0?Math.round(cur/c.vida_max*100):0;
+  var h=hl(pct); var t=mkTags(c.statuses);
+  var inj=(c.injuries||[]).length?'<div class="stags">'+(c.injuries||[]).map(function(i){
+    return '<span class="stag" style="border-color:#c87830;color:#c87830">🩹 '+esc(i.name)+(i.permanent?'':' ('+i.days+'d)')+'</span>';}).join('')+'</div>':'';
+  return '<div class="card"><div class="cname">'+esc(c.name)+'</div>'
+    +'<div class="ctype">'+esc(m.username)+'</div>'
+    +'<div class="health-text" style="color:'+h.c+'">'+h.t+'</div>'
+    +'<div class="hbar"><div class="hbar-fill" style="background:'+h.c+'"></div></div>'
+    +(t?'<div class="stags">'+t+'</div>':'')+inj+'</div>';
+}
+function renderRoster(){
+  if(!ROSTER)return;
+  var meM=ROSTER.members.find(function(m){return m.user_id===MY_UID;});
+  MYCHAR=(meM&&meM.character)?meM.character.id:null;
+  var mp=document.getElementById('ocMe');
+  var html='';
+  if(meM&&meM.character){
+    var c=meM.character;
+    html+='<div class="section-lbl" style="margin-top:0">Mi personaje</div>'
+      +'<div class="me-card"><div class="me-head"><span class="me-name">'+esc(c.name)+'</span></div>'
+      +'<div class="me-sheet-row"><button class="btn-sheet" onclick="openRosterSheet(\'c\')">Ver ficha</button>'
+      +(c.has_pdf?'<a class="btn-sheet" href="/api/characters/'+c.id+'/pdf" target="_blank">Ver PDF</a>':'')+'</div>'
+      +ocStatCtl('c',c,'vida','Vida','#e05050')+ocStatCtl('c',c,'focus','Focus','#6aaae8')+ocStatCtl('c',c,'inv','Investidura','#aa8aec')
+      +ocStatuses('c',c.statuses)+ocInjuriesHTML(c)+'</div>';
+    if(meM.pets&&meM.pets.length){
+      html+='<div class="section-lbl">Mis mascotas</div>'+meM.pets.map(function(p){
+        return '<div class="me-card"><div class="me-head"><span class="me-name">'+esc(p.name)+' <span class="pet-tag">Mascota</span></span></div>'
+          +'<div class="me-sheet-row"><button class="btn-sheet" onclick="openRosterSheet(\'p'+p.id+'\')">Ver ficha</button></div>'
+          +ocStatCtl('p'+p.id,p,'vida','Vida','#e05050')+ocStatCtl('p'+p.id,p,'focus','Focus','#6aaae8')+ocStatCtl('p'+p.id,p,'inv','Investidura','#aa8aec')
+          +ocStatuses('p'+p.id,p.statuses)+'</div>';
+      }).join('');
+    }
+  }else{
+    html+='<div class="me-select"><div class="me-q">No tenés personaje en esta campaña.</div></div>';
+  }
+  mp.innerHTML=html;
+  var os=ROSTER.members.filter(function(m){return m.user_id!==MY_UID&&m.character;});
+  document.getElementById('ocOthersLbl').style.display=os.length?'':'none';
+  document.getElementById('ocOthers').innerHTML=os.map(allyCard).join('');
+}
+function openRosterSheet(target){
+  if(!ROSTER)return;
+  var meM=ROSTER.members.find(function(m){return m.user_id===MY_UID;});
+  if(!meM)return;
+  var html;
+  if(target==='c'){
+    var c=meM.character;
+    html=charSheetHTML({name:c.name,stats:c.sheet,vida_max:c.vida_max,focus_max:c.focus_max,inv_max:c.inv_max});
+  }else{
+    var p=(meM.pets||[]).find(function(x){return 'p'+x.id===target;});
+    if(!p)return;
+    html=petSheetHTML({name:p.name,stats:p.stats,acciones:p.acciones,vida_max:p.vida_max,focus_max:p.focus_max,inv_max:p.inv_max});
+  }
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'+html;
+  document.getElementById('overlay').classList.add('on');
 }
 
 function connect(){
@@ -405,6 +550,12 @@ async function init(){
   try{ var me=await api('/api/auth/me'); MY_UID=me.id; }
   catch(e){ return; }   // 401 ya redirige a /login
   connect();
+  loadRoster();
+  // refresco periódico del grupo mientras no hay combate (los cambios de otros
+  // fuera de combate no viajan por WS)
+  setInterval(function(){
+    if(document.getElementById('activeCombat').style.display==='none') loadRoster();
+  }, 5000);
 }
 init();
 </script>

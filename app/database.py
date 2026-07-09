@@ -165,3 +165,8 @@ def init_db():
                 "  SELECT c.dm_id FROM campaigns c WHERE c.id = enemies.campaign_id"
                 ") WHERE owner_id IS NULL AND campaign_id IS NOT NULL"
             )
+
+        # Migración: heridas (injuries) por personaje.
+        chcols = {r["name"] for r in conn.execute("PRAGMA table_info(characters)")}
+        if "injuries" not in chcols:
+            conn.execute("ALTER TABLE characters ADD COLUMN injuries TEXT DEFAULT '[]'")

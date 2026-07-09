@@ -1,6 +1,7 @@
 """API: Personajes de jugador (CRUD + importar/descargar PDF)."""
 
 import json
+import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
@@ -8,7 +9,8 @@ from fastapi.responses import Response
 from ..auth import current_user
 from ..cosmere_import import ImportError_, parse_statblock
 from ..database import db
-from ..models import CharacterIn, LiveStat, LiveStatus, PetImportIn
+from ..models import (CharacterIn, DaysChange, InjuryIn, LiveStat, LiveStatus,
+                      PetImportIn)
 from ..pdf_import import parse_character_pdf
 
 router = APIRouter(prefix="/api/characters", tags=["characters"])
@@ -18,6 +20,7 @@ def _serialize(r) -> dict:
     d = dict(r)
     d["statuses"] = json.loads(d.get("statuses") or "[]")
     d["sheet"] = json.loads(d.get("sheet") or "{}")
+    d["injuries"] = json.loads(d.get("injuries") or "[]")
     return d
 
 
@@ -227,22 +230,6 @@ def character_status_remove(cid: int, s: LiveStatus, user=Depends(current_user))
     return {"ok": True, "statuses": st}
 
 
-@router.post("/{cid}/rest")
-def character_rest(cid: int, user=Depends(current_user)):
-    """Descanso completo: cura a full y limpia estados, del personaje y sus mascotas."""
-    with db() as conn:
-        _owned(conn, cid, user)
-        conn.execute(
-            "UPDATE characters SET vida=vida_max, focus=focus_max, inv=inv_max, statuses='[]' WHERE id=?",
-            (cid,),
-        )
-        conn.execute(
-            "UPDATE pets SET vida=vida_max, focus=focus_max, inv=inv_max, statuses='[]' WHERE character_id=?",
-            (cid,),
-        )
-    return {"ok": True}
-
-
 @router.post("/{cid}/pets/{pid}/stat")
 def pet_stat(cid: int, pid: int, s: LiveStat, user=Depends(current_user)):
     if s.stat not in _STATS:
@@ -272,6 +259,43 @@ def pet_status_remove(cid: int, pid: int, s: LiveStatus, user=Depends(current_us
             st.remove(s.status)
         conn.execute("UPDATE pets SET statuses=? WHERE id=?", (json.dumps(st), pid))
     return {"ok": True, "statuses": st}
+
+
+# ── Heridas (injuries) del personaje ──────────────────────
+
+@router.post("/{cid}/injuries")
+def add_injury(cid: int, inj: InjuryIn, user=Depends(current_user)):
+    name = inj.name.strip()
+    if not name:
+        raise HTTPException(400, "Poné el tipo de herida")
+    with db() as conn:
+        r = _owned(conn, cid, user)
+        lst = json.loads(r["injuries"] or "[]")
+        lst.append({"id": uuid.uuid4().hex[:8], "name": name,
+                    "days": max(0, inj.days), "permanent": bool(inj.permanent)})
+        conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(lst), cid))
+    return {"ok": True, "injuries": lst}
+
+
+@router.post("/{cid}/injuries/{iid}/days")
+def injury_days(cid: int, iid: str, ch: DaysChange, user=Depends(current_user)):
+    with db() as conn:
+        r = _owned(conn, cid, user)
+        lst = json.loads(r["injuries"] or "[]")
+        for it in lst:
+            if it["id"] == iid and not it.get("permanent"):
+                it["days"] = max(0, it.get("days", 0) + ch.delta)
+        conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(lst), cid))
+    return {"ok": True, "injuries": lst}
+
+
+@router.delete("/{cid}/injuries/{iid}")
+def delete_injury(cid: int, iid: str, user=Depends(current_user)):
+    with db() as conn:
+        r = _owned(conn, cid, user)
+        lst = [it for it in json.loads(r["injuries"] or "[]") if it["id"] != iid]
+        conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(lst), cid))
+    return {"ok": True, "injuries": lst}
 
 
 @router.get("/{cid}/pdf")

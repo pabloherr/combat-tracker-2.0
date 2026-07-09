@@ -5,10 +5,10 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..access import campaign_or_404, require_dm
+from ..access import campaign_or_404, require_access, require_dm
 from ..auth import current_user
 from ..database import db
-from ..models import AcceptIn, CampaignIn, InviteIn
+from ..models import AcceptIn, CampaignIn, InviteIn, LongRestIn
 
 router = APIRouter(prefix="/api", tags=["campaigns"])
 
@@ -142,6 +142,88 @@ def campaign_party(cid: int, user=Depends(current_user)):
                 level = int(m.group())
             out.append({"username": r["username"], "character_name": r["character_name"], "level": level})
         return out
+
+
+@router.get("/campaigns/{cid}/roster")
+def campaign_roster(cid: int, user=Depends(current_user)):
+    """Estado en vivo de los personajes de la campaña (para gestionar fuera de
+    combate y ver a los demás). Accesible al DM y a cualquier miembro aceptado."""
+    with db() as conn:
+        require_access(conn, cid, user)
+        rows = conn.execute(
+            "SELECT m.user_id, u.username, ch.* FROM campaign_members m "
+            "JOIN users u ON u.id=m.user_id "
+            "JOIN characters ch ON ch.id=m.character_id "
+            "WHERE m.campaign_id=? AND m.status='accepted' AND m.character_id IS NOT NULL "
+            "ORDER BY u.username",
+            (cid,),
+        ).fetchall()
+        members = []
+        for r in rows:
+            pets = [
+                {"id": p["id"], "name": p["name"],
+                 "vida": p["vida"], "vida_max": p["vida_max"],
+                 "focus": p["focus"], "focus_max": p["focus_max"],
+                 "inv": p["inv"], "inv_max": p["inv_max"],
+                 "statuses": json.loads(p["statuses"] or "[]"),
+                 "stats": json.loads(p["stats"] or "{}"),
+                 "acciones": json.loads(p["acciones"] or "[]")}
+                for p in conn.execute("SELECT * FROM pets WHERE character_id=? ORDER BY name", (r["id"],))
+            ]
+            members.append({
+                "user_id": r["user_id"], "username": r["username"],
+                "character": {
+                    "id": r["id"], "name": r["name"],
+                    "vida": r["vida"], "vida_max": r["vida_max"],
+                    "focus": r["focus"], "focus_max": r["focus_max"],
+                    "inv": r["inv"], "inv_max": r["inv_max"],
+                    "statuses": json.loads(r["statuses"] or "[]"),
+                    "injuries": json.loads(r["injuries"] or "[]"),
+                    "sheet": json.loads(r["sheet"] or "{}"),
+                    "has_pdf": bool(r["has_pdf"]),
+                },
+                "pets": pets,
+            })
+        return {"members": members}
+
+
+@router.post("/campaigns/{cid}/long_rest")
+def long_rest(cid: int, payload: LongRestIn, user=Depends(current_user)):
+    """Descanso largo (DM): cura a full a los personajes aceptados (y sus mascotas)
+    y baja en 1 los días de sus heridas; las permanentes no cambian. El DM puede
+    excluir jugadores con `exclude` (lista de user_id)."""
+    excl = set(payload.exclude or [])
+    with db() as conn:
+        require_dm(conn, cid, user)
+        chars = conn.execute(
+            "SELECT m.user_id, ch.* FROM campaign_members m JOIN characters ch ON ch.id=m.character_id "
+            "WHERE m.campaign_id=? AND m.status='accepted' AND m.character_id IS NOT NULL",
+            (cid,),
+        ).fetchall()
+        done = 0
+        for ch in chars:
+            if ch["user_id"] in excl:
+                continue
+            done += 1
+            conn.execute(
+                "UPDATE characters SET vida=vida_max, focus=focus_max, inv=inv_max, statuses='[]' WHERE id=?",
+                (ch["id"],),
+            )
+            conn.execute(
+                "UPDATE pets SET vida=vida_max, focus=focus_max, inv=inv_max, statuses='[]' WHERE character_id=?",
+                (ch["id"],),
+            )
+            inj = json.loads(ch["injuries"] or "[]")
+            kept = []
+            for it in inj:
+                if it.get("permanent"):
+                    kept.append(it)
+                    continue
+                it["days"] = it.get("days", 0) - 1
+                if it["days"] >= 0:      # al bajar de 0, la herida se curó
+                    kept.append(it)
+            conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(kept), ch["id"]))
+    return {"ok": True, "characters": done}
 
 
 # ── Jugador: invitaciones y membresías ─────────────────────

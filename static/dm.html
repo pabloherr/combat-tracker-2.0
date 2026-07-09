@@ -316,6 +316,10 @@ select.fi{appearance:auto;}
       <input class="fi" id="inviteUser" placeholder="usuario a invitar" style="max-width:220px"/>
       <button class="btn accent" onclick="invitePlayer()">Invitar</button>
     </div>
+    <div class="row" style="margin-bottom:14px">
+      <button class="btn" onclick="longRest()">🛌 Descanso largo</button>
+      <span style="font-size:12px;color:var(--text3);font-style:italic">Cura a full a todos los jugadores y sus mascotas, y baja 1 día las heridas (las permanentes no cambian).</span>
+    </div>
     <div class="grid" id="membersGrid"></div>
     <div class="empty" id="membersEmpty">Sin jugadores todavía. Invitá a alguien por su nombre de usuario.</div>
   </div>
@@ -475,6 +479,28 @@ async function loadMembers(){
         +'</div>':'')
       +'</div>';
   }).join('');
+}
+async function longRest(){
+  var members=await api(API+'/members');
+  var accepted=members.filter(function(m){return m.status==='accepted'&&m.character_id;});
+  if(!accepted.length){alert('No hay jugadores aceptados con personaje.');return;}
+  var rows=accepted.map(function(m){
+    return '<label style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">'
+      +'<input type="checkbox" class="lr-chk" value="'+m.user_id+'" checked/> '
+      +'<span>'+esc(m.username)+' <span style="color:var(--text3)">— '+esc(m.character_name||'sin personaje')+'</span></span></label>';
+  }).join('');
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cname" style="font-size:18px">🛌 Descanso largo</div>'
+    +'<div style="font-size:13px;color:var(--text2);margin:6px 0 12px">Cura a full (vida, focus, investidura, estados) a los jugadores elegidos y sus mascotas, y baja 1 día sus heridas (las permanentes no cambian). <b>Destildá</b> a quien quieras dejar afuera.</div>'
+    +'<div>'+rows+'</div>'
+    +'<div class="form-actions" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="doLongRest()">Aplicar descanso</button></div>';
+  document.getElementById('overlay').classList.add('on');
+}
+async function doLongRest(){
+  var exclude=[].slice.call(document.querySelectorAll('.lr-chk:not(:checked)')).map(function(c){return parseInt(c.value);});
+  var r=await api(API+'/long_rest','POST',{exclude:exclude});
+  closeModal();
+  alert('Descanso largo aplicado a '+r.characters+' personaje(s).');
 }
 async function invitePlayer(){
   var u=document.getElementById('inviteUser').value.trim();

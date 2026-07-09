@@ -47,6 +47,10 @@ class AcceptIn(BaseModel):
     character_id: int
 
 
+class LongRestIn(BaseModel):
+    exclude: list[int] = []      # user_ids que NO reciben el descanso
+
+
 # ── Personajes ─────────────────────────────────────────────
 
 class CharacterIn(BaseModel):
@@ -73,6 +77,16 @@ class LiveStat(BaseModel):
 
 class LiveStatus(BaseModel):
     status: str
+
+
+class InjuryIn(BaseModel):
+    name: str
+    days: int = 0            # días restantes (0 = se cura en el próximo descanso largo)
+    permanent: bool = False
+
+
+class DaysChange(BaseModel):
+    delta: int
 
 
 class AccionIn(BaseModel):

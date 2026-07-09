@@ -87,6 +87,11 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .spill-group{display:inline-flex;align-items:stretch;border:1px solid;border-radius:20px;overflow:hidden;}
 .spill-group .spill{border:none;border-radius:0;}
 .spill-minus{border:none;border-left:1px solid;background:rgba(0,0,0,.28);cursor:pointer;padding:0 12px;font-size:16px;font-family:'Cinzel',serif;line-height:1;}
+.inj-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--border);}
+.inj-name{font-size:13px;color:var(--text);flex:1;min-width:130px;}
+.inj-dur{font-size:12px;color:var(--text2);}
+.inj-ctrl{display:flex;gap:4px;align-items:center;}
+.inj-add{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;}
 </style>
 </head>
 <body>
@@ -297,6 +302,7 @@ var SC={Determined:'#5aaa70',Enhanced:'#6aaae8',Empowered:'#e8c840',Focus:'#aa8a
   Unconscious:'#a03030',Immobilized:'#b06030',Afflicted:'#9040a0'};
 var POS=['Determined','Enhanced','Empowered','Focus'];
 var NEG=['Restrained','Surprised','Stunned','Slowed','Disoriented','Prone','Exhausted','Unconscious','Immobilized','Afflicted'];
+var INJURY_EFFECTS=['Exhausted [−1]','Exhausted [−2]','Slowed','Disoriented','Surprised','Can only use one hand'];
 var MANAGE_ID=null;
 
 function mStatBlock(target,stat,label,cur,mx,color){
@@ -333,8 +339,7 @@ async function openManage(id){
   MANAGE_ID=id;
   document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
     +'<div class="cname" style="font-size:18px">⚙ Gestionar personaje</div>'
-    +'<div class="section-sub">Ajustá vida, focus, investidura y estados. Se guarda solo (sirve dentro y fuera de combate).</div>'
-    +'<div class="card-actions" style="margin:8px 0 12px"><button class="btn" onclick="mRest()">🛌 Descanso completo (curar todo)</button></div>'
+    +'<div class="section-sub">Ajustá vida, focus, investidura, estados y heridas. Se guarda solo (sirve dentro y fuera de combate). El descanso largo lo aplica el DM desde la campaña.</div>'
     +'<div id="manageBody"></div>';
   document.getElementById('overlay').classList.add('on');
   refreshManage();
@@ -345,12 +350,58 @@ async function refreshManage(){
   var body=document.getElementById('manageBody');
   if(!c||!body){closeModal();return;}
   var pets=await api('/api/characters/'+MANAGE_ID+'/pets');
-  var html=mgEntity('c',c.name,c);
+  var html=mgEntity('c',c.name,c)+injuriesHTML(c);
   if(pets.length){
     html+='<div class="section-sub" style="margin:4px 0 8px">🐾 Mascotas</div>'
       +pets.map(function(p){return mgEntity('p'+p.id,p.name,p);}).join('');
   }
   body.innerHTML=html;
+}
+function injuriesHTML(c){
+  var inj=c.injuries||[];
+  var list=inj.length?inj.map(function(it){
+    var dur=it.permanent?'<span style="color:#c84040">Permanente</span>'
+      :(it.days+' día'+(it.days===1?'':'s'));
+    var ctrl=it.permanent?''
+      :'<button class="btn sm" onclick="injDays(\''+it.id+'\',-1)" title="Un día menos">−</button>'
+      +'<button class="btn sm" onclick="injDays(\''+it.id+'\',1)" title="Un día más">+</button>';
+    return '<div class="inj-row"><span class="inj-name">'+esc(it.name)+'</span>'
+      +'<span class="inj-dur">'+dur+'</span>'
+      +'<span class="inj-ctrl">'+ctrl+'<button class="btn danger sm" onclick="delInjury(\''+it.id+'\')" title="Curada / borrar">✕</button></span></div>';
+  }).join(''):'<div class="empty" style="font-size:12px">Sin heridas.</div>';
+  var opts=INJURY_EFFECTS.map(function(e){return '<option value="'+esc(e)+'">'+esc(e)+'</option>';}).join('')
+    +'<option value="__custom">Otra (escribir)…</option>';
+  return '<div class="mg-block"><div class="mg-name">🩹 Heridas (injuries)</div>'
+    +list
+    +'<div class="inj-add">'
+      +'<select class="fi" id="injEffect" onchange="injCustomToggle()">'+opts+'</select>'
+      +'<input class="fi" id="injCustom" placeholder="Escribí la herida" style="display:none;flex:1;min-width:140px"/>'
+      +'<input class="fi" id="injDaysN" type="number" min="0" value="0" title="Días de duración" style="width:66px"/>'
+      +'<label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="injPerm"/> Permanente</label>'
+      +'<button class="btn accent sm" onclick="addInjury()">+ Agregar</button>'
+    +'</div>'
+    +'<div style="font-size:11px;color:var(--text3);margin-top:5px">0 días = se cura en el próximo descanso largo. Podés subir/bajar los días a mano.</div></div>';
+}
+function injCustomToggle(){
+  var sel=document.getElementById('injEffect');
+  document.getElementById('injCustom').style.display=sel.value==='__custom'?'':'none';
+}
+async function addInjury(){
+  var sel=document.getElementById('injEffect');
+  var name=sel.value==='__custom'?document.getElementById('injCustom').value.trim():sel.value;
+  if(!name){alert('Elegí o escribí la herida.');return;}
+  var days=Math.max(0,parseInt(document.getElementById('injDaysN').value)||0);
+  var perm=document.getElementById('injPerm').checked;
+  await api('/api/characters/'+MANAGE_ID+'/injuries','POST',{name:name,days:days,permanent:perm});
+  refreshManage();
+}
+async function injDays(iid,delta){
+  await api('/api/characters/'+MANAGE_ID+'/injuries/'+iid+'/days','POST',{delta:delta});
+  refreshManage();
+}
+async function delInjury(iid){
+  await api('/api/characters/'+MANAGE_ID+'/injuries/'+iid,'DELETE');
+  refreshManage();
 }
 function _mgUrl(target){
   return target==='c' ? '/api/characters/'+MANAGE_ID
@@ -368,11 +419,6 @@ async function mStatus(target,status){
 async function mStatusRm(target,status){
   await api(_mgUrl(target)+'/status/remove_one','POST',{status:status});
   refreshManage();
-}
-async function mRest(){
-  if(!confirm('¿Curar a full y limpiar estados del personaje y sus mascotas?'))return;
-  await api('/api/characters/'+MANAGE_ID+'/rest','POST');
-  refreshManage(); loadCharacters();
 }
 
 // ─── Actualizar personaje (a mano o reemplazando el PDF) ───
