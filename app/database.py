@@ -200,3 +200,11 @@ def init_db():
             )
         if "has_image" not in chcols:
             conn.execute("ALTER TABLE characters ADD COLUMN has_image INTEGER DEFAULT 0")
+
+        # Migración: marcos (esferas). Total y cuántos están cargados (con luz).
+        # Opacos = marcos - marcos_light.
+        chcols = {r["name"] for r in conn.execute("PRAGMA table_info(characters)")}
+        if "marcos" not in chcols:
+            conn.execute("ALTER TABLE characters ADD COLUMN marcos INTEGER DEFAULT 0")
+        if "marcos_light" not in chcols:
+            conn.execute("ALTER TABLE characters ADD COLUMN marcos_light INTEGER DEFAULT 0")

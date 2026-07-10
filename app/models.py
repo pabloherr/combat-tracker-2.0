@@ -86,6 +86,15 @@ class DaysChange(BaseModel):
     delta: int
 
 
+class MarcosChange(BaseModel):
+    delta: int              # +/- marcos (total) o carga/descarga de luz, según el endpoint
+
+
+class MarcosSet(BaseModel):
+    cargados: int = 0       # marcos con luz
+    opacos: int = 0         # marcos sin luz (total = cargados + opacos)
+
+
 class AccionIn(BaseModel):
     nombre: str
     coste: str = ""          # ej: "1 acción", "2 focus"

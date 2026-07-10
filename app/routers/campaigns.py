@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..access import campaign_or_404, require_access, require_dm
 from ..auth import current_user
 from ..database import db
-from ..models import CampaignIn, InviteIn, LongRestIn
+from ..models import CampaignIn, InviteIn, LongRestIn, MarcosChange
 
 router = APIRouter(prefix="/api", tags=["campaigns"])
 
@@ -46,6 +46,36 @@ def _advance_storm(conn, cid: int) -> dict:
     else:
         conn.execute("UPDATE storm_tracker SET day=? WHERE campaign_id=?", (day, cid))
     return {"stormed": stormed, "storm_day": storm_day, "storm_moment": storm_moment}
+
+
+# ── Marcos: recarga en tormenta y descarga con el paso de los días ──
+STORM_DISCHARGE_START = 5    # día desde el que los marcos empiezan a apagarse
+STORM_DISCHARGE_FULL = 15    # día en que ya no queda ninguno con luz
+
+
+def _marcos_tick(conn, cid: int, stormed: bool, day: int):
+    """Aplica al día que avanza: la tormenta recarga todos los marcos; a partir del
+    día 5 sin tormenta, cada marco cargado se apaga con probabilidad creciente
+    (pocos al principio, todos para el día 15)."""
+    rows = conn.execute(
+        "SELECT id, marcos, marcos_light FROM characters WHERE campaign_id=?", (cid,)
+    ).fetchall()
+    if stormed:
+        for r in rows:
+            if (r["marcos"] or 0) != (r["marcos_light"] or 0):
+                conn.execute("UPDATE characters SET marcos_light=marcos WHERE id=?", (r["id"],))
+        return
+    if day < STORM_DISCHARGE_START:
+        return
+    span = STORM_DISCHARGE_FULL - (STORM_DISCHARGE_START - 1)   # 11
+    p = min(1.0, max(0.0, (day - (STORM_DISCHARGE_START - 1)) / span))
+    for r in rows:
+        light = r["marcos_light"] or 0
+        if light <= 0:
+            continue
+        lost = sum(1 for _ in range(light) if random.random() < p)
+        if lost:
+            conn.execute("UPDATE characters SET marcos_light=? WHERE id=?", (light - lost, r["id"]))
 
 
 # ── DM: campañas propias ───────────────────────────────────
@@ -95,7 +125,8 @@ def list_members(cid: int, user=Depends(current_user)):
     with db() as conn:
         require_dm(conn, cid, user)
         rows = conn.execute(
-            "SELECT m.user_id, m.status, m.character_id, u.username, ch.name AS character_name, ch.has_pdf "
+            "SELECT m.user_id, m.status, m.character_id, u.username, ch.name AS character_name, "
+            "ch.has_pdf, ch.marcos, ch.marcos_light "
             "FROM campaign_members m JOIN users u ON u.id=m.user_id "
             "LEFT JOIN characters ch ON ch.id=m.character_id "
             "WHERE m.campaign_id=? ORDER BY u.username",
@@ -155,6 +186,41 @@ def member_sheet(cid: int, uid: int, user=Depends(current_user)):
         d["statuses"] = json.loads(d.get("statuses") or "[]")
         d["sheet"] = json.loads(d.get("sheet") or "{}")
         return d
+
+
+def _member_char(conn, cid: int, uid: int):
+    m = conn.execute(
+        "SELECT ch.* FROM campaign_members m JOIN characters ch ON ch.id=m.character_id "
+        "WHERE m.campaign_id=? AND m.user_id=?",
+        (cid, uid),
+    ).fetchone()
+    if not m:
+        raise HTTPException(404, "Ese jugador todavía no tiene personaje")
+    return m
+
+
+@router.post("/campaigns/{cid}/members/{uid}/marcos")
+def dm_member_marcos(cid: int, uid: int, ch: MarcosChange, user=Depends(current_user)):
+    """El DM agrega/saca marcos (total) a un jugador. Al reducir, opacos primero."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+        r = _member_char(conn, cid, uid)
+        total = max(0, (r["marcos"] or 0) + ch.delta)
+        light = min(r["marcos_light"] or 0, total)
+        conn.execute("UPDATE characters SET marcos=?, marcos_light=? WHERE id=?", (total, light, r["id"]))
+    return {"ok": True, "marcos": total, "marcos_light": light}
+
+
+@router.post("/campaigns/{cid}/members/{uid}/marcos/light")
+def dm_member_marcos_light(cid: int, uid: int, ch: MarcosChange, user=Depends(current_user)):
+    """El DM carga (delta>0) o apaga (delta<0) marcos de un jugador."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+        r = _member_char(conn, cid, uid)
+        total = r["marcos"] or 0
+        light = max(0, min(total, (r["marcos_light"] or 0) + ch.delta))
+        conn.execute("UPDATE characters SET marcos_light=? WHERE id=?", (light, r["id"]))
+    return {"ok": True, "marcos": total, "marcos_light": light}
 
 
 @router.get("/campaigns/{cid}/party")
@@ -219,6 +285,8 @@ def campaign_roster(cid: int, user=Depends(current_user)):
                     "sheet": json.loads(r["sheet"] or "{}"),
                     "has_pdf": bool(r["has_pdf"]),
                     "has_image": bool(r["has_image"]),
+                    "marcos": r["marcos"] or 0,
+                    "marcos_light": r["marcos_light"] or 0,
                 },
                 "pets": pets,
             })
@@ -243,8 +311,10 @@ def long_rest(cid: int, payload: LongRestIn, user=Depends(current_user)):
             if ch["user_id"] in excl:
                 continue
             done += 1
+            # El descanso ya NO recarga investidura: el jugador la carga cuando quiere
+            # desde sus marcos. Sí cura vida/focus y limpia estados.
             conn.execute(
-                "UPDATE characters SET vida=vida_max, focus=focus_max, inv=inv_max, statuses='[]' WHERE id=?",
+                "UPDATE characters SET vida=vida_max, focus=focus_max, statuses='[]' WHERE id=?",
                 (ch["id"],),
             )
             conn.execute(
@@ -262,6 +332,7 @@ def long_rest(cid: int, payload: LongRestIn, user=Depends(current_user)):
                     kept.append(it)
             conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(kept), ch["id"]))
         storm = _advance_storm(conn, cid)   # el día pasa para todos, con o sin descanso
+        _marcos_tick(conn, cid, storm["stormed"], _get_storm(conn, cid)["day"])
     return {"ok": True, "characters": done, "storm": storm}
 
 
@@ -289,6 +360,7 @@ def advance_storm(cid: int, user=Depends(current_user)):
         require_dm(conn, cid, user)
         storm = _advance_storm(conn, cid)
         row = _get_storm(conn, cid)
+        _marcos_tick(conn, cid, storm["stormed"], row["day"])
     return {"ok": True, "storm": storm, "state": _storm_view(row, True)}
 
 

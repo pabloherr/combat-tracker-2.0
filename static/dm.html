@@ -339,7 +339,7 @@ select.fi{appearance:auto;}
     </div>
     <div class="row" style="margin-bottom:14px">
       <button class="btn" onclick="longRest()">🛌 Descanso largo</button>
-      <span style="font-size:12px;color:var(--text3);font-style:italic">Cura a full a todos los jugadores y sus mascotas, y baja 1 día las heridas (las permanentes no cambian).</span>
+      <span style="font-size:12px;color:var(--text3);font-style:italic">Cura vida y focus a full, limpia estados y baja 1 día las heridas (la investidura ya no se recarga sola: la cargan con marcos).</span>
     </div>
     <div class="grid" id="membersGrid"></div>
     <div class="empty" id="membersEmpty">Sin jugadores todavía. Invitá a alguien por su nombre de usuario.</div>
@@ -497,9 +497,33 @@ async function loadMembers(){
       +(acc&&m.character_id?'<div class="card-actions">'
           +'<button class="btn sm" onclick="viewMemberSheet('+m.user_id+')">Ver ficha</button>'
           +(m.has_pdf?'<a class="btn sm" href="/api/characters/'+m.character_id+'/pdf" target="_blank">PDF</a>':'')
-        +'</div>':'')
+        +'</div>'+marcosDmBlock(m):'')
       +'</div>';
   }).join('');
+}
+// Controles de marcos del jugador (agregar/sacar total, cargar/apagar luz)
+function marcosDmBlock(m){
+  var total=m.marcos||0, light=m.marcos_light||0, dun=Math.max(0,total-light);
+  return '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'
+    +'<div style="font-size:12px;margin-bottom:6px">💠 Marcos: <b style="color:var(--gold2)">'+total+'</b> '
+      +'<span style="color:#e8c840">'+light+' cargados</span><span style="color:var(--text3)">, '+dun+' opacos</span></div>'
+    +'<div class="row" style="gap:6px;margin:0 0 6px;align-items:center">'
+      +'<input class="fi" type="number" id="dmMarcosN-'+m.user_id+'" value="1" min="1" style="width:60px"/>'
+      +'<button class="btn sm" onclick="dmMarcos('+m.user_id+',1)">+ marcos</button>'
+      +'<button class="btn sm" onclick="dmMarcos('+m.user_id+',-1)">− marcos</button>'
+      +'<button class="btn sm" onclick="dmMarcosLight('+m.user_id+',1)" title="Dar luz">Cargar</button>'
+      +'<button class="btn sm" onclick="dmMarcosLight('+m.user_id+',-1)" title="Sacar luz">Apagar</button>'
+    +'</div></div>';
+}
+async function dmMarcos(uid,sign){
+  var amt=Math.max(1,parseInt((document.getElementById('dmMarcosN-'+uid)||{}).value)||1);
+  await api(API+'/members/'+uid+'/marcos','POST',{delta:sign*amt});
+  loadMembers();
+}
+async function dmMarcosLight(uid,sign){
+  var amt=Math.max(1,parseInt((document.getElementById('dmMarcosN-'+uid)||{}).value)||1);
+  await api(API+'/members/'+uid+'/marcos/light','POST',{delta:sign*amt});
+  loadMembers();
 }
 async function longRest(){
   var members=await api(API+'/members');
@@ -512,7 +536,7 @@ async function longRest(){
   }).join('');
   document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
     +'<div class="cname" style="font-size:18px">🛌 Descanso largo</div>'
-    +'<div style="font-size:13px;color:var(--text2);margin:6px 0 12px">Cura a full (vida, focus, investidura, estados) a los jugadores elegidos y sus mascotas, y baja 1 día sus heridas (las permanentes no cambian). <b>Destildá</b> a quien quieras dejar afuera.</div>'
+    +'<div style="font-size:13px;color:var(--text2);margin:6px 0 12px">Cura vida y focus a full y limpia estados a los jugadores elegidos y sus mascotas, y baja 1 día sus heridas (las permanentes no cambian). La investidura ya no se recarga: la cargan con sus marcos. <b>Destildá</b> a quien quieras dejar afuera.</div>'
     +'<div>'+rows+'</div>'
     +'<div class="form-actions" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="doLongRest()">Aplicar descanso</button></div>';
   document.getElementById('overlay').classList.add('on');
@@ -521,6 +545,7 @@ async function doLongRest(){
   var exclude=[].slice.call(document.querySelectorAll('.lr-chk:not(:checked)')).map(function(c){return parseInt(c.value);});
   var r=await api(API+'/long_rest','POST',{exclude:exclude});
   closeModal();
+  loadMembers();
   if(r.state) renderStorm(r.state); else loadStorm();
   var msg='Descanso largo aplicado a '+r.characters+' personaje(s).';
   if(r.storm&&r.storm.stormed) msg+='\n\n⚡ ¡Alta tormenta! Cayó el día '+r.storm.storm_day+' '+r.storm.storm_moment+'.';
@@ -547,6 +572,7 @@ async function loadStorm(){ try{ renderStorm(await api(API+'/storm')); }catch(e)
 async function stormAdvance(){
   var r=await api(API+'/storm/advance','POST');
   renderStorm(r.state);
+  loadMembers();
   if(r.storm&&r.storm.stormed) alert('⚡ ¡Alta tormenta! Cayó el día '+r.storm.storm_day+' '+r.storm.storm_moment+'.');
 }
 async function stormReset(){

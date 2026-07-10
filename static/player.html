@@ -149,6 +149,15 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .import-ta{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:'Courier New',monospace;font-size:12px;line-height:1.5;outline:none;resize:vertical;min-height:150px;white-space:pre;}
 .import-ta:focus{border-color:var(--gold);}
 .inv-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;}
+/* marcos (esferas) */
+.marcos-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:12px 14px;margin-top:12px;cursor:pointer;transition:border-color .15s;}
+.marcos-box:hover{border-color:var(--gold);}
+.marcos-box-h{font-family:'Cinzel',serif;font-size:13px;color:var(--gold2);letter-spacing:.04em;display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
+.marcos-hint{font-size:10px;color:var(--text3);font-style:italic;font-family:'Crimson Pro',serif;letter-spacing:0;}
+.marcos-counts{display:flex;gap:20px;font-size:14px;}
+.marcos-counts b{font-family:'Cinzel',serif;font-size:18px;}
+.marcos-charged{color:#e8c840;}
+.marcos-dun{color:var(--text3);}
 </style>
 </head>
 <body>
@@ -225,6 +234,7 @@ var _qtab=(new URLSearchParams(location.search).get('tab')||'').toLowerCase();
 var TAB=({pj:'pj',grupo:'grupo',combate:'combate'}[_qtab])||'pj';
 var TAB_EXPLICIT=!!_qtab;   // si el usuario pidió una pestaña explícita en la URL
 var IMG_V=0;                // versión de la imagen (para refrescar caché al cambiarla)
+var MARCOS_EDIT=false;      // si el recuadro de marcos está en modo edición
 
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 async function api(path,method,body){
@@ -601,6 +611,53 @@ async function ocAddInjury(){
 async function ocInjDays(iid,delta){ await api('/api/characters/'+MYCHAR+'/injuries/'+iid+'/days','POST',{delta:delta}); loadRoster(); }
 async function ocDelInjury(iid){ await api('/api/characters/'+MYCHAR+'/injuries/'+iid,'DELETE'); loadRoster(); }
 
+// ─── Marcos (esferas): moneda + luz/investidura ───
+function marcosCard(c){
+  var total=c.marcos||0, light=Math.min(c.marcos_light||0,total), dun=Math.max(0,total-light);
+  var inv=(c.inv==null?c.inv_max:c.inv);
+  var canCharge=light>0 && c.inv_max>0 && inv<c.inv_max;
+  if(MARCOS_EDIT){
+    return '<div class="me-card" style="margin-top:12px">'
+      +'<div class="me-name" style="font-size:15px;margin-bottom:12px">💠 Editar marcos</div>'
+      +'<div style="display:flex;gap:12px;flex-wrap:wrap">'
+        +'<label style="flex:1;min-width:120px"><div class="mstat-l" style="margin-bottom:5px">Cargados</div>'
+          +'<input class="oc-fi" id="mCargados" type="number" min="0" value="'+light+'" style="width:100%"/></label>'
+        +'<label style="flex:1;min-width:120px"><div class="mstat-l" style="margin-bottom:5px">Opacos</div>'
+          +'<input class="oc-fi" id="mOpacos" type="number" min="0" value="'+dun+'" style="width:100%"/></label>'
+      +'</div>'
+      +'<div class="me-sheet-row" style="justify-content:flex-end;border:none;margin-top:14px">'
+        +'<button class="btn-sheet" onclick="cancelMarcosEdit()">Cancelar</button>'
+        +'<button class="btn-sheet" style="background:var(--gold);color:#1c1915;border-color:var(--gold)" onclick="saveMarcos()">Guardar</button>'
+      +'</div></div>';
+  }
+  return '<div class="marcos-box" onclick="startMarcosEdit()" title="Tocá para editar tus marcos">'
+    +'<div class="marcos-box-h"><span>💠 Marcos · '+total+'</span><span class="marcos-hint">✎ tocar para editar</span></div>'
+    +'<div class="marcos-counts">'
+      +'<span class="marcos-charged">● <b>'+light+'</b> cargados</span>'
+      +'<span class="marcos-dun">○ <b>'+dun+'</b> opacos</span>'
+    +'</div></div>'
+    +(c.inv_max>0?'<button class="btn-sheet" style="margin-top:10px;width:100%;text-align:center;'
+      +(canCharge?'background:rgba(232,200,64,.14);border-color:#e8c840;color:#e8c840':'opacity:.45;cursor:not-allowed')+'"'
+      +(canCharge?' onclick="chargeInv()"':' disabled')+'>⚡ Cargar investidura</button>':'')
+    +'<div style="font-size:11px;color:var(--text3);margin-top:6px;font-style:italic">Se recargan con las altas tormentas. Cargar investidura apaga marcos.</div>';
+}
+function startMarcosEdit(){
+  MARCOS_EDIT=true; renderRoster();
+  setTimeout(function(){var e=document.getElementById('mCargados'); if(e){e.focus(); e.select();}},0);
+}
+function cancelMarcosEdit(){ MARCOS_EDIT=false; renderRoster(); }
+async function saveMarcos(){
+  var cargados=Math.max(0,parseInt((document.getElementById('mCargados')||{}).value)||0);
+  var opacos=Math.max(0,parseInt((document.getElementById('mOpacos')||{}).value)||0);
+  MARCOS_EDIT=false;
+  await api('/api/characters/'+MYCHAR+'/marcos/set','POST',{cargados:cargados,opacos:opacos});
+  loadRoster();
+}
+async function chargeInv(){
+  await api('/api/characters/'+MYCHAR+'/marcos/charge_inv','POST');
+  loadRoster();
+}
+
 function allyCard(m){
   var c=m.character;
   var cur=(c.vida==null?c.vida_max:c.vida);
@@ -640,7 +697,8 @@ function renderRoster(){
       +'</div>'
       +'<div class="me-card">'
       +ocStatCtl('c',c,'vida','Vida','#e05050')+ocStatCtl('c',c,'focus','Focus','#6aaae8')+ocStatCtl('c',c,'inv','Investidura','#aa8aec')
-      +ocStatuses('c',c.statuses,c.injuries)+ocInjuriesHTML(c)+'</div>';
+      +ocStatuses('c',c.statuses,c.injuries)+ocInjuriesHTML(c)+'</div>'
+      +marcosCard(c);
     if(meM.pets&&meM.pets.length){
       html+='<div class="section-lbl">Mis mascotas</div>'+meM.pets.map(function(p){
         return '<div class="me-card"><div class="me-head"><span class="me-name">'+esc(p.name)+' <span class="pet-tag">Mascota</span></span>'
@@ -658,9 +716,16 @@ function renderRoster(){
     html+='<div class="me-select"><div class="me-q">No tenés personaje en esta campaña.</div>'
       +'<div style="font-size:13px;color:var(--text3)">Se crea al aceptar la invitación desde el inicio.</div></div>';
   }
-  var injSnap=snapInjForm();
-  mp.innerHTML=html;
-  restoreInjForm(injSnap);
+  // No pisar el panel mientras el jugador está escribiendo en algún campo suyo
+  // (marcos, días de herida, cantidades de vida/focus, etc.): el refresco de 5s
+  // esperaría a que termine.
+  var ae=document.activeElement;
+  var editing=ae && mp.contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName);
+  if(!editing){
+    var injSnap=snapInjForm();
+    mp.innerHTML=html;
+    restoreInjForm(injSnap);
+  }
   var os=ROSTER.members.filter(function(m){return m.user_id!==MY_UID&&m.character;});
   document.getElementById('ocOthersLbl').style.display=os.length?'':'none';
   document.getElementById('grupoEmpty').style.display=os.length?'none':'';

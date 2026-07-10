@@ -10,7 +10,7 @@ from ..auth import current_user
 from ..cosmere_import import ImportError_, parse_statblock
 from ..database import db
 from ..models import (CharacterIn, DaysChange, InjuryIn, LiveStat, LiveStatus,
-                      PetImportIn)
+                      MarcosChange, MarcosSet, PetImportIn)
 from ..pdf_import import extract_pdf_image, parse_character_pdf
 
 router = APIRouter(prefix="/api/characters", tags=["characters"])
@@ -353,6 +353,52 @@ def delete_injury(cid: int, iid: str, user=Depends(current_user)):
         lst = [it for it in json.loads(r["injuries"] or "[]") if it["id"] != iid]
         conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(lst), cid))
     return {"ok": True, "injuries": lst}
+
+
+# ── Marcos (esferas) del personaje ────────────────────────
+
+def _adjust_marcos_total(conn, char_id: int, marcos: int, light: int, delta: int):
+    """Ajusta el total de marcos. Al reducir se van primero los opacos; los que se
+    agregan entran opacos. Devuelve (nuevo_total, nueva_luz)."""
+    new_total = max(0, marcos + delta)
+    new_light = min(light, new_total)
+    conn.execute("UPDATE characters SET marcos=?, marcos_light=? WHERE id=?",
+                 (new_total, new_light, char_id))
+    return new_total, new_light
+
+
+@router.post("/{cid}/marcos")
+def character_marcos(cid: int, ch: MarcosChange, user=Depends(current_user)):
+    with db() as conn:
+        r = _owned(conn, cid, user)
+        total, light = _adjust_marcos_total(conn, cid, r["marcos"] or 0, r["marcos_light"] or 0, ch.delta)
+    return {"ok": True, "marcos": total, "marcos_light": light}
+
+
+@router.post("/{cid}/marcos/set")
+def character_marcos_set(cid: int, s: MarcosSet, user=Depends(current_user)):
+    """El jugador fija directamente cuántos marcos tiene cargados y opacos."""
+    cargados = max(0, s.cargados)
+    opacos = max(0, s.opacos)
+    with db() as conn:
+        _owned(conn, cid, user)
+        conn.execute("UPDATE characters SET marcos=?, marcos_light=? WHERE id=?",
+                     (cargados + opacos, cargados, cid))
+    return {"ok": True, "marcos": cargados + opacos, "marcos_light": cargados}
+
+
+@router.post("/{cid}/marcos/charge_inv")
+def character_charge_inv(cid: int, user=Depends(current_user)):
+    """Cargar investidura: llena el medidor 1:1 apagando marcos cargados."""
+    with db() as conn:
+        r = _owned(conn, cid, user)
+        light = r["marcos_light"] or 0
+        inv = r["inv"] if r["inv"] is not None else r["inv_max"]
+        amount = max(0, min(r["inv_max"] - inv, light))
+        new_inv = inv + amount
+        new_light = light - amount
+        conn.execute("UPDATE characters SET inv=?, marcos_light=? WHERE id=?", (new_inv, new_light, cid))
+    return {"ok": True, "inv": new_inv, "marcos_light": new_light, "charged": amount}
 
 
 # ── Imagen (retrato) del personaje ────────────────────────
