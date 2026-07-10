@@ -261,10 +261,22 @@ async def change_stat(cid: int, c: StatChange, user=Depends(current_user)):
         raise HTTPException(404, "Participante no encontrado")
     _guard_participant(is_dm, p, user)
     mx = p[f"{c.stat}_max"]
-    p[c.stat] = max(0, min(mx, p[c.stat] + c.delta))
+    old = p[c.stat]
+    p[c.stat] = max(0, min(mx, old + c.delta))
     if c.stat == "vida":
         p["defeated"] = p["vida"] == 0
     _persist_participant(p)
+    # Cargar investidura apaga marcos cargados 1:1 (solo personajes de jugador).
+    if c.stat == "inv" and p.get("char_id"):
+        gained = p["inv"] - old
+        if gained > 0:
+            with db() as conn:
+                row = conn.execute("SELECT marcos_light FROM characters WHERE id=?",
+                                   (p["char_id"],)).fetchone()
+                light = (row["marcos_light"] if row else 0) or 0
+                if light > 0:
+                    conn.execute("UPDATE characters SET marcos_light=? WHERE id=?",
+                                 (max(0, light - gained), p["char_id"]))
     await push_state(cid)
     return {"ok": True}
 

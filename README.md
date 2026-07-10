@@ -52,7 +52,7 @@ cosmere-app/
     auth.py             ← cuentas y sesiones (login por cookie)
     access.py           ← chequeos de acceso a campañas (DM / miembro)
     models.py           ← modelos Pydantic
-    pdf_import.py       ← extracción de fichas de personaje desde PDF
+    pdf_import.py       ← extracción de fichas de personaje y su retrato desde PDF
     cosmere_import.py   ← parser de statblocks (importar enemigos)
     state.py            ← estado del combate por campaña (memoria + persistencia)
     ws.py               ← WebSockets con salas por campaña
@@ -81,17 +81,26 @@ Al entrar y loguearte llegás al **panel principal** (`/`), con dos zonas:
    los jugadores aceptados + los enemigos del encuentro.
 
 **Como jugador:**
-1. **Creá personajes** a mano, o **subí la ficha PDF** (formato oficial de Cosmere RPG):
-   se extraen automáticamente **vida, focus e investidura** (y el resto de la ficha:
-   atributos, defensas, habilidades, talentos, armas, equipo).
-2. **Mascotas:** con el botón **🐾 Mascotas** de un personaje cargás sus mascotas
-   pegando el statblock (mismo formato de código que los enemigos). Entran al combate
-   como aliados que **vos controlás**, y les llevás el seguimiento (vida, focus,
-   estados, turno) igual que a tu personaje.
-3. **Aceptá invitaciones** a campañas, eligiendo con qué personaje entrás (sus mascotas
-   van con él). Podés **salir** de una campaña cuando quieras.
-4. Entrá a **Jugar** para gestionar en vivo tu turno, vida, focus, investidura y estados
-   (los tuyos y los de tus mascotas).
+1. En el panel principal ves una **galería visual de tus personajes** (retrato, nombre,
+   clases, nivel y campaña). Cada personaje **pertenece a una campaña** (uno por campaña):
+   no hay personajes sueltos.
+2. **Aceptá invitaciones** creando el personaje ahí mismo: **a mano** o **subiendo la
+   ficha PDF** (formato oficial de Cosmere RPG), que extrae automáticamente **vida, focus
+   e investidura** (y el resto de la ficha: atributos, defensas, habilidades, talentos,
+   armas, equipo) e intenta sacar un **retrato** del PDF. Eso enlaza al personaje con la
+   campaña y acepta la invitación en un paso.
+3. Al **entrar a un personaje** llegás a su ficha detallada (pestaña **Mi personaje**),
+   con botones para **editarlo**, gestionar sus **🐾 mascotas**, subir/cambiar su
+   **retrato** y **actualizar el PDF**.
+4. **Mascotas:** cargás sus statblocks (mismo formato de código que los enemigos). Entran
+   al combate como aliados que **vos controlás**, con seguimiento propio (vida, focus,
+   estados, turno).
+5. Dentro de una campaña tenés tres pestañas: **Mi personaje** (tu ficha y gestión fuera
+   de combate), **Grupo** (el resto del grupo) y **Combate** (tu turno en vivo). Podés
+   **salir** de la campaña cuando quieras (esto borra tu personaje de esa campaña).
+
+Para el detalle de marcos, tormentas, retratos y heridas, ver
+[Novedades](#novedades-personajes-marcos-tormentas-y-heridas).
 
 ### Importar enemigos desde código
 
@@ -170,6 +179,103 @@ puede editar a mano desde el bestiario para ajustar clase y color.
 - De los **enemigos** ve solo el nombre, color, salud descriptiva y estados: **no** ve
   su tier/tipo, ni si tomaron turno rápido o lento. Los ocultos por el DM no aparecen.
 
+## Novedades: personajes, marcos, tormentas y heridas
+
+### Personajes ligados a una campaña
+
+- Cada personaje **pertenece a una campaña**, y hay **uno por campaña** por jugador. No
+  se pueden tener personajes fuera de una campaña.
+- El personaje se crea **al aceptar una invitación** (creándolo a mano o subiendo el PDF).
+  Eso enlaza el PJ a la campaña y marca la membresía como aceptada en un solo paso.
+- **Salir** de una campaña (o que el DM te **eche**) **elimina** tu personaje de esa
+  campaña (con sus mascotas, PDF e imagen, por cascada).
+- El panel principal del jugador es una **galería visual**: retrato, nombre, clases,
+  nivel y campaña de cada personaje.
+
+### Retrato del personaje
+
+- Al subir el PDF, el sistema intenta **extraer un retrato** de la ficha
+  (`extract_pdf_image`, best-effort: toma la imagen raster más grande; requiere que el
+  PDF traiga una imagen embebida). Si no encuentra ninguna, no pasa nada.
+- Desde **Mi personaje** el jugador puede **subir/cambiar** el retrato a mano (gana sobre
+  el del PDF) o **borrarlo**. Reimportar el PDF **no pisa** un retrato subido a mano.
+- El retrato lo ven el dueño, el DM y los miembros de la campaña.
+
+### Marcos (esferas) e investidura
+
+Los **marcos** son la moneda del juego y a la vez almacenan **luz/investidura**. Cada
+personaje tiene un total de marcos que se reparte en:
+
+- **Cargados** (con luz) — los que pueden alimentar investidura.
+- **Opacos** (sin luz) — total menos cargados.
+
+En **Mi personaje** y en **Combate** hay un recuadro chico (arriba a la derecha del
+bloque de vida): **total** arriba, **cargados** abajo a la izquierda, **opacos** abajo a
+la derecha. Haciendo **click en un número** lo editás directamente (Enter para guardar,
+Escape para cancelar); el sondeo cada 5 s **no** te pisa lo que estás escribiendo.
+
+- **Cargar investidura** consume marcos cargados **1:1**: cada punto de investidura que
+  subís apaga un marco cargado (hasta llenar el medidor o quedarte sin luz).
+- El **descanso largo ya no recarga la investidura**: el jugador decide cuándo cargarla
+  desde sus marcos.
+- **El DM** puede, por jugador, **agregar/sacar marcos** (al sacar se van primero los
+  opacos; los que agrega entran opacos) y **cargar/apagar** marcos (mover luz), desde su
+  vista de jugadores.
+
+### Ciclo de altas tormentas y descarga de marcos
+
+El **paso del tiempo** avanza con **Descanso largo** o con **Adelantar un día** (viaje).
+Cada día que pasa:
+
+- Cuando **cae la tormenta**, se **recargan todos los marcos** (todos pasan a cargados).
+  Tras la tormenta arranca un ciclo nuevo con un objetivo al azar dentro del rango.
+- Sin tormenta, a partir del **día de inicio de descarga** cada marco cargado se puede
+  **apagar** con probabilidad creciente (pocos al principio, todos para el **día de
+  apagado total**). La cantidad que se apaga cada día es **aleatoria** (Bernoulli por
+  marco).
+- La **forma** de la caída la controla la **curva de descarga** (exponente): `1` = pareja
+  (lineal); más alto = arranca más lento y acelera al final. Por defecto **2.0**, así que
+  los primeros días descargan suave.
+
+Probabilidad por marco un día dado (sin tormenta):
+`base = (día − (inicio−1)) / (apagado − (inicio−1))`, `p = base ^ curva`.
+Con los valores por defecto (inicio 5, apagado 15, curva 2) casi no se pierde luz al
+principio y todo llega a 0 en el día 15 si no hubo tormenta.
+
+### Panel de ajustes del DM (⚙ Ajustes)
+
+En la vista del DM, el botón **⚙ Ajustes** abre un panel para **tunear los parámetros**
+de la campaña sin tocar código (se guardan en la campaña):
+
+- **Tormentas:** días mínimo/máximo entre tormentas.
+- **Descarga de marcos:** día de inicio, día de apagado total y **curva de descarga**.
+- **Estado actual de la tormenta:** día del ciclo, día objetivo y momento del día.
+
+El panel incluye un **preview en vivo**: una mini gráfica de barras del **% de marcos con
+luz por día**, que se recalcula al instante al mover el día de inicio/apagado o la curva
+(es el valor esperado; la descarga real es al azar). Sirve para ver el ritmo y ajustarlo
+antes de guardar.
+
+Los valores por defecto: tormenta cada **8–12** días, descarga del día **5** al **15**,
+curva **2.0**. Una campaña sin ajustes guardados toma estos valores.
+
+### Vista de jugadores del DM
+
+La lista de jugadores del DM es **visual**: por cada jugador ve su personaje con retrato,
+nivel/clase, **barras** de vida/focus/investidura, **estados**, **heridas**, su recuadro
+de **marcos** (con controles para cargar/descargar y agregar/sacar) y acceso a la ficha y
+al PDF.
+
+### Heridas (injuries)
+
+- Cada personaje puede acumular **heridas** con un **tipo**, **días** restantes y si es
+  **permanente**. El **descanso largo** baja en 1 los días de las no permanentes; al bajar
+  de 0 se curan.
+- Mientras la asignás, tomarte tu tiempo **ya no reinicia** el tipo ni los días (el sondeo
+  no pisa la selección en curso).
+- Si una herida **genera un estado**, ese estado queda **marcado y bloqueado**: no se
+  puede quitar a mano hasta que la herida se cure.
+
 ## Datos y persistencia
 
 Todo se guarda en `cosmere.db` (SQLite) y **sobrevive a reiniciar/apagar el servidor**:
@@ -180,7 +286,10 @@ campaña.
   cual (ronda, turnos, vida y estados de todos).
 - **Estado de los personajes:** cada personaje conserva su **vida, focus, investidura y
   estados actuales** de forma permanente — sobreviven a "Terminar combate" y a empezar
-  un combate nuevo (no vuelven a vida full solos).
+  un combate nuevo (no vuelven a vida full solos). También persisten sus **marcos**
+  (cargados/opacos), **heridas** y **retrato**.
+- **Ciclo de tormentas y ajustes por campaña:** el día del ciclo, el objetivo y los
+  parámetros del panel ⚙ Ajustes se guardan por campaña y sobreviven al reinicio.
 - Los **enemigos** arrancan cada combate con su vida completa (son plantillas del
   encuentro); su vida solo se mantiene mientras ese combate siga activo.
 

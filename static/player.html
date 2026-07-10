@@ -250,6 +250,7 @@ async function chStat(uid,stat,sign){
   var el=document.getElementById('mi-'+stat);
   var val=Math.max(1,parseInt(el&&el.value)||1);
   await api(API+'/combat/stat','POST',{uid:uid,stat:stat,delta:sign*val});
+  if(stat==='inv') loadRoster();  // la luz baja al cargar: refresca el recuadro de marcos
 }
 async function chStatus(uid,status){await api(API+'/combat/status','POST',{uid:uid,status:status});}
 async function rmStatus(uid,status){await api(API+'/combat/status/remove_one','POST',{uid:uid,status:status});}

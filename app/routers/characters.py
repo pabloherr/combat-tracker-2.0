@@ -264,7 +264,15 @@ def character_stat(cid: int, s: LiveStat, user=Depends(current_user)):
         r = _owned(conn, cid, user)
         val = _clamp_stat(r, s.stat, s.delta)
         conn.execute(f"UPDATE characters SET {s.stat}=? WHERE id=?", (val, cid))
-    return {"ok": True, "value": val}
+        light = r["marcos_light"] or 0
+        if s.stat == "inv":
+            # Cargar investidura apaga marcos cargados 1:1 (tantos como luz disponible).
+            cur = r["inv"] if r["inv"] is not None else r["inv_max"]
+            gained = val - cur
+            if gained > 0 and light > 0:
+                light = max(0, light - gained)
+                conn.execute("UPDATE characters SET marcos_light=? WHERE id=?", (light, cid))
+    return {"ok": True, "value": val, "marcos_light": light}
 
 
 @router.post("/{cid}/status")
