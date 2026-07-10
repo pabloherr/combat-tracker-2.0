@@ -261,6 +261,32 @@ select.fi{appearance:auto;}
 .storm-cell.storm{background:#e05050;box-shadow:0 0 5px rgba(224,80,80,.7);}
 .storm-info{font-size:11px;color:var(--text3);font-style:italic;white-space:nowrap;}
 .storm-ctrl{display:flex;gap:4px;}
+/* ajustes (config) */
+.cfg-sec{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border);}
+.cfg-lrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;font-size:14px;color:var(--text2);}
+.cfg-hint{font-size:11px;color:var(--text3);font-style:italic;}
+.dchart-lbl{font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--text3);margin:10px 0 6px;font-family:'Cinzel',serif;}
+.dchart{display:flex;align-items:flex-end;gap:3px;height:100px;padding:5px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;overflow-x:auto;}
+.dbar-col{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;min-width:15px;}
+.dbar-wrap{height:74px;width:100%;display:flex;align-items:flex-end;}
+.dbar{width:100%;background:linear-gradient(180deg,#e8c840,#bf8a20);border-radius:2px 2px 0 0;min-height:1px;transition:height .12s;}
+.dbar-day{font-size:9px;color:var(--text3);font-family:'Cinzel',serif;}
+/* tarjetas de jugadores (más visual) */
+.mem-top{display:flex;gap:12px;align-items:flex-start;margin-bottom:10px;}
+.mem-avatar{width:56px;height:72px;border-radius:8px;object-fit:cover;border:1px solid var(--border2);background:var(--bg3);flex:none;}
+.mem-avatar-ph{display:flex;align-items:center;justify-content:center;font-size:26px;color:var(--text3);background:linear-gradient(135deg,var(--bg3),var(--bg4));}
+.mem-id{flex:1;min-width:0;}
+.mem-user{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text3);font-family:'Cinzel',serif;}
+.mem-char{font-family:'Cinzel',serif;font-size:16px;color:var(--gold2);letter-spacing:.03em;margin-top:1px;}
+.mem-sub{font-size:12px;color:var(--text2);margin-top:2px;}
+.mem-bars{display:flex;flex-direction:column;gap:5px;margin-bottom:8px;}
+.mem-bar-row{display:flex;align-items:center;gap:8px;font-size:11px;}
+.mem-bar-l{width:42px;color:var(--text3);letter-spacing:.04em;text-transform:uppercase;font-size:9px;font-family:'Cinzel',serif;}
+.mem-bar{flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;}
+.mem-bar>div{height:100%;border-radius:3px;}
+.mem-bar-v{width:52px;text-align:right;font-family:'Cinzel',serif;font-size:12px;}
+.mem-chips{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;}
+.mem-chip{font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid;font-family:'Cinzel',serif;letter-spacing:.03em;}
 </style>
 </head>
 <body>
@@ -280,6 +306,7 @@ select.fi{appearance:auto;}
     <span class="storm-ctrl">
       <button class="btn ghost sm" onclick="stormAdvance()" title="Pasar un día (sin descanso)">+1 día</button>
       <button class="btn ghost sm" onclick="stormReset()" title="Reiniciar el ciclo">⟳</button>
+      <button class="btn ghost sm" onclick="openConfig()" title="Ajustar parámetros (tormentas, marcos)">⚙ Ajustes</button>
     </span>
   </div>
 
@@ -486,20 +513,52 @@ async function loadMembers(){
   var members=await api(API+'/members');
   var g=document.getElementById('membersGrid');
   document.getElementById('membersEmpty').style.display=members.length?'none':'block';
-  g.innerHTML=members.map(function(m){
-    var acc=m.status==='accepted';
-    var estado=acc?(m.character_name?'Personaje: <b style="color:var(--gold2)">'+esc(m.character_name)+'</b>':'Aceptó, sin personaje')
-                  :'<span style="color:#e8a860">Invitación pendiente</span>';
+  g.innerHTML=members.map(memberCard).join('');
+}
+function memBar(label,cur,mx,color){
+  if(!mx&&label!=='Vida')return '';
+  cur=(cur==null?mx:cur); mx=mx||0;
+  var pct=mx>0?Math.round(cur/mx*100):0;
+  return '<div class="mem-bar-row"><span class="mem-bar-l">'+label+'</span>'
+    +'<div class="mem-bar"><div style="width:'+pct+'%;background:'+color+'"></div></div>'
+    +'<span class="mem-bar-v" style="color:'+color+'">'+cur+' / '+mx+'</span></div>';
+}
+function memChips(m){
+  var sc={}; (m.statuses||[]).forEach(function(s){sc[s]=(sc[s]||0)+1;});
+  var chips=Object.keys(sc).map(function(s){var col=SC[s]||'#a09070';
+    return '<span class="mem-chip" style="border-color:'+col+';color:'+col+'">'+s+(sc[s]>1?' x'+sc[s]:'')+'</span>';});
+  (m.injuries||[]).forEach(function(i){
+    chips.push('<span class="mem-chip" style="border-color:#c87830;color:#c87830">🩹 '+esc(i.name)+(i.permanent?'':' ('+i.days+'d)')+'</span>');});
+  return chips.length?'<div class="mem-chips">'+chips.join('')+'</div>':'';
+}
+function memberCard(m){
+  var acc=m.status==='accepted';
+  if(!acc||!m.character_id){
     return '<div class="card">'
       +'<div class="card-head"><span class="cname">'+esc(m.username)+'</span>'
       +'<button class="del-btn" onclick="kickMember('+m.user_id+')" title="Sacar de la campaña">✕</button></div>'
-      +'<div class="cmeta">'+estado+'</div>'
-      +(acc&&m.character_id?'<div class="card-actions">'
-          +'<button class="btn sm" onclick="viewMemberSheet('+m.user_id+')">Ver ficha</button>'
-          +(m.has_pdf?'<a class="btn sm" href="/api/characters/'+m.character_id+'/pdf" target="_blank">PDF</a>':'')
-        +'</div>'+marcosDmBlock(m):'')
-      +'</div>';
-  }).join('');
+      +'<div class="cmeta">'+(acc?'Aceptó, sin personaje':'<span style="color:#e8a860">Invitación pendiente</span>')+'</div></div>';
+  }
+  var av=m.has_image
+    ? '<img class="mem-avatar" src="/api/characters/'+m.character_id+'/image" alt=""/>'
+    : '<div class="mem-avatar mem-avatar-ph">'+(m.has_pdf?'📜':'🛡')+'</div>';
+  var sub=[m.clase,(m.nivel?'Nivel '+m.nivel:'')].filter(Boolean).map(esc).join(' · ');
+  return '<div class="card">'
+    +'<div class="mem-top">'+av
+      +'<div class="mem-id"><div class="mem-user">'+esc(m.username)+'</div>'
+        +'<div class="mem-char">'+esc(m.character_name)+'</div>'
+        +(sub?'<div class="mem-sub">'+sub+'</div>':'')+'</div>'
+      +'<button class="del-btn" onclick="kickMember('+m.user_id+')" title="Sacar de la campaña">✕</button></div>'
+    +'<div class="mem-bars">'
+      +memBar('Vida',m.vida,m.vida_max,'#e05050')
+      +memBar('Focus',m.focus,m.focus_max,'#6aaae8')
+      +memBar('Inv',m.inv,m.inv_max,'#aa8aec')+'</div>'
+    +memChips(m)
+    +marcosDmBlock(m)
+    +'<div class="card-actions" style="margin-top:10px">'
+      +'<button class="btn sm" onclick="viewMemberSheet('+m.user_id+')">Ver ficha</button>'
+      +(m.has_pdf?'<a class="btn sm" href="/api/characters/'+m.character_id+'/pdf" target="_blank">PDF</a>':'')
+    +'</div></div>';
 }
 // Controles de marcos del jugador (agregar/sacar total, cargar/apagar luz)
 function marcosDmBlock(m){
@@ -579,6 +638,68 @@ async function stormReset(){
   if(!confirm('¿Reiniciar el ciclo de tormentas? Se sortea un nuevo día y momento.'))return;
   var r=await api(API+'/storm/reset','POST');
   renderStorm(r.state);
+}
+
+// ─── Ajustes de la campaña (parámetros de tormenta/marcos) ───
+function cfgRow(label,id,val,hint,extra){
+  return '<label class="cfg-lrow"><span>'+label+(hint?'<br><span class="cfg-hint">'+hint+'</span>':'')+'</span>'
+    +'<input class="fi" type="number" id="'+id+'" value="'+val+'" style="width:90px" '+(extra||'')+'/></label>';
+}
+async function openConfig(){
+  var cfg=await api(API+'/config');
+  var moments=(cfg.moments||[]).map(function(m){return '<option value="'+esc(m)+'"'+(m===cfg.storm_moment?' selected':'')+'>'+esc(m)+'</option>';}).join('');
+  var dp='oninput="renderDischargePreview()"';
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cname" style="font-size:18px">⚙ Ajustes de la campaña</div>'
+    +'<div style="font-size:12px;color:var(--text3);font-style:italic;margin:4px 0 12px">Jugá con los parámetros del ciclo de tormentas y la descarga de marcos.</div>'
+    +'<div class="cfg-sec">Ciclo de tormentas</div>'
+    +cfgRow('Mínimo de días entre tormentas','cfg-smin',cfg.storm_min)
+    +cfgRow('Máximo de días entre tormentas','cfg-smax',cfg.storm_max)
+    +'<div class="cfg-sec">Descarga de marcos</div>'
+    +cfgRow('Día en que empiezan a apagarse','cfg-dstart',cfg.discharge_start,'','min="1" '+dp)
+    +cfgRow('Día en que se apagan del todo','cfg-dfull',cfg.discharge_full,'','min="2" '+dp)
+    +cfgRow('Curva de descarga','cfg-dcurve',cfg.discharge_curve,'1 = pareja · más alto arranca más lento','step="0.5" min="0.5" '+dp)
+    +'<div class="dchart-lbl">Marcos con luz por día (promedio) — pasá el mouse por cada barra</div>'
+    +'<div class="dchart" id="dchart"></div>'
+    +'<div class="cfg-sec">Estado actual de la tormenta</div>'
+    +cfgRow('Día actual del ciclo','cfg-sday',cfg.storm_day)
+    +cfgRow('Cae el día','cfg-starget',cfg.storm_target)
+    +'<label class="cfg-lrow"><span>Momento</span><select class="fi" id="cfg-smoment" style="min-width:150px">'+moments+'</select></label>'
+    +'<div class="form-actions" style="margin-top:16px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="saveConfig()">Guardar</button></div>';
+  document.getElementById('overlay').classList.add('on');
+  renderDischargePreview();
+}
+// Mini gráfica del % de marcos que queda con luz cada día (valor esperado),
+// con la misma fórmula que el backend: p(día) = (base) ** curva.
+function renderDischargePreview(){
+  var el=document.getElementById('dchart'); if(!el)return;
+  var start=Math.max(1,parseInt(document.getElementById('cfg-dstart').value)||5);
+  var full=Math.max(start+1,parseInt(document.getElementById('cfg-dfull').value)||15);
+  var curve=Math.max(0.1,Math.min(8,parseFloat(document.getElementById('cfg-dcurve').value)||1));
+  var span=full-(start-1), remaining=1, bars='';
+  for(var d=start-1; d<=full; d++){
+    if(d>=start){
+      var base=Math.min(1,Math.max(0,(d-(start-1))/span));
+      remaining=remaining*(1-Math.pow(base,curve));
+    }
+    var pct=Math.round(remaining*100);
+    bars+='<div class="dbar-col" title="Día '+d+': '+pct+'% con luz">'
+      +'<div class="dbar-wrap"><div class="dbar" style="height:'+pct+'%"></div></div>'
+      +'<div class="dbar-day">'+d+'</div></div>';
+  }
+  el.innerHTML=bars;
+}
+async function saveConfig(){
+  var v=function(id){var n=parseInt(document.getElementById(id).value);return isNaN(n)?null:n;};
+  var vf=function(id){var n=parseFloat(document.getElementById(id).value);return isNaN(n)?null:n;};
+  await api(API+'/config','PUT',{
+    storm_min:v('cfg-smin'), storm_max:v('cfg-smax'),
+    discharge_start:v('cfg-dstart'), discharge_full:v('cfg-dfull'), discharge_curve:vf('cfg-dcurve'),
+    storm_day:v('cfg-sday'), storm_target:v('cfg-starget'),
+    storm_moment:document.getElementById('cfg-smoment').value
+  });
+  closeModal();
+  loadStorm();
 }
 async function invitePlayer(){
   var u=document.getElementById('inviteUser').value.trim();

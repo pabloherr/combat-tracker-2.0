@@ -47,6 +47,18 @@ class LongRestIn(BaseModel):
     exclude: list[int] = []      # user_ids que NO reciben el descanso
 
 
+class ConfigIn(BaseModel):
+    # Parámetros ajustables por el DM. Todos opcionales: se aplica lo que venga.
+    storm_min: int | None = None        # mínimo de días entre tormentas
+    storm_max: int | None = None        # máximo de días entre tormentas
+    discharge_start: int | None = None  # día desde el que los marcos empiezan a apagarse
+    discharge_full: int | None = None   # día en que ya no queda luz
+    discharge_curve: float | None = None  # exponente de la curva (1 = pareja)
+    storm_day: int | None = None        # estado actual: día del ciclo
+    storm_target: int | None = None     # estado actual: día en que cae la tormenta
+    storm_moment: str | None = None     # estado actual: momento del día
+
+
 # ── Personajes ─────────────────────────────────────────────
 
 class CharacterIn(BaseModel):

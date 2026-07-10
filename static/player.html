@@ -149,15 +149,17 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .import-ta{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:'Courier New',monospace;font-size:12px;line-height:1.5;outline:none;resize:vertical;min-height:150px;white-space:pre;}
 .import-ta:focus{border-color:var(--gold);}
 .inv-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;}
-/* marcos (esferas) */
-.marcos-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:12px 14px;margin-top:12px;cursor:pointer;transition:border-color .15s;}
-.marcos-box:hover{border-color:var(--gold);}
-.marcos-box-h{font-family:'Cinzel',serif;font-size:13px;color:var(--gold2);letter-spacing:.04em;display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;}
-.marcos-hint{font-size:10px;color:var(--text3);font-style:italic;font-family:'Crimson Pro',serif;letter-spacing:0;}
-.marcos-counts{display:flex;gap:20px;font-size:14px;}
-.marcos-counts b{font-family:'Cinzel',serif;font-size:18px;}
-.marcos-charged{color:#e8c840;}
-.marcos-dun{color:var(--text3);}
+/* marcos (esferas): recuadro chico total/cargados/opacos */
+.marcos-w{border:1px solid var(--border2);border-radius:8px;overflow:hidden;width:104px;text-align:center;background:var(--bg3);flex:none;}
+.marcos-w-total{font-family:'Cinzel',serif;color:var(--gold2);font-size:15px;padding:3px 6px;border-bottom:1px solid var(--border2);white-space:nowrap;}
+.marcos-w-row{display:flex;}
+.marcos-w-cell{flex:1;padding:4px 4px;font-family:'Cinzel',serif;font-size:15px;cursor:pointer;min-width:0;}
+.marcos-w-cell.charged{color:#e8c840;border-right:1px solid var(--border2);}
+.marcos-w-cell.dun{color:var(--text3);}
+.marcos-w-cell:hover{background:rgba(224,189,124,.14);}
+.marcos-w-inp{width:100%;background:var(--bg2);border:none;color:inherit;font-family:'Cinzel',serif;font-size:15px;text-align:center;outline:none;padding:0;-moz-appearance:textfield;}
+.marcos-w-inp::-webkit-outer-spin-button,.marcos-w-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.marcos-w-lbl{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin:14px 0 6px;}
 </style>
 </head>
 <body>
@@ -234,7 +236,6 @@ var _qtab=(new URLSearchParams(location.search).get('tab')||'').toLowerCase();
 var TAB=({pj:'pj',grupo:'grupo',combate:'combate'}[_qtab])||'pj';
 var TAB_EXPLICIT=!!_qtab;   // si el usuario pidió una pestaña explícita en la URL
 var IMG_V=0;                // versión de la imagen (para refrescar caché al cambiarla)
-var MARCOS_EDIT=false;      // si el recuadro de marcos está en modo edición
 
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 async function api(path,method,body){
@@ -292,7 +293,7 @@ function meControls(p){
     +statusPanel(p);
 }
 // tarjeta con controles (personaje propio o mascota propia)
-function controlCard(p,tagHTML,turnLabel,isPet){
+function controlCard(p,tagHTML,turnLabel,isPet,marcosHTML){
   var turnCtl;
   if(isPet){
     // las mascotas toman turno al azar: se muestra pero no se edita
@@ -308,7 +309,7 @@ function controlCard(p,tagHTML,turnLabel,isPet){
     +(p.kind==='player'&&p.has_pdf?'<a class="btn-sheet" href="/api/characters/'+p.char_id+'/pdf" target="_blank">Ver PDF</a>':'')
     +'</div>';
   return '<div class="me-card">'
-    +'<div class="me-head"><span class="me-name">'+esc(p.name)+(tagHTML||'')+'</span></div>'
+    +'<div class="me-head"><span class="me-name">'+esc(p.name)+(tagHTML||'')+'</span>'+(marcosHTML||'')+'</div>'
     +'<div class="me-turn-row"><span class="me-turn-lbl">'+(turnLabel||'Turno')+'</span>'+turnCtl+'</div>'
     +meControls(p)+sheetRow+'</div>';
 }
@@ -322,10 +323,13 @@ function renderMe(combat){
     return null;
   }
   var html='';
-  if(me) html+='<div class="section-lbl">Mi personaje</div>'+controlCard(me,'','Tu turno',false);
+  var mc=meChar();
+  if(me) html+='<div class="section-lbl">Mi personaje</div>'+controlCard(me,'','Tu turno',false,mc?marcosWidget(mc):'');
   if(pets.length) html+='<div class="section-lbl">Mis mascotas</div>'
     +pets.map(function(pt){return controlCard(pt,' <span class="pet-tag">Mascota</span>','Turno',true);}).join('');
-  mp.innerHTML=html;
+  // no pisar el panel si el jugador está editando algún campo (marcos, cantidades)
+  var ae=document.activeElement;
+  if(!(ae && mp.contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName))) mp.innerHTML=html;
   return me?me.user_id:MY_UID;
 }
 
@@ -495,6 +499,7 @@ async function loadRoster(){
   if(MY_UID==null)return;
   try{ ROSTER=await api(API+'/roster'); }catch(e){ return; }
   renderRoster();
+  if(COMBAT&&COMBAT.active) renderMe(COMBAT);   // refresca el recuadro de marcos del combate
 }
 // tracker de altas tormentas: el jugador ve la barra pero NO el día/momento exactos
 function renderStorm(s){
@@ -611,50 +616,36 @@ async function ocAddInjury(){
 async function ocInjDays(iid,delta){ await api('/api/characters/'+MYCHAR+'/injuries/'+iid+'/days','POST',{delta:delta}); loadRoster(); }
 async function ocDelInjury(iid){ await api('/api/characters/'+MYCHAR+'/injuries/'+iid,'DELETE'); loadRoster(); }
 
-// ─── Marcos (esferas): moneda + luz/investidura ───
-function marcosCard(c){
+// ─── Marcos (esferas): recuadro total / cargados / opacos ───
+// Total arriba; abajo izquierda cargados (dorado), derecha opacos (gris). Se toca
+// cualquiera de los dos números para editarlo directo.
+function marcosWidget(c){
   var total=c.marcos||0, light=Math.min(c.marcos_light||0,total), dun=Math.max(0,total-light);
-  var inv=(c.inv==null?c.inv_max:c.inv);
-  var canCharge=light>0 && c.inv_max>0 && inv<c.inv_max;
-  if(MARCOS_EDIT){
-    return '<div class="me-card" style="margin-top:12px">'
-      +'<div class="me-name" style="font-size:15px;margin-bottom:12px">💠 Editar marcos</div>'
-      +'<div style="display:flex;gap:12px;flex-wrap:wrap">'
-        +'<label style="flex:1;min-width:120px"><div class="mstat-l" style="margin-bottom:5px">Cargados</div>'
-          +'<input class="oc-fi" id="mCargados" type="number" min="0" value="'+light+'" style="width:100%"/></label>'
-        +'<label style="flex:1;min-width:120px"><div class="mstat-l" style="margin-bottom:5px">Opacos</div>'
-          +'<input class="oc-fi" id="mOpacos" type="number" min="0" value="'+dun+'" style="width:100%"/></label>'
-      +'</div>'
-      +'<div class="me-sheet-row" style="justify-content:flex-end;border:none;margin-top:14px">'
-        +'<button class="btn-sheet" onclick="cancelMarcosEdit()">Cancelar</button>'
-        +'<button class="btn-sheet" style="background:var(--gold);color:#1c1915;border-color:var(--gold)" onclick="saveMarcos()">Guardar</button>'
-      +'</div></div>';
-  }
-  return '<div class="marcos-box" onclick="startMarcosEdit()" title="Tocá para editar tus marcos">'
-    +'<div class="marcos-box-h"><span>💠 Marcos · '+total+'</span><span class="marcos-hint">✎ tocar para editar</span></div>'
-    +'<div class="marcos-counts">'
-      +'<span class="marcos-charged">● <b>'+light+'</b> cargados</span>'
-      +'<span class="marcos-dun">○ <b>'+dun+'</b> opacos</span>'
-    +'</div></div>'
-    +(c.inv_max>0?'<button class="btn-sheet" style="margin-top:10px;width:100%;text-align:center;'
-      +(canCharge?'background:rgba(232,200,64,.14);border-color:#e8c840;color:#e8c840':'opacity:.45;cursor:not-allowed')+'"'
-      +(canCharge?' onclick="chargeInv()"':' disabled')+'>⚡ Cargar investidura</button>':'')
-    +'<div style="font-size:11px;color:var(--text3);margin-top:6px;font-style:italic">Se recargan con las altas tormentas. Cargar investidura apaga marcos.</div>';
+  return '<div class="marcos-w">'
+    +'<div class="marcos-w-total" title="Total de marcos">💠 '+total+'</div>'
+    +'<div class="marcos-w-row">'
+      +'<span class="marcos-w-cell charged" onclick="editMarco(this,\'light\')" title="Cargados — tocá para editar">'+light+'</span>'
+      +'<span class="marcos-w-cell dun" onclick="editMarco(this,\'dun\')" title="Opacos — tocá para editar">'+dun+'</span>'
+    +'</div></div>';
 }
-function startMarcosEdit(){
-  MARCOS_EDIT=true; renderRoster();
-  setTimeout(function(){var e=document.getElementById('mCargados'); if(e){e.focus(); e.select();}},0);
+function repaintMe(){ renderRoster(); if(COMBAT&&COMBAT.active) renderMe(COMBAT); }
+function editMarco(el, which){
+  if(el.querySelector('input'))return;
+  var canceled=false;
+  el.innerHTML='<input class="marcos-w-inp" type="number" min="0" value="'+el.textContent.trim()+'"/>';
+  var inp=el.firstChild; inp.focus(); inp.select();
+  inp.onkeydown=function(e){ if(e.key==='Enter'){inp.blur();} else if(e.key==='Escape'){canceled=true;inp.blur();} };
+  inp.onblur=function(){
+    if(canceled){ repaintMe(); return; }
+    saveMarcoField(which, Math.max(0,parseInt(inp.value)||0));
+  };
 }
-function cancelMarcosEdit(){ MARCOS_EDIT=false; renderRoster(); }
-async function saveMarcos(){
-  var cargados=Math.max(0,parseInt((document.getElementById('mCargados')||{}).value)||0);
-  var opacos=Math.max(0,parseInt((document.getElementById('mOpacos')||{}).value)||0);
-  MARCOS_EDIT=false;
-  await api('/api/characters/'+MYCHAR+'/marcos/set','POST',{cargados:cargados,opacos:opacos});
-  loadRoster();
-}
-async function chargeInv(){
-  await api('/api/characters/'+MYCHAR+'/marcos/charge_inv','POST');
+async function saveMarcoField(which, v){
+  var c=meChar();
+  var light=c?Math.min(c.marcos_light||0,c.marcos||0):0;
+  var dun=c?Math.max(0,(c.marcos||0)-light):0;
+  if(which==='light') light=v; else dun=v;
+  await api('/api/characters/'+MYCHAR+'/marcos/set','POST',{cargados:light,opacos:dun});
   loadRoster();
 }
 
@@ -685,8 +676,9 @@ function renderRoster(){
       ? '<img class="pj-portrait-sm" src="/api/characters/'+c.id+'/image?v='+IMG_V+'" alt=""/>'
       : '<div class="pj-hero-ph">'+(c.has_pdf?'📜':'🛡')+'</div>';
     html+='<div class="pj-hero">'+portrait
-      +'<div><div class="pj-hero-name">'+esc(c.name)+'</div>'
-      +(sub?'<div class="pj-hero-sub">'+sub+'</div>':'')+lvl+'</div></div>'
+      +'<div style="flex:1;min-width:0"><div class="pj-hero-name">'+esc(c.name)+'</div>'
+      +(sub?'<div class="pj-hero-sub">'+sub+'</div>':'')+lvl+'</div>'
+      +marcosWidget(c)+'</div>'
       +'<div class="pj-actions">'
         +'<button class="btn-sheet" onclick="openEditChar()">✎ Editar</button>'
         +'<button class="btn-sheet" onclick="openPets()">🐾 Mascotas</button>'
@@ -697,8 +689,7 @@ function renderRoster(){
       +'</div>'
       +'<div class="me-card">'
       +ocStatCtl('c',c,'vida','Vida','#e05050')+ocStatCtl('c',c,'focus','Focus','#6aaae8')+ocStatCtl('c',c,'inv','Investidura','#aa8aec')
-      +ocStatuses('c',c.statuses,c.injuries)+ocInjuriesHTML(c)+'</div>'
-      +marcosCard(c);
+      +ocStatuses('c',c.statuses,c.injuries)+ocInjuriesHTML(c)+'</div>';
     if(meM.pets&&meM.pets.length){
       html+='<div class="section-lbl">Mis mascotas</div>'+meM.pets.map(function(p){
         return '<div class="me-card"><div class="me-head"><span class="me-name">'+esc(p.name)+' <span class="pet-tag">Mascota</span></span>'

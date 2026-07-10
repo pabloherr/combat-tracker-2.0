@@ -208,3 +208,9 @@ def init_db():
             conn.execute("ALTER TABLE characters ADD COLUMN marcos INTEGER DEFAULT 0")
         if "marcos_light" not in chcols:
             conn.execute("ALTER TABLE characters ADD COLUMN marcos_light INTEGER DEFAULT 0")
+
+        # Migración: parámetros ajustables por campaña (JSON: rango de tormentas,
+        # curva de descarga de marcos, etc.).
+        cpcols = {r["name"] for r in conn.execute("PRAGMA table_info(campaigns)")}
+        if "config" not in cpcols:
+            conn.execute("ALTER TABLE campaigns ADD COLUMN config TEXT DEFAULT '{}'")

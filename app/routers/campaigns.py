@@ -9,22 +9,56 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..access import campaign_or_404, require_access, require_dm
 from ..auth import current_user
 from ..database import db
-from ..models import CampaignIn, InviteIn, LongRestIn, MarcosChange
+from ..models import CampaignIn, ConfigIn, InviteIn, LongRestIn, MarcosChange
 
 router = APIRouter(prefix="/api", tags=["campaigns"])
 
 # ── Altas tormentas: cada 10±2 días (8-12), en un momento al azar ──
-STORM_MIN, STORM_MAX = 8, 12
 STORM_MOMENTS = ["al amanecer", "por la mañana", "al mediodía",
                  "por la tarde", "al anochecer", "de madrugada"]
+
+# Parámetros por defecto, ajustables por el DM (se guardan en campaigns.config).
+CONFIG_DEFAULTS = {
+    "storm_min": 8,          # mínimo de días entre tormentas
+    "storm_max": 12,         # máximo de días entre tormentas
+    "discharge_start": 5,    # día desde el que los marcos empiezan a apagarse
+    "discharge_full": 15,    # día en que ya no queda luz
+    "discharge_curve": 2.0,  # exponente: 1 = pareja; más alto = arranca más lento
+}
+_CONFIG_INT_KEYS = {"storm_min", "storm_max", "discharge_start", "discharge_full"}
+
+
+def _get_config(conn, cid: int) -> dict:
+    row = conn.execute("SELECT config FROM campaigns WHERE id=?", (cid,)).fetchone()
+    cfg = dict(CONFIG_DEFAULTS)
+    if row and row["config"]:
+        try:
+            saved = json.loads(row["config"])
+            for k, v in saved.items():
+                if k in CONFIG_DEFAULTS:
+                    cfg[k] = int(v) if k in _CONFIG_INT_KEYS else float(v)
+        except (ValueError, TypeError):
+            pass
+    # saneo básico para no romper la lógica
+    cfg["storm_min"] = max(1, cfg["storm_min"])
+    cfg["storm_max"] = max(cfg["storm_min"], cfg["storm_max"])
+    cfg["discharge_start"] = max(1, cfg["discharge_start"])
+    cfg["discharge_full"] = max(cfg["discharge_start"] + 1, cfg["discharge_full"])
+    cfg["discharge_curve"] = max(0.1, min(8.0, cfg["discharge_curve"]))
+    return cfg
+
+
+def _new_target(cfg: dict) -> int:
+    return random.randint(cfg["storm_min"], cfg["storm_max"])
 
 
 def _get_storm(conn, cid: int):
     row = conn.execute("SELECT * FROM storm_tracker WHERE campaign_id=?", (cid,)).fetchone()
     if not row:
+        cfg = _get_config(conn, cid)
         conn.execute(
             "INSERT INTO storm_tracker (campaign_id, day, target, moment) VALUES (?,0,?,?)",
-            (cid, random.randint(STORM_MIN, STORM_MAX), random.choice(STORM_MOMENTS)),
+            (cid, _new_target(cfg), random.choice(STORM_MOMENTS)),
         )
         row = conn.execute("SELECT * FROM storm_tracker WHERE campaign_id=?", (cid,)).fetchone()
     return row
@@ -39,9 +73,10 @@ def _advance_storm(conn, cid: int) -> dict:
     if day >= row["target"]:
         stormed = True
         day = 0
+        cfg = _get_config(conn, cid)
         conn.execute(
             "UPDATE storm_tracker SET day=?, target=?, moment=? WHERE campaign_id=?",
-            (day, random.randint(STORM_MIN, STORM_MAX), random.choice(STORM_MOMENTS), cid),
+            (day, _new_target(cfg), random.choice(STORM_MOMENTS), cid),
         )
     else:
         conn.execute("UPDATE storm_tracker SET day=? WHERE campaign_id=?", (day, cid))
@@ -49,14 +84,11 @@ def _advance_storm(conn, cid: int) -> dict:
 
 
 # ── Marcos: recarga en tormenta y descarga con el paso de los días ──
-STORM_DISCHARGE_START = 5    # día desde el que los marcos empiezan a apagarse
-STORM_DISCHARGE_FULL = 15    # día en que ya no queda ninguno con luz
-
 
 def _marcos_tick(conn, cid: int, stormed: bool, day: int):
     """Aplica al día que avanza: la tormenta recarga todos los marcos; a partir del
-    día 5 sin tormenta, cada marco cargado se apaga con probabilidad creciente
-    (pocos al principio, todos para el día 15)."""
+    día de inicio, sin tormenta, cada marco cargado se apaga con probabilidad
+    creciente (pocos al principio, todos para el día de apagado total)."""
     rows = conn.execute(
         "SELECT id, marcos, marcos_light FROM characters WHERE campaign_id=?", (cid,)
     ).fetchall()
@@ -65,10 +97,13 @@ def _marcos_tick(conn, cid: int, stormed: bool, day: int):
             if (r["marcos"] or 0) != (r["marcos_light"] or 0):
                 conn.execute("UPDATE characters SET marcos_light=marcos WHERE id=?", (r["id"],))
         return
-    if day < STORM_DISCHARGE_START:
+    cfg = _get_config(conn, cid)
+    start, full = cfg["discharge_start"], cfg["discharge_full"]
+    if day < start:
         return
-    span = STORM_DISCHARGE_FULL - (STORM_DISCHARGE_START - 1)   # 11
-    p = min(1.0, max(0.0, (day - (STORM_DISCHARGE_START - 1)) / span))
+    span = full - (start - 1)
+    base = min(1.0, max(0.0, (day - (start - 1)) / span))
+    p = base ** cfg["discharge_curve"]   # curva>1 => arranca más lento
     for r in rows:
         light = r["marcos_light"] or 0
         if light <= 0:
@@ -126,13 +161,28 @@ def list_members(cid: int, user=Depends(current_user)):
         require_dm(conn, cid, user)
         rows = conn.execute(
             "SELECT m.user_id, m.status, m.character_id, u.username, ch.name AS character_name, "
-            "ch.has_pdf, ch.marcos, ch.marcos_light "
+            "ch.has_pdf, ch.has_image, ch.marcos, ch.marcos_light, ch.sheet, "
+            "ch.vida, ch.vida_max, ch.focus, ch.focus_max, ch.inv, ch.inv_max, "
+            "ch.statuses, ch.injuries "
             "FROM campaign_members m JOIN users u ON u.id=m.user_id "
             "LEFT JOIN characters ch ON ch.id=m.character_id "
             "WHERE m.campaign_id=? ORDER BY u.username",
             (cid,),
         ).fetchall()
-        return [dict(r) for r in rows]
+        out = []
+        for r in rows:
+            d = dict(r)
+            if d.get("character_id"):
+                sheet = json.loads(d.get("sheet") or "{}")
+                d["clase"] = sheet.get("paths") or ""
+                d["nivel"] = sheet.get("level") or ""
+                d["statuses"] = json.loads(d.get("statuses") or "[]")
+                d["injuries"] = json.loads(d.get("injuries") or "[]")
+                d["has_pdf"] = bool(d.get("has_pdf"))
+                d["has_image"] = bool(d.get("has_image"))
+            d.pop("sheet", None)
+            out.append(d)
+        return out
 
 
 @router.post("/campaigns/{cid}/invite")
@@ -336,9 +386,9 @@ def long_rest(cid: int, payload: LongRestIn, user=Depends(current_user)):
     return {"ok": True, "characters": done, "storm": storm}
 
 
-def _storm_view(row, is_dm: bool) -> dict:
+def _storm_view(row, is_dm: bool, cfg: dict) -> dict:
     """El DM ve el día y momento exactos; los jugadores solo la barra."""
-    base = {"day": row["day"], "min": STORM_MIN, "max": STORM_MAX}
+    base = {"day": row["day"], "min": cfg["storm_min"], "max": cfg["storm_max"]}
     if is_dm:
         base["target"] = row["target"]
         base["moment"] = row["moment"]
@@ -350,7 +400,7 @@ def get_storm(cid: int, user=Depends(current_user)):
     with db() as conn:
         _, is_dm = require_access(conn, cid, user)
         row = _get_storm(conn, cid)
-        return _storm_view(row, is_dm)
+        return _storm_view(row, is_dm, _get_config(conn, cid))
 
 
 @router.post("/campaigns/{cid}/storm/advance")
@@ -361,7 +411,8 @@ def advance_storm(cid: int, user=Depends(current_user)):
         storm = _advance_storm(conn, cid)
         row = _get_storm(conn, cid)
         _marcos_tick(conn, cid, storm["stormed"], row["day"])
-    return {"ok": True, "storm": storm, "state": _storm_view(row, True)}
+        state = _storm_view(row, True, _get_config(conn, cid))
+    return {"ok": True, "storm": storm, "state": state}
 
 
 @router.post("/campaigns/{cid}/storm/reset")
@@ -370,12 +421,62 @@ def reset_storm(cid: int, user=Depends(current_user)):
     with db() as conn:
         require_dm(conn, cid, user)
         _get_storm(conn, cid)   # asegura que exista la fila
+        cfg = _get_config(conn, cid)
         conn.execute(
             "UPDATE storm_tracker SET day=0, target=?, moment=? WHERE campaign_id=?",
-            (random.randint(STORM_MIN, STORM_MAX), random.choice(STORM_MOMENTS), cid),
+            (_new_target(cfg), random.choice(STORM_MOMENTS), cid),
         )
         row = _get_storm(conn, cid)
-    return {"ok": True, "state": _storm_view(row, True)}
+    return {"ok": True, "state": _storm_view(row, True, cfg)}
+
+
+# ── Parámetros ajustables por el DM ────────────────────────
+
+@router.get("/campaigns/{cid}/config")
+def get_config(cid: int, user=Depends(current_user)):
+    """Devuelve los parámetros ajustables + el estado actual de la tormenta."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+        cfg = _get_config(conn, cid)
+        row = _get_storm(conn, cid)
+        cfg.update({"storm_day": row["day"], "storm_target": row["target"],
+                    "storm_moment": row["moment"], "moments": STORM_MOMENTS})
+        return cfg
+
+
+@router.put("/campaigns/{cid}/config")
+def put_config(cid: int, c: ConfigIn, user=Depends(current_user)):
+    with db() as conn:
+        require_dm(conn, cid, user)
+        cfg = _get_config(conn, cid)
+        for k in CONFIG_DEFAULTS:
+            v = getattr(c, k)
+            if v is not None:
+                cfg[k] = int(v) if k in _CONFIG_INT_KEYS else float(v)
+        # revalidar coherencia antes de guardar
+        cfg["storm_min"] = max(1, cfg["storm_min"])
+        cfg["storm_max"] = max(cfg["storm_min"], cfg["storm_max"])
+        cfg["discharge_start"] = max(1, cfg["discharge_start"])
+        cfg["discharge_full"] = max(cfg["discharge_start"] + 1, cfg["discharge_full"])
+        cfg["discharge_curve"] = max(0.1, min(8.0, cfg["discharge_curve"]))
+        conn.execute("UPDATE campaigns SET config=? WHERE id=?",
+                     (json.dumps({k: cfg[k] for k in CONFIG_DEFAULTS}), cid))
+        # estado actual de la tormenta (opcional)
+        row = _get_storm(conn, cid)
+        day = c.storm_day if c.storm_day is not None else row["day"]
+        target = c.storm_target if c.storm_target is not None else row["target"]
+        moment = c.storm_moment if c.storm_moment is not None else row["moment"]
+        day = max(0, int(day))
+        target = max(1, int(target))
+        if moment not in STORM_MOMENTS:
+            moment = row["moment"]
+        conn.execute("UPDATE storm_tracker SET day=?, target=?, moment=? WHERE campaign_id=?",
+                     (day, target, moment, cid))
+        cfg = _get_config(conn, cid)
+        row = _get_storm(conn, cid)
+        cfg.update({"storm_day": row["day"], "storm_target": row["target"],
+                    "storm_moment": row["moment"], "moments": STORM_MOMENTS})
+    return {"ok": True, **cfg}
 
 
 # ── Jugador: invitaciones y membresías ─────────────────────
