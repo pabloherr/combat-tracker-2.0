@@ -123,3 +123,41 @@ def parse_character_pdf(data: bytes) -> dict:
         "inv": _i(g("char_invest_current"), inv_max),
         "sheet": sheet,
     }
+
+
+_IMG_MIME = {
+    "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+    "gif": "image/gif", "webp": "image/webp", "bmp": "image/bmp", "tiff": "image/tiff",
+}
+
+
+def extract_pdf_image(data: bytes) -> tuple[bytes, str] | None:
+    """Intenta sacar el retrato del PDF: la imagen raster más grande.
+
+    Best-effort y sin dependencia dura de Pillow: si algo falla (Pillow no
+    instalado, formato que pypdf no puede decodificar, PDF sin imágenes, etc.)
+    devuelve None y el jugador sube la imagen a mano. NUNCA propaga excepciones:
+    la subida del PDF no debe romperse por no poder extraer un retrato.
+    """
+    try:
+        reader = pypdf.PdfReader(io.BytesIO(data))
+    except Exception:
+        return None
+    best = None          # (len, bytes, mime)
+    for page in reader.pages:
+        # La iteración de page.images decodifica cada imagen y puede lanzar
+        # (p.ej. ImportError si falta Pillow); se envuelve todo el recorrido.
+        try:
+            for img in page.images:
+                raw = img.data
+                if not raw or len(raw) < 6000:   # descarta íconos/logos chicos
+                    continue
+                ext = (getattr(img, "name", "") or "").rsplit(".", 1)[-1].lower()
+                mime = _IMG_MIME.get(ext, "image/png")
+                if best is None or len(raw) > best[0]:
+                    best = (len(raw), raw, mime)
+        except Exception:
+            continue
+    if best is None:
+        return None
+    return best[1], best[2]

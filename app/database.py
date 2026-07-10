@@ -76,6 +76,13 @@ def init_db():
             pdf BLOB NOT NULL
         );
 
+        -- Imagen (retrato) del personaje: extraída del PDF o subida a mano.
+        CREATE TABLE IF NOT EXISTS character_images (
+            character_id INTEGER PRIMARY KEY REFERENCES characters(id) ON DELETE CASCADE,
+            image BLOB NOT NULL,
+            mime  TEXT DEFAULT 'image/png'
+        );
+
         -- Mascotas de un personaje (ficha estilo enemigo, cargada por el jugador)
         CREATE TABLE IF NOT EXISTS pets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -178,3 +185,18 @@ def init_db():
         chcols = {r["name"] for r in conn.execute("PRAGMA table_info(characters)")}
         if "injuries" not in chcols:
             conn.execute("ALTER TABLE characters ADD COLUMN injuries TEXT DEFAULT '[]'")
+
+        # Migración: los personajes pasan a pertenecer a una campaña.
+        # Backfill desde la membresía que los referencia (si existe).
+        chcols = {r["name"] for r in conn.execute("PRAGMA table_info(characters)")}
+        if "campaign_id" not in chcols:
+            conn.execute("ALTER TABLE characters ADD COLUMN campaign_id INTEGER "
+                         "REFERENCES campaigns(id) ON DELETE CASCADE")
+            conn.execute(
+                "UPDATE characters SET campaign_id = ("
+                "  SELECT m.campaign_id FROM campaign_members m"
+                "  WHERE m.character_id = characters.id LIMIT 1"
+                ") WHERE campaign_id IS NULL"
+            )
+        if "has_image" not in chcols:
+            conn.execute("ALTER TABLE characters ADD COLUMN has_image INTEGER DEFAULT 0")

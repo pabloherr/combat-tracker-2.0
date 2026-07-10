@@ -131,6 +131,24 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .storm-cell.past{background:var(--gold,#e0bd7c);}
 .storm-cell.current{outline:1.5px solid var(--gold2,#f4d9a0);outline-offset:1px;}
 .storm-info{font-size:11px;color:var(--text3);font-style:italic;white-space:nowrap;}
+/* pestañas de la campaña */
+.tabbar{display:flex;gap:4px;margin-bottom:1.1rem;border-bottom:1px solid var(--border);}
+.tab{flex:1;font-family:'Cinzel',serif;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:11px 6px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text3);cursor:pointer;}
+.tab.on{color:var(--gold2);border-bottom-color:var(--gold);}
+.tab-badge{color:#e05050;margin-left:5px;font-size:9px;vertical-align:middle;}
+/* cabecera del personaje */
+.pj-hero{display:flex;gap:14px;align-items:center;margin-bottom:12px;}
+.pj-portrait-sm,.pj-hero-ph{width:66px;height:86px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);flex:none;}
+.pj-portrait-sm{object-fit:cover;display:block;}
+.pj-hero-ph{display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--text3);background:linear-gradient(135deg,var(--bg3),var(--bg4));}
+.pj-hero-name{font-family:'Cinzel',serif;font-size:19px;color:var(--gold2);letter-spacing:.03em;}
+.pj-hero-sub{font-size:13px;color:var(--text2);margin-top:3px;}
+.pj-hero-lvl{display:inline-block;font-size:10px;letter-spacing:.05em;padding:1px 8px;border-radius:20px;border:1px solid var(--border2);color:var(--gold);font-family:'Cinzel',serif;margin-top:6px;}
+.pj-actions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;}
+.pj-sheet-wrap{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
+.import-ta{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:'Courier New',monospace;font-size:12px;line-height:1.5;outline:none;resize:vertical;min-height:150px;white-space:pre;}
+.import-ta:focus{border-color:var(--gold);}
+.inv-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;}
 </style>
 </head>
 <body>
@@ -150,28 +168,40 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
     <span class="storm-info" id="stormInfo"></span>
   </div>
 
-  <div id="outOfCombat">
-    <div class="empty-msg" id="ocNote" style="padding:10px 0;font-size:13px">Sin combate activo — podés gestionar tu personaje y ver al resto del grupo.</div>
-    <div id="ocMe"></div>
-    <div class="section-lbl" id="ocOthersLbl" style="display:none">Otros jugadores</div>
-    <div class="grid" id="ocOthers"></div>
+  <div class="tabbar">
+    <button class="tab" id="tab-pj" onclick="setTab('pj')">Mi personaje</button>
+    <button class="tab" id="tab-grupo" onclick="setTab('grupo')">Grupo</button>
+    <button class="tab" id="tab-combate" onclick="setTab('combate')">Combate<span class="tab-badge" id="combBadge" style="display:none">●</span></button>
   </div>
 
-  <div id="activeCombat" style="display:none">
-    <div class="phase-bar">
-      <div class="phase p1">1 · PJ rápidos</div>
-      <div class="phase p2">2 · Enemigos rápidos</div>
-      <div class="phase p3">3 · PJ lentos</div>
-      <div class="phase p4">4 · Enemigos lentos</div>
+  <div id="tabPJ" class="tabpanel">
+    <div id="ocMe"></div>
+  </div>
+
+  <div id="tabGrupo" class="tabpanel" style="display:none">
+    <div class="section-lbl" id="ocOthersLbl" style="display:none">Otros jugadores</div>
+    <div class="grid" id="ocOthers"></div>
+    <div class="empty-msg" id="grupoEmpty" style="display:none">Todavía no hay otros jugadores en la campaña.</div>
+  </div>
+
+  <div id="tabCombate" class="tabpanel" style="display:none">
+    <div class="empty-msg" id="noCombat">No hay combate activo. Cuando el DM lo inicie, aparece acá.</div>
+    <div id="activeCombat" style="display:none">
+      <div class="phase-bar">
+        <div class="phase p1">1 · PJ rápidos</div>
+        <div class="phase p2">2 · Enemigos rápidos</div>
+        <div class="phase p3">3 · PJ lentos</div>
+        <div class="phase p4">4 · Enemigos lentos</div>
+      </div>
+
+      <div id="mePanel"></div>
+
+      <div class="section-lbl" id="playersLbl">Personajes</div>
+      <div class="grid" id="playersGrid"></div>
+
+      <div class="section-lbl">Enemigos</div>
+      <div class="grid" id="enemiesGrid"></div>
     </div>
-
-    <div id="mePanel"></div>
-
-    <div class="section-lbl" id="playersLbl">Personajes</div>
-    <div class="grid" id="playersGrid"></div>
-
-    <div class="section-lbl">Enemigos</div>
-    <div class="grid" id="enemiesGrid"></div>
   </div>
 </div>
 
@@ -191,6 +221,10 @@ var COMBAT=null;
 var MY_UID=null;   // id de mi usuario (para reconocer mi personaje en el combate)
 var CID=parseInt(location.pathname.split('/').filter(Boolean).pop());
 var API='/api/campaigns/'+CID;
+var _qtab=(new URLSearchParams(location.search).get('tab')||'').toLowerCase();
+var TAB=({pj:'pj',grupo:'grupo',combate:'combate'}[_qtab])||'pj';
+var TAB_EXPLICIT=!!_qtab;   // si el usuario pidió una pestaña explícita en la URL
+var IMG_V=0;                // versión de la imagen (para refrescar caché al cambiarla)
 
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 async function api(path,method,body){
@@ -393,22 +427,45 @@ function card(p,enemyView){
     +'</div>';
 }
 
+var PREV_ACTIVE=null;   // para autocambiar a Combate cuando arranca
+var PANELS={pj:'tabPJ',grupo:'tabGrupo',combate:'tabCombate'};
+function setTab(t){
+  TAB=t;
+  Object.keys(PANELS).forEach(function(x){
+    document.getElementById(PANELS[x]).style.display=(x===t)?'':'none';
+    document.getElementById('tab-'+x).classList.toggle('on',x===t);
+  });
+  if(t==='pj'||t==='grupo') loadRoster();
+}
+
 function render(combat){
   COMBAT=combat;
-  var active=combat&&combat.active;
-  document.getElementById('outOfCombat').style.display=active?'none':'';
-  document.getElementById('activeCombat').style.display=active?'':'none';
+  var active=!!(combat&&combat.active);
   document.getElementById('roundNum').textContent=active?combat.round:'—';
-  if(!active){document.getElementById('mePanel').innerHTML='';loadRoster();return;}
-  var myUid=renderMe(combat);
-  var pl=combat.participants.filter(function(p){return (p.kind==='player'||p.kind==='pet')&&p.user_id!==myUid;});
-  var en=combat.participants.filter(function(p){return p.kind==='enemy'&&!p.hidden;});
-  // los personajes se ordenan por turno; los enemigos quedan en orden fijo
-  // (no por turno) para no revelar quién es rápido o lento
-  pl.sort(function(a,b){return (a.turn==='slow'?1:0)-(b.turn==='slow'?1:0);});
-  document.getElementById('playersLbl').style.display=pl.length?'':'none';
-  document.getElementById('playersGrid').innerHTML=pl.map(card).join('');
-  document.getElementById('enemiesGrid').innerHTML=en.map(function(p){return card(p,true);}).join('');
+  document.getElementById('noCombat').style.display=active?'none':'';
+  document.getElementById('activeCombat').style.display=active?'':'none';
+  document.getElementById('combBadge').style.display=active?'':'none';
+  if(active){
+    var myUid=renderMe(combat);
+    var pl=combat.participants.filter(function(p){return (p.kind==='player'||p.kind==='pet')&&p.user_id!==myUid;});
+    var en=combat.participants.filter(function(p){return p.kind==='enemy'&&!p.hidden;});
+    // los personajes se ordenan por turno; los enemigos quedan en orden fijo
+    // (no por turno) para no revelar quién es rápido o lento
+    pl.sort(function(a,b){return (a.turn==='slow'?1:0)-(b.turn==='slow'?1:0);});
+    document.getElementById('playersLbl').style.display=pl.length?'':'none';
+    document.getElementById('playersGrid').innerHTML=pl.map(card).join('');
+    document.getElementById('enemiesGrid').innerHTML=en.map(function(p){return card(p,true);}).join('');
+  }else{
+    document.getElementById('mePanel').innerHTML='';
+  }
+  if(PREV_ACTIVE===null){
+    // primera carga: si no pidieron pestaña y ya hay combate, mostrá Combate
+    if(!TAB_EXPLICIT && active) setTab('combate');
+  }else{
+    if(active && !PREV_ACTIVE) setTab('combate');   // arrancó el combate
+    if(!active && PREV_ACTIVE) loadRoster();          // terminó: refrescá la ficha
+  }
+  PREV_ACTIVE=active;
 }
 
 // ─── Gestión fuera de combate (mi personaje/mascotas + ver al grupo) ───
@@ -564,29 +621,49 @@ function renderRoster(){
   var mp=document.getElementById('ocMe');
   var html='';
   if(meM&&meM.character){
-    var c=meM.character;
-    html+='<div class="section-lbl" style="margin-top:0">Mi personaje</div>'
-      +'<div class="me-card"><div class="me-head"><span class="me-name">'+esc(c.name)+'</span></div>'
-      +'<div class="me-sheet-row"><button class="btn-sheet" onclick="openRosterSheet(\'c\')">Ver ficha</button>'
-      +(c.has_pdf?'<a class="btn-sheet" href="/api/characters/'+c.id+'/pdf" target="_blank">Ver PDF</a>':'')+'</div>'
+    var c=meM.character; var s=c.sheet||{};
+    var sub=[s.ancestry,s.paths].filter(Boolean).map(esc).join(' · ');
+    var lvl=s.level?'<div class="pj-hero-lvl">Nivel '+esc(s.level)+'</div>':'';
+    var portrait=c.has_image
+      ? '<img class="pj-portrait-sm" src="/api/characters/'+c.id+'/image?v='+IMG_V+'" alt=""/>'
+      : '<div class="pj-hero-ph">'+(c.has_pdf?'📜':'🛡')+'</div>';
+    html+='<div class="pj-hero">'+portrait
+      +'<div><div class="pj-hero-name">'+esc(c.name)+'</div>'
+      +(sub?'<div class="pj-hero-sub">'+sub+'</div>':'')+lvl+'</div></div>'
+      +'<div class="pj-actions">'
+        +'<button class="btn-sheet" onclick="openEditChar()">✎ Editar</button>'
+        +'<button class="btn-sheet" onclick="openPets()">🐾 Mascotas</button>'
+        +'<label class="btn-sheet" style="cursor:pointer">🖼 Imagen<input type="file" accept="image/*" hidden onchange="uploadImg(this)"/></label>'
+        +(c.has_image?'<button class="btn-sheet" onclick="removeImg()">Quitar imagen</button>':'')
+        +'<label class="btn-sheet" style="cursor:pointer">⭳ Actualizar PDF<input type="file" accept="application/pdf" hidden onchange="reimportPDF(this)"/></label>'
+        +(c.has_pdf?'<a class="btn-sheet" href="/api/characters/'+c.id+'/pdf" target="_blank">Ver PDF</a>':'')
+      +'</div>'
+      +'<div class="me-card">'
       +ocStatCtl('c',c,'vida','Vida','#e05050')+ocStatCtl('c',c,'focus','Focus','#6aaae8')+ocStatCtl('c',c,'inv','Investidura','#aa8aec')
       +ocStatuses('c',c.statuses,c.injuries)+ocInjuriesHTML(c)+'</div>';
     if(meM.pets&&meM.pets.length){
       html+='<div class="section-lbl">Mis mascotas</div>'+meM.pets.map(function(p){
-        return '<div class="me-card"><div class="me-head"><span class="me-name">'+esc(p.name)+' <span class="pet-tag">Mascota</span></span></div>'
+        return '<div class="me-card"><div class="me-head"><span class="me-name">'+esc(p.name)+' <span class="pet-tag">Mascota</span></span>'
+          +'<button class="me-change" onclick="delPet('+p.id+')">Quitar</button></div>'
           +'<div class="me-sheet-row"><button class="btn-sheet" onclick="openRosterSheet(\'p'+p.id+'\')">Ver ficha</button></div>'
           +ocStatCtl('p'+p.id,p,'vida','Vida','#e05050')+ocStatCtl('p'+p.id,p,'focus','Focus','#6aaae8')+ocStatCtl('p'+p.id,p,'inv','Investidura','#aa8aec')
           +ocStatuses('p'+p.id,p.statuses)+'</div>';
       }).join('');
     }
+    // ficha detallada del personaje
+    html+='<div class="pj-sheet-wrap">'
+      +charSheetHTML({name:c.name,stats:c.sheet,vida_max:c.vida_max,focus_max:c.focus_max,inv_max:c.inv_max})
+      +'</div>';
   }else{
-    html+='<div class="me-select"><div class="me-q">No tenés personaje en esta campaña.</div></div>';
+    html+='<div class="me-select"><div class="me-q">No tenés personaje en esta campaña.</div>'
+      +'<div style="font-size:13px;color:var(--text3)">Se crea al aceptar la invitación desde el inicio.</div></div>';
   }
   var injSnap=snapInjForm();
   mp.innerHTML=html;
   restoreInjForm(injSnap);
   var os=ROSTER.members.filter(function(m){return m.user_id!==MY_UID&&m.character;});
   document.getElementById('ocOthersLbl').style.display=os.length?'':'none';
+  document.getElementById('grupoEmpty').style.display=os.length?'none':'';
   document.getElementById('ocOthers').innerHTML=os.map(allyCard).join('');
 }
 function openRosterSheet(target){
@@ -606,6 +683,89 @@ function openRosterSheet(target){
   document.getElementById('overlay').classList.add('on');
 }
 
+// ─── Gestión del personaje (editar / mascotas / PDF / imagen) ───
+function meChar(){ var m=ROSTER&&ROSTER.members.find(function(x){return x.user_id===MY_UID;}); return m?m.character:null; }
+function _num(id,v){return '<input class="oc-fi" type="number" style="width:80px" id="'+id+'" value="'+(v==null?'':v)+'"/>';}
+function openEditChar(){
+  var c=meChar(); if(!c)return; var s=c.sheet||{};
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">✎ Editar '+esc(c.name)+'</div>'
+    +'<div class="sh-meta" style="margin-bottom:10px">Editá los datos a mano. Para releer la ficha completa, usá Actualizar PDF.</div>'
+    +'<div style="display:flex;flex-direction:column;gap:9px">'
+    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nombre</span><input class="oc-fi" id="ec-name" value="'+esc(c.name)+'" style="flex:1;max-width:260px"/></label>'
+    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Clase / senda</span><input class="oc-fi" id="ec-class" value="'+esc(s.paths||'')+'" style="flex:1;max-width:260px"/></label>'
+    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nivel</span><input class="oc-fi" id="ec-level" value="'+esc(s.level||'')+'" style="width:90px"/></label>'
+    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Vida (actual / máx)</span><span style="display:flex;gap:6px">'+_num('ec-vida',c.vida)+'<span style="color:var(--text3)">/</span>'+_num('ec-vidam',c.vida_max)+'</span></label>'
+    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Focus (actual / máx)</span><span style="display:flex;gap:6px">'+_num('ec-focus',c.focus)+'<span style="color:var(--text3)">/</span>'+_num('ec-focusm',c.focus_max)+'</span></label>'
+    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Investidura (actual / máx)</span><span style="display:flex;gap:6px">'+_num('ec-inv',c.inv)+'<span style="color:var(--text3)">/</span>'+_num('ec-invm',c.inv_max)+'</span></label>'
+    +'</div>'
+    +'<div class="me-sheet-row" style="justify-content:flex-end;border:none;margin-top:16px"><button class="btn-sheet" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn-sheet" style="background:var(--gold);color:#1c1915;border-color:var(--gold)" onclick="saveEditChar()">Guardar</button></div>';
+  document.getElementById('overlay').classList.add('on');
+}
+function _iv(id){var v=parseInt(document.getElementById(id).value);return isNaN(v)?null:v;}
+async function saveEditChar(){
+  var c=meChar(); if(!c)return; var s=Object.assign({},c.sheet||{});
+  s.paths=document.getElementById('ec-class').value.trim();
+  s.level=document.getElementById('ec-level').value.trim();
+  await api('/api/characters/'+MYCHAR,'PUT',{
+    name:document.getElementById('ec-name').value.trim()||'Personaje',
+    vida_max:_iv('ec-vidam')||0, focus_max:_iv('ec-focusm')||0, inv_max:_iv('ec-invm')||0,
+    vida:_iv('ec-vida'), focus:_iv('ec-focus'), inv:_iv('ec-inv'), sheet:s
+  });
+  closeModal(); loadRoster();
+}
+async function reimportPDF(input){
+  if(!input.files||!input.files[0])return;
+  var fd=new FormData(); fd.append('file',input.files[0]); input.value='';
+  var r=await fetch('/api/characters/'+MYCHAR+'/reimport-pdf',{method:'POST',body:fd});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo leer el PDF');return;}
+  var j=await r.json(); IMG_V++; loadRoster(); alert('Ficha actualizada desde el PDF: '+j.name);
+}
+async function uploadImg(input){
+  if(!input.files||!input.files[0])return;
+  var fd=new FormData(); fd.append('file',input.files[0]); input.value='';
+  var r=await fetch('/api/characters/'+MYCHAR+'/image',{method:'POST',body:fd});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo subir la imagen');return;}
+  IMG_V++; loadRoster();
+}
+async function removeImg(){
+  if(!confirm('¿Quitar la imagen del personaje?'))return;
+  await api('/api/characters/'+MYCHAR+'/image','DELETE'); IMG_V++; loadRoster();
+}
+// mascotas
+function openPets(){
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">🐾 Mis mascotas</div>'
+    +'<div class="sh-meta" style="margin-bottom:10px">Cargá la ficha de la mascota (mismo formato de código que los enemigos).</div>'
+    +'<div id="petsList" style="margin-bottom:12px"></div>'
+    +'<textarea class="import-ta" id="petCode" placeholder="name: &quot;Axehound&quot;&#10;tier: &quot;Tier 1 Rival&quot;&#10;str: 3&#10;hp: 18&#10;actions:&#10;  - name: &quot;Bite&quot;&#10;    desc: &quot;Attack +4...&quot;"></textarea>'
+    +'<div class="me-sheet-row" style="justify-content:flex-end;border:none;margin-top:10px"><button class="btn-sheet" style="background:var(--gold);color:#1c1915;border-color:var(--gold)" onclick="importPet()">Cargar mascota</button></div>';
+  document.getElementById('overlay').classList.add('on');
+  loadPetsInto();
+}
+async function loadPetsInto(){
+  var pets=await api('/api/characters/'+MYCHAR+'/pets');
+  var el=document.getElementById('petsList'); if(!el)return;
+  el.innerHTML=pets.length?pets.map(function(p){
+    return '<div class="inv-row"><span><b style="color:var(--gold2)">'+esc(p.name)+'</b> <span style="color:var(--text3);font-size:12px">Vida '+p.vida_max+' · Focus '+p.focus_max+(p.inv_max?' · Inv '+p.inv_max:'')+'</span></span>'
+      +'<div style="flex:1"></div><button class="btn-sheet" style="color:#e05050;border-color:#e05050" onclick="delPet('+p.id+')">✕</button></div>';
+  }).join(''):'<div style="color:var(--text3);font-style:italic">Todavía no tiene mascotas.</div>';
+}
+async function importPet(){
+  var code=document.getElementById('petCode').value.trim();
+  if(!code){alert('Pegá la ficha de la mascota.');return;}
+  var r=await fetch('/api/characters/'+MYCHAR+'/pets/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo leer la ficha');return;}
+  document.getElementById('petCode').value=''; loadPetsInto(); loadRoster();
+}
+async function delPet(petId){
+  if(!confirm('¿Borrar esta mascota?'))return;
+  await api('/api/characters/'+MYCHAR+'/pets/'+petId,'DELETE');
+  if(document.getElementById('petsList')) loadPetsInto();
+  loadRoster();
+}
+
 function connect(){
   var proto=location.protocol==='https:'?'wss':'ws';
   var ws=new WebSocket(proto+'://'+location.host+'/ws/'+CID);
@@ -622,15 +782,13 @@ function connect(){
 async function init(){
   try{ var me=await api('/api/auth/me'); MY_UID=me.id; }
   catch(e){ return; }   // 401 ya redirige a /login
+  setTab(TAB);
   connect();
   loadRoster();
   loadStorm();
-  // refresco periódico: el tracker de tormentas siempre; el grupo solo fuera de
-  // combate (esos cambios no viajan por WS)
-  setInterval(function(){
-    loadStorm();
-    if(document.getElementById('activeCombat').style.display==='none') loadRoster();
-  }, 5000);
+  // refresco periódico: la ficha del personaje / grupo y el tracker de tormentas
+  // (esos cambios no viajan por WS)
+  setInterval(function(){ loadStorm(); loadRoster(); }, 5000);
 }
 init();
 </script>

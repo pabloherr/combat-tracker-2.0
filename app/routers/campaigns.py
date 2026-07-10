@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..access import campaign_or_404, require_access, require_dm
 from ..auth import current_user
 from ..database import db
-from ..models import AcceptIn, CampaignIn, InviteIn, LongRestIn
+from ..models import CampaignIn, InviteIn, LongRestIn
 
 router = APIRouter(prefix="/api", tags=["campaigns"])
 
@@ -131,6 +131,8 @@ def invite(cid: int, inv: InviteIn, user=Depends(current_user)):
 def kick(cid: int, uid: int, user=Depends(current_user)):
     with db() as conn:
         require_dm(conn, cid, user)
+        # El personaje pertenece a la campaña: al echar al jugador se elimina.
+        conn.execute("DELETE FROM characters WHERE campaign_id=? AND owner_id=?", (cid, uid))
         conn.execute("DELETE FROM campaign_members WHERE campaign_id=? AND user_id=?", (cid, uid))
     return {"ok": True}
 
@@ -216,6 +218,7 @@ def campaign_roster(cid: int, user=Depends(current_user)):
                     "injuries": json.loads(r["injuries"] or "[]"),
                     "sheet": json.loads(r["sheet"] or "{}"),
                     "has_pdf": bool(r["has_pdf"]),
+                    "has_image": bool(r["has_image"]),
                 },
                 "pets": pets,
             })
@@ -332,26 +335,10 @@ def my_campaigns_as_player(user=Depends(current_user)):
         return [dict(r) for r in rows]
 
 
-@router.post("/campaigns/{cid}/accept")
-def accept_invite(cid: int, a: AcceptIn, user=Depends(current_user)):
-    with db() as conn:
-        m = conn.execute(
-            "SELECT * FROM campaign_members WHERE campaign_id=? AND user_id=?",
-            (cid, user["id"]),
-        ).fetchone()
-        if not m or m["status"] != "invited":
-            raise HTTPException(404, "No tenés una invitación pendiente a esta campaña")
-        ch = conn.execute(
-            "SELECT id FROM characters WHERE id=? AND owner_id=?",
-            (a.character_id, user["id"]),
-        ).fetchone()
-        if not ch:
-            raise HTTPException(400, "Elegí un personaje tuyo válido")
-        conn.execute(
-            "UPDATE campaign_members SET status='accepted', character_id=? WHERE campaign_id=? AND user_id=?",
-            (a.character_id, cid, user["id"]),
-        )
-    return {"ok": True}
+# Aceptar una invitación ya no es "elegir un PJ existente": el jugador crea el
+# personaje (o sube el PDF) para esa campaña desde el router de personajes, y eso
+# marca la membresía como 'accepted' y la enlaza. Ver characters.create_character /
+# import_pdf.
 
 
 @router.post("/campaigns/{cid}/decline")
@@ -367,6 +354,8 @@ def decline_invite(cid: int, user=Depends(current_user)):
 @router.post("/campaigns/{cid}/leave")
 def leave_campaign(cid: int, user=Depends(current_user)):
     with db() as conn:
+        # El personaje pertenece a la campaña: al salir se elimina.
+        conn.execute("DELETE FROM characters WHERE campaign_id=? AND owner_id=?", (cid, user["id"]))
         conn.execute(
             "DELETE FROM campaign_members WHERE campaign_id=? AND user_id=?",
             (cid, user["id"]),

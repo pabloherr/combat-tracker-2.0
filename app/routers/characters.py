@@ -11,7 +11,7 @@ from ..cosmere_import import ImportError_, parse_statblock
 from ..database import db
 from ..models import (CharacterIn, DaysChange, InjuryIn, LiveStat, LiveStatus,
                       PetImportIn)
-from ..pdf_import import parse_character_pdf
+from ..pdf_import import extract_pdf_image, parse_character_pdf
 
 router = APIRouter(prefix="/api/characters", tags=["characters"])
 
@@ -21,6 +21,8 @@ def _serialize(r) -> dict:
     d["statuses"] = json.loads(d.get("statuses") or "[]")
     d["sheet"] = json.loads(d.get("sheet") or "{}")
     d["injuries"] = json.loads(d.get("injuries") or "[]")
+    d["has_pdf"] = bool(d.get("has_pdf"))
+    d["has_image"] = bool(d.get("has_image"))
     return d
 
 
@@ -31,11 +33,54 @@ def _owned(conn, cid: int, user: dict):
     return r
 
 
+def _joinable_membership(conn, campaign_id, user: dict):
+    """Membresía del jugador en la campaña que todavía no tiene personaje.
+
+    Los personajes pertenecen a una campaña: solo se crean para una campaña
+    donde el jugador está invitado/es miembro y aún no trajo un PJ."""
+    if not campaign_id:
+        raise HTTPException(400, "Falta la campaña del personaje")
+    m = conn.execute(
+        "SELECT * FROM campaign_members WHERE campaign_id=? AND user_id=?",
+        (campaign_id, user["id"]),
+    ).fetchone()
+    if not m:
+        raise HTTPException(404, "No estás invitado a esa campaña")
+    if m["character_id"]:
+        raise HTTPException(400, "Ya tenés un personaje en esta campaña")
+    return m
+
+
+def _link_membership(conn, campaign_id, user: dict, char_id: int):
+    conn.execute(
+        "UPDATE campaign_members SET status='accepted', character_id=? "
+        "WHERE campaign_id=? AND user_id=?",
+        (char_id, campaign_id, user["id"]),
+    )
+
+
+def _store_extracted_image(conn, char_id: int, pdf_bytes: bytes):
+    """Best-effort: si el PDF trae un retrato, lo guarda como imagen del PJ."""
+    img = extract_pdf_image(pdf_bytes)
+    if not img:
+        return
+    blob, mime = img
+    conn.execute(
+        "INSERT INTO character_images (character_id, image, mime) VALUES (?,?,?) "
+        "ON CONFLICT(character_id) DO UPDATE SET image=excluded.image, mime=excluded.mime",
+        (char_id, blob, mime),
+    )
+    conn.execute("UPDATE characters SET has_image=1 WHERE id=?", (char_id,))
+
+
 @router.get("")
 def list_characters(user=Depends(current_user)):
     with db() as conn:
         rows = conn.execute(
-            "SELECT * FROM characters WHERE owner_id=? ORDER BY name", (user["id"],)
+            "SELECT ch.*, camp.name AS campaign_name FROM characters ch "
+            "LEFT JOIN campaigns camp ON camp.id=ch.campaign_id "
+            "WHERE ch.owner_id=? ORDER BY ch.name",
+            (user["id"],),
         ).fetchall()
         return [_serialize(r) for r in rows]
 
@@ -44,13 +89,16 @@ def list_characters(user=Depends(current_user)):
 def create_character(c: CharacterIn, user=Depends(current_user)):
     name = c.name.strip() or "Personaje"
     with db() as conn:
+        _joinable_membership(conn, c.campaign_id, user)
         cur = conn.execute(
-            "INSERT INTO characters (owner_id, name, vida_max, focus_max, inv_max, vida, focus, inv, statuses, sheet, has_pdf) "
-            "VALUES (?,?,?,?,?,?,?,?,'[]',?,0)",
-            (user["id"], name, c.vida_max, c.focus_max, c.inv_max,
+            "INSERT INTO characters (owner_id, campaign_id, name, vida_max, focus_max, inv_max, vida, focus, inv, statuses, sheet, has_pdf) "
+            "VALUES (?,?,?,?,?,?,?,?,?,'[]',?,0)",
+            (user["id"], c.campaign_id, name, c.vida_max, c.focus_max, c.inv_max,
              c.vida_max, c.focus_max, c.inv_max, json.dumps(c.sheet)),
         )
-        return {"id": cur.lastrowid, "name": name}
+        new_id = cur.lastrowid
+        _link_membership(conn, c.campaign_id, user, new_id)
+        return {"id": new_id, "name": name}
 
 
 @router.put("/{cid}")
@@ -95,6 +143,11 @@ async def reimport_pdf(cid: int, file: UploadFile = File(...), user=Depends(curr
             "ON CONFLICT(character_id) DO UPDATE SET pdf=excluded.pdf",
             (cid, data),
         )
+        # Solo auto-extrae el retrato si el PJ todavía no tiene imagen (no pisa
+        # una que el jugador haya subido a mano).
+        has_img = conn.execute("SELECT 1 FROM character_images WHERE character_id=?", (cid,)).fetchone()
+        if not has_img:
+            _store_extracted_image(conn, cid, data)
     return {"id": cid, "name": p["name"]}
 
 
@@ -107,21 +160,25 @@ def delete_character(cid: int, user=Depends(current_user)):
 
 
 @router.post("/import-pdf")
-async def import_pdf(file: UploadFile = File(...), user=Depends(current_user)):
+async def import_pdf(campaign_id: int, file: UploadFile = File(...), user=Depends(current_user)):
+    """Crea un personaje para una campaña a partir de la ficha PDF."""
     data = await file.read()
     try:
         p = parse_character_pdf(data)
     except ValueError as e:
         raise HTTPException(400, str(e))
     with db() as conn:
+        _joinable_membership(conn, campaign_id, user)
         cur = conn.execute(
-            "INSERT INTO characters (owner_id, name, vida_max, focus_max, inv_max, vida, focus, inv, statuses, sheet, has_pdf) "
-            "VALUES (?,?,?,?,?,?,?,?,'[]',?,1)",
-            (user["id"], p["name"], p["vida_max"], p["focus_max"], p["inv_max"],
+            "INSERT INTO characters (owner_id, campaign_id, name, vida_max, focus_max, inv_max, vida, focus, inv, statuses, sheet, has_pdf) "
+            "VALUES (?,?,?,?,?,?,?,?,?,'[]',?,1)",
+            (user["id"], campaign_id, p["name"], p["vida_max"], p["focus_max"], p["inv_max"],
              p["vida"], p["focus"], p["inv"], json.dumps(p["sheet"])),
         )
         cid = cur.lastrowid
         conn.execute("INSERT INTO character_pdfs (character_id, pdf) VALUES (?,?)", (cid, data))
+        _link_membership(conn, campaign_id, user, cid)
+        _store_extracted_image(conn, cid, data)
     return {"id": cid, "name": p["name"]}
 
 
@@ -296,6 +353,62 @@ def delete_injury(cid: int, iid: str, user=Depends(current_user)):
         lst = [it for it in json.loads(r["injuries"] or "[]") if it["id"] != iid]
         conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(lst), cid))
     return {"ok": True, "injuries": lst}
+
+
+# ── Imagen (retrato) del personaje ────────────────────────
+
+@router.post("/{cid}/image")
+async def upload_image(cid: int, file: UploadFile = File(...), user=Depends(current_user)):
+    """El dueño sube/reemplaza el retrato del personaje (gana sobre el del PDF)."""
+    data = await file.read()
+    if not data:
+        raise HTTPException(400, "La imagen está vacía")
+    mime = file.content_type or "image/png"
+    if not mime.startswith("image/"):
+        raise HTTPException(400, "El archivo no es una imagen")
+    with db() as conn:
+        _owned(conn, cid, user)
+        conn.execute(
+            "INSERT INTO character_images (character_id, image, mime) VALUES (?,?,?) "
+            "ON CONFLICT(character_id) DO UPDATE SET image=excluded.image, mime=excluded.mime",
+            (cid, data, mime),
+        )
+        conn.execute("UPDATE characters SET has_image=1 WHERE id=?", (cid,))
+    return {"ok": True}
+
+
+@router.get("/{cid}/image")
+def get_image(cid: int, user=Depends(current_user)):
+    """Sirve el retrato. Lo ve el dueño, el DM o cualquier miembro de su campaña."""
+    with db() as conn:
+        r = conn.execute("SELECT * FROM characters WHERE id=?", (cid,)).fetchone()
+        if not r:
+            raise HTTPException(404, "Personaje no encontrado")
+        allowed = r["owner_id"] == user["id"]
+        if not allowed and r["campaign_id"]:
+            acc = conn.execute(
+                "SELECT 1 FROM campaigns c WHERE c.id=? AND (c.dm_id=? OR EXISTS("
+                "  SELECT 1 FROM campaign_members m WHERE m.campaign_id=c.id AND m.user_id=?))",
+                (r["campaign_id"], user["id"], user["id"]),
+            ).fetchone()
+            allowed = acc is not None
+        if not allowed:
+            raise HTTPException(403, "Sin acceso a esta imagen")
+        row = conn.execute("SELECT image, mime FROM character_images WHERE character_id=?", (cid,)).fetchone()
+        if not row:
+            raise HTTPException(404, "Este personaje no tiene imagen")
+        blob = bytes(row["image"])
+        mime = row["mime"] or "image/png"
+    return Response(content=blob, media_type=mime, headers={"Cache-Control": "no-cache"})
+
+
+@router.delete("/{cid}/image")
+def delete_image(cid: int, user=Depends(current_user)):
+    with db() as conn:
+        _owned(conn, cid, user)
+        conn.execute("DELETE FROM character_images WHERE character_id=?", (cid,))
+        conn.execute("UPDATE characters SET has_image=0 WHERE id=?", (cid,))
+    return {"ok": True}
 
 
 @router.get("/{cid}/pdf")

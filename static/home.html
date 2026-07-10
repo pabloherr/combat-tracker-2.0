@@ -51,47 +51,24 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .pill{display:inline-block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:20px;border:1px solid var(--border2);color:var(--text3);font-family:'Cinzel',serif;}
 .pill.pdf{color:var(--green);border-color:var(--green);}
 .inv-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;}
+/* galería de personajes */
+.pj-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+.pj-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;box-shadow:var(--shadow);transition:border-color .15s,transform .15s;display:flex;flex-direction:column;}
+.pj-card:hover{border-color:var(--gold);transform:translateY(-2px);}
+.pj-clic{cursor:pointer;}
+.pj-portrait{width:100%;aspect-ratio:3/4;background:var(--bg3);object-fit:cover;display:block;}
+.pj-portrait-ph{width:100%;aspect-ratio:3/4;background:linear-gradient(135deg,var(--bg3),var(--bg4));display:flex;align-items:center;justify-content:center;font-size:46px;color:var(--text3);}
+.pj-body{padding:11px 13px 4px;}
+.pj-name{font-family:'Cinzel',serif;font-size:15px;color:var(--gold2);letter-spacing:.03em;}
+.pj-lvl{display:inline-block;font-size:10px;letter-spacing:.05em;padding:1px 8px;border-radius:20px;border:1px solid var(--border2);color:var(--gold);font-family:'Cinzel',serif;margin-left:6px;vertical-align:middle;}
+.pj-class{font-size:13px;color:var(--text2);margin-top:2px;min-height:20px;}
+.pj-camp{font-size:11px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;font-family:'Cinzel',serif;margin-top:8px;}
+.pj-foot{display:flex;gap:6px;padding:10px 13px 13px;}
 /* modal */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow:auto;z-index:50;}
 .overlay.on{display:flex;}
 .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:1.4rem;max-width:640px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.5);}
 .modal-close{float:right;background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;}
-.sb-attrs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0;}
-.sb-col{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:7px;}
-.sb-col-h{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);text-align:center;margin-bottom:5px;}
-.sb-attr{display:flex;justify-content:space-between;padding:1px 5px;font-size:13px;}
-.sb-attr span:first-child{color:var(--text3);font-size:11px;}
-.sb-res{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;margin:8px 0;padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
-.sb-res b{font-family:'Cinzel',serif;}
-.sb-line{font-size:13px;color:var(--text2);margin-bottom:3px;}
-.sb-line .l{color:var(--text3);}
-.sb-h{font-family:'Cinzel',serif;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin:12px 0 5px;}
-.sb-item{background:var(--bg3);border-left:2px solid var(--gold);border-radius:0 var(--r) var(--r) 0;padding:5px 10px;margin-bottom:5px;font-size:13px;}
-.sb-item .n{font-family:'Cinzel',serif;color:var(--gold2);font-size:12px;}
-.chips{display:flex;flex-wrap:wrap;gap:5px;}
-.chip{font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:2px 9px;color:var(--text2);}
-.import-ta{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:'Courier New',monospace;font-size:12px;line-height:1.5;outline:none;resize:vertical;min-height:160px;white-space:pre;}
-.import-ta:focus{border-color:var(--gold);}
-/* gestión en vivo (vida/focus/estados) */
-.mg-block{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:12px;}
-.mg-name{font-family:'Cinzel',serif;color:var(--gold2);font-size:14px;margin-bottom:8px;}
-.mg-stat{margin-bottom:10px;}
-.mg-stat-top{display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;}
-.mbar{height:8px;border-radius:20px;background:var(--bg4,#413c33);overflow:hidden;}
-.mbar>div{height:100%;border-radius:20px;transition:width .2s;}
-.mg-adj{display:flex;gap:6px;align-items:center;margin-top:5px;}
-.mg-adj input{width:56px;text-align:center;padding:5px 6px;}
-.spills{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
-.spill{font-size:11px;letter-spacing:.04em;padding:5px 10px;border-radius:20px;cursor:pointer;border:1px solid var(--border);color:var(--text3);background:transparent;font-family:'Cinzel',serif;}
-.spill.on{border-color:currentColor;}
-.spill-group{display:inline-flex;align-items:stretch;border:1px solid;border-radius:20px;overflow:hidden;}
-.spill-group .spill{border:none;border-radius:0;}
-.spill-minus{border:none;border-left:1px solid;background:rgba(0,0,0,.28);cursor:pointer;padding:0 12px;font-size:16px;font-family:'Cinzel',serif;line-height:1;}
-.inj-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--border);}
-.inj-name{font-size:13px;color:var(--text);flex:1;min-width:130px;}
-.inj-dur{font-size:12px;color:var(--text2);}
-.inj-ctrl{display:flex;gap:4px;align-items:center;}
-.inj-add{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;}
 </style>
 </head>
 <body>
@@ -127,30 +104,16 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
   <!-- ═══════ COMO JUGADOR ═══════ -->
   <div class="section">
     <div class="section-h">Como jugador — tus personajes</div>
-    <div class="section-sub">Creá personajes o subí la ficha PDF (se leen vida, focus e investidura).</div>
-    <div class="row">
-      <button class="btn accent" onclick="document.getElementById('pdfInput').click()">⭳ Subir ficha PDF</button>
-      <input type="file" id="pdfInput" accept="application/pdf" style="display:none" onchange="uploadPDF(this)"/>
-      <input class="fi" id="charName" placeholder="…o crear manual: nombre"/>
-      <input class="fi" id="charVida" type="number" value="20" title="Vida máx" style="width:80px"/>
-      <input class="fi" id="charFocus" type="number" value="10" title="Focus máx" style="width:80px"/>
-      <input class="fi" id="charInv" type="number" value="0" title="Investidura máx" style="width:80px"/>
-      <button class="btn" onclick="createCharacter()">+ Crear</button>
-    </div>
-    <div class="grid" id="charGrid"></div>
-    <div class="empty" id="charEmpty" style="display:none">Todavía no tenés personajes.</div>
+    <div class="section-sub">Cada personaje pertenece a una campaña. Hacé clic para entrar a su ficha dentro de la partida.</div>
+    <div class="pj-gallery" id="charGrid"></div>
+    <div class="empty" id="charEmpty" style="display:none">Todavía no tenés personajes. Aceptá una invitación para crear uno.</div>
   </div>
 
   <div class="section">
     <div class="section-h">Invitaciones</div>
+    <div class="section-sub">Al unirte creás tu personaje para esa campaña: subí el PDF o cargalo a mano.</div>
     <div id="invList"></div>
     <div class="empty" id="invEmpty" style="display:none">No tenés invitaciones pendientes.</div>
-  </div>
-
-  <div class="section">
-    <div class="section-h">Campañas donde jugás</div>
-    <div class="grid" id="joinedGrid"></div>
-    <div class="empty" id="joinedEmpty" style="display:none">No estás en ninguna campaña como jugador.</div>
   </div>
   </div><!-- /playerMode -->
 </div>
@@ -161,6 +124,7 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 
 <script>
 var CHARS=[];
+var INVITES=[];
 var ME=null;
 var MODE=location.pathname.indexOf('/jugar')===0?'player':'dm';
 async function api(path,method,body){
@@ -245,367 +209,109 @@ async function loadCampaigns(){
   }).join('');
 }
 async function delCampaign(id){
-  if(!confirm('¿Borrar la campaña y todo su contenido (encuentros, combate, membresías)?'))return;
+  if(!confirm('¿Borrar la campaña y todo su contenido (personajes, encuentros, combate, membresías)?'))return;
   await api('/api/campaigns/'+id,'DELETE');
   loadCampaigns();
 }
 
-// ─── Jugador: personajes ───
-async function createCharacter(){
-  var name=document.getElementById('charName').value.trim();
-  if(!name){alert('Poné un nombre al personaje.');return;}
-  await api('/api/characters','POST',{
-    name:name,
-    vida_max:parseInt(document.getElementById('charVida').value)||20,
-    focus_max:parseInt(document.getElementById('charFocus').value)||10,
-    inv_max:parseInt(document.getElementById('charInv').value)||0
-  });
-  document.getElementById('charName').value='';
-  loadCharacters();
-}
-async function uploadPDF(input){
-  if(!input.files||!input.files[0])return;
-  var fd=new FormData(); fd.append('file',input.files[0]);
-  input.value='';
-  var r=await fetch('/api/characters/import-pdf',{method:'POST',body:fd});
-  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo leer el PDF');return;}
-  var j=await r.json();
-  await loadCharacters();
-  alert('Ficha importada: '+j.name);
-}
+// ─── Jugador: galería de personajes (uno por campaña) ───
 async function loadCharacters(){
   CHARS=await api('/api/characters');
-  document.getElementById('charEmpty').style.display=CHARS.length?'none':'block';
-  document.getElementById('charGrid').innerHTML=CHARS.map(function(c){
-    return '<div class="card"><div class="cname">'+esc(c.name)+(c.has_pdf?' <span class="pill pdf">PDF</span>':'')+'</div>'
-      +'<div class="cmeta">Vida '+(c.vida==null?c.vida_max:c.vida)+'/'+c.vida_max+' · Focus '+(c.focus==null?c.focus_max:c.focus)+'/'+c.focus_max+(c.inv_max?' · Inv '+(c.inv==null?c.inv_max:c.inv)+'/'+c.inv_max:'')+'</div>'
-      +'<div class="card-actions">'
-      +'<button class="btn accent sm" onclick="openManage('+c.id+')">⚙ Gestionar</button>'
-      +'<button class="btn sm" onclick="viewSheet('+c.id+')">Ver ficha</button>'
-      +'<button class="btn sm" onclick="openEditChar('+c.id+')">✎ Actualizar</button>'
-      +'<button class="btn sm" onclick="openPets('+c.id+')">🐾 Mascotas</button>'
-      +(c.has_pdf?'<a class="btn sm" href="/api/characters/'+c.id+'/pdf" target="_blank">PDF</a>':'')
-      +'<button class="btn danger sm" onclick="delChar('+c.id+')">✕</button>'
+  var mine=CHARS.filter(function(c){return c.campaign_id;});
+  document.getElementById('charEmpty').style.display=mine.length?'none':'block';
+  document.getElementById('charGrid').innerHTML=mine.map(function(c){
+    var s=c.sheet||{};
+    var cls=s.paths?esc(s.paths):'<span style="color:var(--text3);font-style:italic">Sin clase</span>';
+    var lvl=s.level?'<span class="pj-lvl">Nivel '+esc(s.level)+'</span>':'';
+    var img=c.has_image
+      ? '<img class="pj-portrait" src="/api/characters/'+c.id+'/image" alt=""/>'
+      : '<div class="pj-portrait-ph">'+(c.has_pdf?'📜':'🛡')+'</div>';
+    return '<div class="pj-card">'
+      +'<div class="pj-clic" onclick="enterPJ('+c.campaign_id+')">'+img
+        +'<div class="pj-body"><div class="pj-name">'+esc(c.name)+lvl+'</div>'
+        +'<div class="pj-class">'+cls+'</div>'
+        +'<div class="pj-camp">⚔ '+esc(c.campaign_name||'—')+'</div></div>'
+      +'</div>'
+      +'<div class="pj-foot">'
+        +'<a class="btn accent sm" href="/play/'+c.campaign_id+'?tab=pj">Abrir</a>'
+        +'<div class="sep"></div>'
+        +'<button class="btn danger sm" onclick="leave('+c.campaign_id+',\''+encodeURIComponent(c.campaign_name||'')+'\')">Salir</button>'
       +'</div></div>';
   }).join('');
 }
-async function delChar(id){
-  if(!confirm('¿Borrar este personaje?'))return;
-  await api('/api/characters/'+id,'DELETE');
+function enterPJ(cid){ location.href='/play/'+cid+'?tab=pj'; }
+async function leave(cid,nameEnc){
+  var nm=nameEnc?decodeURIComponent(nameEnc):'esta campaña';
+  if(!confirm('¿Salir de "'+nm+'"?\n\nTu personaje de esta campaña se elimina (no se puede deshacer).'))return;
+  await api('/api/campaigns/'+cid+'/leave','POST');
   loadCharacters();
 }
 
-// ─── Gestión en vivo (vida/focus/investidura/estados), dentro o fuera de combate ───
-var SC={Determined:'#5aaa70',Enhanced:'#6aaae8',Empowered:'#e8c840',Focus:'#aa8aec',
-  Restrained:'#c87830',Surprised:'#d0a040',Stunned:'#e0a020',Slowed:'#c8a040',
-  Disoriented:'#e07070',Prone:'#c84040',Exhausted:'#bf4a20',
-  Unconscious:'#a03030',Immobilized:'#b06030',Afflicted:'#9040a0'};
-var POS=['Determined','Enhanced','Empowered','Focus'];
-var NEG=['Restrained','Surprised','Stunned','Slowed','Disoriented','Prone','Exhausted','Unconscious','Immobilized','Afflicted'];
-var INJURY_EFFECTS=['Exhausted [−1]','Exhausted [−2]','Slowed','Disoriented','Surprised','Can only use one hand'];
-// Heridas que imponen un estado: [estado, cargas]. Se fija mientras dure la herida.
-var INJURY_STATUS={'Exhausted [−1]':['Exhausted',1],'Exhausted [−2]':['Exhausted',2],
-  'Slowed':['Slowed',1],'Disoriented':['Disoriented',1],'Surprised':['Surprised',1]};
-function lockedCounts(injuries){
-  var m={};
-  (injuries||[]).forEach(function(it){var e=INJURY_STATUS[it.name];if(e)m[e[0]]=(m[e[0]]||0)+e[1];});
-  return m;
-}
-function injLockMsg(){ alert('Este estado lo fija una herida. Se quita al curar la herida.'); }
-var MANAGE_ID=null;
-
-function mStatBlock(target,stat,label,cur,mx,color){
-  if(stat!=='vida'&&mx===0)return '';
-  cur=(cur==null)?mx:cur;
-  var pct=mx>0?Math.round(cur/mx*100):0;
-  var iid='amt-'+target+'-'+stat;
-  return '<div class="mg-stat"><div class="mg-stat-top"><span>'+label+'</span>'
-    +'<span style="color:'+color+'">'+cur+' <span style="color:var(--text3);font-size:11px">/ '+mx+'</span></span></div>'
-    +'<div class="mbar"><div style="width:'+pct+'%;background:'+color+'"></div></div>'
-    +'<div class="mg-adj"><button class="btn sm" onclick="mStat(\''+target+'\',\''+stat+'\',-1)">−</button>'
-    +'<input class="fi" type="number" min="1" value="1" id="'+iid+'"/>'
-    +'<button class="btn sm" onclick="mStat(\''+target+'\',\''+stat+'\',1)">+</button></div></div>';
-}
-function mSpills(target,statuses,injuries){
-  var locked=lockedCounts(injuries);
-  return POS.concat(NEG).map(function(s){
-    var manual=statuses.filter(function(x){return x===s;}).length;
-    var lk=locked[s]||0; var cnt=manual+lk; var on=cnt>0; var col=SC[s]||'#8a8a8a';
-    if(s==='Exhausted'){
-      if(cnt===0)
-        return '<button class="spill" onclick="mStatus(\''+target+'\',\'Exhausted\')">Exhausted</button>';
-      var minus=manual>0
-        ? '<button class="spill-minus" style="color:'+col+'" onclick="mStatusRm(\''+target+'\',\'Exhausted\')" title="Quitar carga">−</button>'
-        : '<span class="spill-minus" style="color:'+col+';cursor:default" onclick="injLockMsg()" title="Fijado por una herida">🔒</span>';
-      return '<span class="spill-group" style="border-color:'+col+'">'
-        +'<button class="spill on" style="color:'+col+';background:'+col+'22" onclick="mStatus(\''+target+'\',\'Exhausted\')" title="Sumar carga">Exhausted'+(cnt>1?' x'+cnt:'')+'</button>'
-        +minus+'</span>';
-    }
-    if(lk>0){
-      return '<button class="spill on" style="border-color:'+col+';color:'+col+';background:'+col+'22;cursor:default" onclick="injLockMsg()" title="Fijado por una herida">'+s+' 🔒</button>';
-    }
-    return '<button class="spill'+(on?' on':'')+'" style="'+(on?'border-color:'+col+';color:'+col+';background:'+col+'22':'')+'" onclick="mStatus(\''+target+'\',\''+esc(s)+'\')">'+s+'</button>';
-  }).join('');
-}
-function mgEntity(target,name,o){
-  return '<div class="mg-block"><div class="mg-name">'+esc(name)+'</div>'
-    +mStatBlock(target,'vida','Vida',o.vida,o.vida_max,'#e05050')
-    +mStatBlock(target,'focus','Focus',o.focus,o.focus_max,'#6aaae8')
-    +mStatBlock(target,'inv','Investidura',o.inv,o.inv_max,'#aa8aec')
-    +'<div class="spills">'+mSpills(target,o.statuses||[],o.injuries||[])+'</div></div>';
-}
-async function openManage(id){
-  MANAGE_ID=id;
-  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
-    +'<div class="cname" style="font-size:18px">⚙ Gestionar personaje</div>'
-    +'<div class="section-sub">Ajustá vida, focus, investidura, estados y heridas. Se guarda solo (sirve dentro y fuera de combate). El descanso largo lo aplica el DM desde la campaña.</div>'
-    +'<div id="manageBody"></div>';
-  document.getElementById('overlay').classList.add('on');
-  refreshManage();
-}
-async function refreshManage(){
-  CHARS=await api('/api/characters');
-  var c=CHARS.find(function(x){return x.id===MANAGE_ID;});
-  var body=document.getElementById('manageBody');
-  if(!c||!body){closeModal();return;}
-  var pets=await api('/api/characters/'+MANAGE_ID+'/pets');
-  var html=mgEntity('c',c.name,c)+injuriesHTML(c);
-  if(pets.length){
-    html+='<div class="section-sub" style="margin:4px 0 8px">🐾 Mascotas</div>'
-      +pets.map(function(p){return mgEntity('p'+p.id,p.name,p);}).join('');
-  }
-  body.innerHTML=html;
-}
-function injuriesHTML(c){
-  var inj=c.injuries||[];
-  var list=inj.length?inj.map(function(it){
-    var dur=it.permanent?'<span style="color:#c84040">Permanente</span>'
-      :(it.days+' día'+(it.days===1?'':'s'));
-    var ctrl=it.permanent?''
-      :'<button class="btn sm" onclick="injDays(\''+it.id+'\',-1)" title="Un día menos">−</button>'
-      +'<button class="btn sm" onclick="injDays(\''+it.id+'\',1)" title="Un día más">+</button>';
-    return '<div class="inj-row"><span class="inj-name">'+esc(it.name)+'</span>'
-      +'<span class="inj-dur">'+dur+'</span>'
-      +'<span class="inj-ctrl">'+ctrl+'<button class="btn danger sm" onclick="delInjury(\''+it.id+'\')" title="Curada / borrar">✕</button></span></div>';
-  }).join(''):'<div class="empty" style="font-size:12px">Sin heridas.</div>';
-  var opts=INJURY_EFFECTS.map(function(e){return '<option value="'+esc(e)+'">'+esc(e)+'</option>';}).join('')
-    +'<option value="__custom">Otra (escribir)…</option>';
-  return '<div class="mg-block"><div class="mg-name">🩹 Heridas (injuries)</div>'
-    +list
-    +'<div class="inj-add">'
-      +'<select class="fi" id="injEffect" onchange="injCustomToggle()">'+opts+'</select>'
-      +'<input class="fi" id="injCustom" placeholder="Escribí la herida" style="display:none;flex:1;min-width:140px"/>'
-      +'<input class="fi" id="injDaysN" type="number" min="0" value="0" title="Días de duración" style="width:66px"/>'
-      +'<label style="font-size:12px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="injPerm"/> Permanente</label>'
-      +'<button class="btn accent sm" onclick="addInjury()">+ Agregar</button>'
-    +'</div>'
-    +'<div style="font-size:11px;color:var(--text3);margin-top:5px">0 días = se cura en el próximo descanso largo. Podés subir/bajar los días a mano.</div></div>';
-}
-function injCustomToggle(){
-  var sel=document.getElementById('injEffect');
-  document.getElementById('injCustom').style.display=sel.value==='__custom'?'':'none';
-}
-async function addInjury(){
-  var sel=document.getElementById('injEffect');
-  var name=sel.value==='__custom'?document.getElementById('injCustom').value.trim():sel.value;
-  if(!name){alert('Elegí o escribí la herida.');return;}
-  var days=Math.max(0,parseInt(document.getElementById('injDaysN').value)||0);
-  var perm=document.getElementById('injPerm').checked;
-  await api('/api/characters/'+MANAGE_ID+'/injuries','POST',{name:name,days:days,permanent:perm});
-  refreshManage();
-}
-async function injDays(iid,delta){
-  await api('/api/characters/'+MANAGE_ID+'/injuries/'+iid+'/days','POST',{delta:delta});
-  refreshManage();
-}
-async function delInjury(iid){
-  await api('/api/characters/'+MANAGE_ID+'/injuries/'+iid,'DELETE');
-  refreshManage();
-}
-function _mgUrl(target){
-  return target==='c' ? '/api/characters/'+MANAGE_ID
-                      : '/api/characters/'+MANAGE_ID+'/pets/'+target.slice(1);
-}
-async function mStat(target,stat,sign){
-  var amt=Math.max(1,parseInt(document.getElementById('amt-'+target+'-'+stat).value)||1);
-  await api(_mgUrl(target)+'/stat','POST',{stat:stat,delta:sign*amt});
-  refreshManage(); loadCharacters();
-}
-async function mStatus(target,status){
-  await api(_mgUrl(target)+'/status','POST',{status:status});
-  refreshManage();
-}
-async function mStatusRm(target,status){
-  await api(_mgUrl(target)+'/status/remove_one','POST',{status:status});
-  refreshManage();
-}
-
-// ─── Actualizar personaje (a mano o reemplazando el PDF) ───
-function _num(id,v){return '<input class="fi" type="number" style="width:76px" id="'+id+'" value="'+v+'"/>';}
-function openEditChar(id){
-  var c=CHARS.find(function(x){return x.id===id;});
-  if(!c)return;
-  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
-    +'<div class="cname" style="font-size:18px">✎ Actualizar '+esc(c.name)+'</div>'
-    +'<div class="section-sub">Editá los datos a mano, o reemplazá la ficha PDF (vuelve a leer vida, focus e investidura).</div>'
-    +'<div style="display:flex;flex-direction:column;gap:10px;margin-top:6px">'
-    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nombre</span>'
-      +'<input class="fi" id="ec-name" value="'+esc(c.name)+'" style="flex:1;max-width:260px"/></label>'
-    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Vida (actual / máx)</span>'
-      +'<span style="display:flex;gap:6px">'+_num('ec-vida',c.vida)+'<span style="color:var(--text3)">/</span>'+_num('ec-vidam',c.vida_max)+'</span></label>'
-    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Focus (actual / máx)</span>'
-      +'<span style="display:flex;gap:6px">'+_num('ec-focus',c.focus)+'<span style="color:var(--text3)">/</span>'+_num('ec-focusm',c.focus_max)+'</span></label>'
-    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Investidura (actual / máx)</span>'
-      +'<span style="display:flex;gap:6px">'+_num('ec-inv',c.inv)+'<span style="color:var(--text3)">/</span>'+_num('ec-invm',c.inv_max)+'</span></label>'
-    +'</div>'
-    +'<div class="card-actions" style="justify-content:space-between;margin-top:16px">'
-      +'<span><button class="btn" onclick="document.getElementById(\'ec-pdf\').click()">⭳ Reemplazar PDF</button>'
-      +'<input type="file" id="ec-pdf" accept="application/pdf" style="display:none" onchange="reimportPDF('+c.id+',this)"/></span>'
-      +'<button class="btn accent" onclick="saveEditChar('+c.id+')">Guardar</button>'
-    +'</div>';
-  document.getElementById('overlay').classList.add('on');
-}
-function _iv(id){var v=parseInt(document.getElementById(id).value);return isNaN(v)?null:v;}
-async function saveEditChar(id){
-  var c=CHARS.find(function(x){return x.id===id;});
-  await api('/api/characters/'+id,'PUT',{
-    name:document.getElementById('ec-name').value.trim()||'Personaje',
-    vida_max:_iv('ec-vidam')||0, focus_max:_iv('ec-focusm')||0, inv_max:_iv('ec-invm')||0,
-    vida:_iv('ec-vida'), focus:_iv('ec-focus'), inv:_iv('ec-inv'),
-    sheet:(c&&c.sheet)||{}
-  });
-  closeModal();
-  loadCharacters();
-}
-async function reimportPDF(id,input){
-  if(!input.files||!input.files[0])return;
-  var fd=new FormData(); fd.append('file',input.files[0]); input.value='';
-  var r=await fetch('/api/characters/'+id+'/reimport-pdf',{method:'POST',body:fd});
-  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo leer el PDF');return;}
-  var j=await r.json();
-  closeModal();
-  await loadCharacters();
-  alert('Ficha actualizada desde el PDF: '+j.name);
-}
-
-// ─── Mascotas (pets) ───
-function openPets(charId){
-  var c=CHARS.find(function(x){return x.id===charId;});
-  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
-    +'<div class="cname" style="font-size:18px">🐾 Mascotas de '+esc(c?c.name:'')+'</div>'
-    +'<div class="section-sub">Cargá la ficha de la mascota (mismo formato de código que los enemigos).</div>'
-    +'<div id="petsList" style="margin-bottom:12px"></div>'
-    +'<textarea class="import-ta" id="petCode" placeholder="name: &quot;Axehound&quot;&#10;tier: &quot;Tier 1 Rival&quot;&#10;str: 3&#10;hp: 18&#10;actions:&#10;  - name: &quot;Bite&quot;&#10;    desc: &quot;Attack +4...&quot;"></textarea>'
-    +'<div class="card-actions" style="justify-content:flex-end;margin-top:10px"><button class="btn accent" onclick="importPet('+charId+')">Cargar mascota</button></div>';
-  document.getElementById('overlay').classList.add('on');
-  loadPetsInto(charId);
-}
-async function loadPetsInto(charId){
-  var pets=await api('/api/characters/'+charId+'/pets');
-  var el=document.getElementById('petsList');
-  if(!el)return;
-  el.innerHTML=pets.length?pets.map(function(p){
-    return '<div class="inv-row"><span><b style="color:var(--gold2)">'+esc(p.name)+'</b>'
-      +' <span style="color:var(--text3);font-size:12px">Vida '+p.vida_max+' · Focus '+p.focus_max+(p.inv_max?' · Inv '+p.inv_max:'')+'</span></span>'
-      +'<div class="sep"></div><button class="btn danger sm" onclick="delPet('+charId+','+p.id+')">✕</button></div>';
-  }).join(''):'<div class="empty">Todavía no tiene mascotas.</div>';
-}
-async function importPet(charId){
-  var code=document.getElementById('petCode').value.trim();
-  if(!code){alert('Pegá la ficha de la mascota.');return;}
-  var r=await fetch('/api/characters/'+charId+'/pets/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code})});
-  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo leer la ficha');return;}
-  document.getElementById('petCode').value='';
-  loadPetsInto(charId);
-}
-async function delPet(charId,petId){
-  if(!confirm('¿Borrar esta mascota?'))return;
-  await api('/api/characters/'+charId+'/pets/'+petId,'DELETE');
-  loadPetsInto(charId);
-}
-
-// ─── Invitaciones ───
+// ─── Invitaciones: unirse creando el PJ ───
 async function loadInvitations(){
-  var invs=await api('/api/invitations');
-  document.getElementById('invEmpty').style.display=invs.length?'none':'block';
-  document.getElementById('invList').innerHTML=invs.map(function(iv){
-    var opts=CHARS.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+'</option>';}).join('');
+  INVITES=await api('/api/invitations');
+  document.getElementById('invEmpty').style.display=INVITES.length?'none':'block';
+  document.getElementById('invList').innerHTML=INVITES.map(function(iv){
     return '<div class="inv-row"><span><b style="color:var(--gold2)">'+esc(iv.name)+'</b> — DM: '+esc(iv.dm)+'</span>'
       +'<div class="sep"></div>'
-      +'<span style="font-size:12px;color:var(--text3)">Entrar con:</span>'
-      +'<select class="fi" id="inv-char-'+iv.campaign_id+'">'+(opts||'<option value="">— sin personajes —</option>')+'</select>'
-      +'<button class="btn accent sm" onclick="acceptInv('+iv.campaign_id+')">Aceptar</button>'
+      +'<button class="btn accent sm" onclick="openJoin('+iv.campaign_id+')">Unirme</button>'
       +'<button class="btn sm" onclick="declineInv('+iv.campaign_id+')">Rechazar</button>'
       +'</div>';
   }).join('');
 }
-async function acceptInv(cid){
-  var sel=document.getElementById('inv-char-'+cid);
-  var chid=parseInt(sel&&sel.value);
-  if(!chid){alert('Creá o elegí un personaje para entrar.');return;}
-  await api('/api/campaigns/'+cid+'/accept','POST',{character_id:chid});
-  await loadInvitations(); loadMyCampaigns();
+function openJoin(cid){
+  var iv=INVITES.find(function(x){return x.campaign_id===cid;});
+  var name=iv?iv.name:'';
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cname" style="font-size:18px">Unirme a '+esc(name)+'</div>'
+    +'<div class="section-sub">Creá tu personaje para esta campaña: subí la ficha PDF o cargalo a mano.</div>'
+    +'<div class="card-actions" style="margin:2px 0 14px">'
+      +'<button class="btn accent" onclick="document.getElementById(\'joinPdf\').click()">⭳ Subir ficha PDF</button>'
+      +'<input type="file" id="joinPdf" accept="application/pdf" style="display:none" onchange="joinUpload('+cid+',this)"/>'
+    +'</div>'
+    +'<div style="border-top:1px solid var(--border);padding-top:12px;font-size:13px;color:var(--text3);font-style:italic;margin-bottom:10px">…o cargalo a mano:</div>'
+    +'<div style="display:flex;flex-direction:column;gap:9px">'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nombre</span><input class="fi" id="j-name" style="flex:1;max-width:280px"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Clase / senda</span><input class="fi" id="j-class" style="flex:1;max-width:280px" placeholder="ej: Windrunner"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nivel</span><input class="fi" id="j-level" style="width:90px" placeholder="1"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Vida / Focus / Investidura máx</span><span style="display:flex;gap:6px">'
+        +'<input class="fi" id="j-vida" type="number" value="20" title="Vida máx" style="width:70px"/>'
+        +'<input class="fi" id="j-focus" type="number" value="10" title="Focus máx" style="width:70px"/>'
+        +'<input class="fi" id="j-inv" type="number" value="0" title="Investidura máx" style="width:70px"/></span></label>'
+    +'</div>'
+    +'<div class="card-actions" style="justify-content:flex-end;margin-top:16px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="joinCreate('+cid+')">Crear personaje</button></div>';
+  document.getElementById('overlay').classList.add('on');
+}
+async function joinCreate(cid){
+  var name=document.getElementById('j-name').value.trim();
+  if(!name){alert('Poné un nombre al personaje.');return;}
+  await api('/api/characters','POST',{
+    name:name, campaign_id:cid,
+    vida_max:parseInt(document.getElementById('j-vida').value)||20,
+    focus_max:parseInt(document.getElementById('j-focus').value)||0,
+    inv_max:parseInt(document.getElementById('j-inv').value)||0,
+    sheet:{paths:document.getElementById('j-class').value.trim(),level:document.getElementById('j-level').value.trim()}
+  });
+  closeModal();
+  await loadCharacters(); loadInvitations();
+}
+async function joinUpload(cid,input){
+  if(!input.files||!input.files[0])return;
+  var fd=new FormData(); fd.append('file',input.files[0]); input.value='';
+  var r=await fetch('/api/characters/import-pdf?campaign_id='+cid,{method:'POST',body:fd});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo leer el PDF');return;}
+  var j=await r.json();
+  closeModal();
+  await loadCharacters(); loadInvitations();
+  alert('Personaje creado desde el PDF: '+j.name);
 }
 async function declineInv(cid){
   await api('/api/campaigns/'+cid+'/decline','POST');
   loadInvitations();
 }
 
-// ─── Campañas donde juego ───
-async function loadMyCampaigns(){
-  var mine=await api('/api/my/campaigns');
-  document.getElementById('joinedEmpty').style.display=mine.length?'none':'block';
-  document.getElementById('joinedGrid').innerHTML=mine.map(function(c){
-    return '<div class="card"><div class="cname">'+esc(c.name)+'</div>'
-      +'<div class="cmeta">DM: '+esc(c.dm)+(c.character_name?' · '+esc(c.character_name):'')+'</div>'
-      +'<div class="card-actions">'
-      +'<a class="btn accent sm" href="/play/'+c.id+'">Jugar</a>'
-      +'<button class="btn danger sm" onclick="leave('+c.id+')">Salir</button>'
-      +'</div></div>';
-  }).join('');
-}
-async function leave(cid){
-  if(!confirm('¿Salir de esta campaña?'))return;
-  await api('/api/campaigns/'+cid+'/leave','POST');
-  loadMyCampaigns();
-}
-
-// ─── Modal ficha ───
+// ─── Modal ───
 function closeModal(){document.getElementById('overlay').classList.remove('on');}
-function viewSheet(id){
-  var c=CHARS.find(function(x){return x.id===id;});
-  if(!c)return;
-  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'+sheetHTML(c);
-  document.getElementById('overlay').classList.add('on');
-}
-function sheetHTML(c){
-  var s=c.sheet||{};var a=s.attributes||{};var d=s.defenses||{};
-  var h='<div class="cname" style="font-size:18px">'+esc(c.name)+'</div>';
-  if(s.paths||s.ancestry||s.level) h+='<div class="cmeta">'+[s.ancestry,s.paths,(s.level?'Nivel '+s.level:'')].filter(Boolean).map(esc).join(' · ')+'</div>';
-  if(a.STR!=null){
-    h+='<div class="sb-attrs">'
-      +'<div class="sb-col"><div class="sb-col-h">Físico</div>'+attr('STR',a.STR)+attr('DEF',d.physical)+attr('SPD',a.SPD)+'</div>'
-      +'<div class="sb-col"><div class="sb-col-h">Cognitivo</div>'+attr('INT',a.INT)+attr('DEF',d.cognitive)+attr('WIL',a.WIL)+'</div>'
-      +'<div class="sb-col"><div class="sb-col-h">Espiritual</div>'+attr('AWA',a.AWA)+attr('DEF',d.spiritual)+attr('PRE',a.PRE)+'</div>'
-      +'</div>';
-  }
-  h+='<div class="sb-res"><span>Vida <b style="color:var(--red)">'+c.vida_max+'</b></span>'
-    +'<span>Focus <b style="color:var(--blue)">'+c.focus_max+'</b></span>'
-    +(c.inv_max?'<span>Investidura <b style="color:var(--purple)">'+c.inv_max+'</b></span>':'')+'</div>';
-  h+=line('Movimiento',s.movement)+line('Sentidos',s.senses)+line('Deflect',s.deflect)+line('Expertise',s.expertise);
-  var sk=s.skills||{};
-  ['physical','cognitive','spiritual'].forEach(function(cat){
-    var arr=sk[cat]||[];
-    if(arr.length){h+='<div class="sb-h">Habilidades '+({physical:'físicas',cognitive:'cognitivas',spiritual:'espirituales'}[cat])+'</div>'
-      +'<div class="chips">'+arr.map(function(x){return '<span class="chip">'+esc(x.name)+' +'+x.value+'</span>';}).join('')+'</div>';}
-  });
-  if((s.talents||[]).length){h+='<div class="sb-h">Talentos</div>'+s.talents.map(function(t){return '<div class="sb-item"><span class="n">'+esc(t.name)+'</span>'+(t.desc?'<div>'+esc(t.desc)+'</div>':'')+'</div>';}).join('');}
-  if((s.weapons||[]).length){h+='<div class="sb-h">Armas</div>'+s.weapons.map(function(w){return '<div class="sb-item">'+esc(w)+'</div>';}).join('');}
-  if((s.equipment||[]).length){h+='<div class="sb-h">Equipo</div><div class="chips">'+s.equipment.map(function(e){return '<span class="chip">'+esc(e)+'</span>';}).join('')+'</div>';}
-  return h;
-}
-function attr(l,v){return '<div class="sb-attr"><span>'+l+'</span><span>'+(v==null?'—':v)+'</span></div>';}
-function line(l,v){return (v&&v!=='-')?'<div class="sb-line"><span class="l">'+l+':</span> '+esc(v)+'</div>':'';}
 
 async function init(){
   await loadMe();
@@ -615,7 +321,6 @@ async function init(){
   }else{
     await loadCharacters();
     await loadInvitations();
-    await loadMyCampaigns();
   }
 }
 init();

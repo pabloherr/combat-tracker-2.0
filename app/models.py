@@ -43,10 +43,6 @@ class InviteIn(BaseModel):
     username: str
 
 
-class AcceptIn(BaseModel):
-    character_id: int
-
-
 class LongRestIn(BaseModel):
     exclude: list[int] = []      # user_ids que NO reciben el descanso
 
@@ -55,6 +51,7 @@ class LongRestIn(BaseModel):
 
 class CharacterIn(BaseModel):
     name: str
+    campaign_id: int | None = None   # requerido al crear: el PJ pertenece a una campaña
     vida_max: int = 20
     focus_max: int = 10
     inv_max: int = 0
