@@ -246,6 +246,11 @@ def _build_from_data(data: dict) -> dict:
     # Vida para el tracker: 'hp' explícito, si no el número inicial de 'health'.
     vida_max = _to_int(data.get("hp"), _to_int(health, 20))
 
+    # `color` y `notes` no son parte del formato original, pero los emite el
+    # exportador para que el bestiario vaya y vuelva sin perder nada.
+    color = str(data.get("color", "")).strip()
+    notas = str(data.get("notes", data.get("notas", ""))).strip()
+
     return {
         "name": name,
         "tipo": tier,
@@ -254,7 +259,57 @@ def _build_from_data(data: dict) -> dict:
         "focus_max": stats["focus"],
         "inv_max": stats["investiture"],
         "acciones": [_action_to_accion(a) for a in actions],
-        "notas": "",
-        "faction_color": _CLASS_COLORS.get(clase, ""),
+        "notas": notas,
+        "faction_color": color or _CLASS_COLORS.get(clase, ""),
         "stats": stats,
     }
+
+
+# ── Exportar: enemigo guardado → statblock YAML ────────────
+
+def enemy_to_statblock(e: dict) -> dict:
+    """Reversa de `_build_from_data`: arma el dict YAML de una ficha guardada."""
+    s = e.get("stats") or {}
+    ph, co, sp = s.get("physical") or {}, s.get("cognitive") or {}, s.get("spiritual") or {}
+    sk = s.get("skills") or {}
+
+    d = {"layout": "Cosmere RPG", "name": e.get("name", "")}
+    tier = s.get("tier") or e.get("tipo") or ""
+    if tier:
+        d["tier"] = tier
+    d["class"] = e.get("clase") or "rival"
+
+    d["str"], d["pdef"], d["spd"] = ph.get("str", 0), ph.get("def", 0), ph.get("spd", 0)
+    if s.get("health"):
+        d["health"] = s["health"]
+    d["int"], d["cdef"], d["wil"] = co.get("int", 0), co.get("def", 0), co.get("wil", 0)
+    d["focus"] = e.get("focus_max", 0)
+    d["awa"], d["sdef"], d["pre"] = sp.get("awa", 0), sp.get("def", 0), sp.get("pre", 0)
+    d["investiture"] = e.get("inv_max", 0)
+    d["hp"] = e.get("vida_max", 0)
+
+    for k in ("deflect", "movement", "senses", "immunities", "resistances",
+              "weaknesses", "languages"):
+        if s.get(k):
+            d[k] = s[k]
+    for src, dst in (("physical", "skills_p"), ("cognitive", "skills_c"),
+                     ("spiritual", "skills_s"), ("surge", "skills_surge")):
+        if sk.get(src):
+            d[dst] = sk[src]
+
+    if e.get("faction_color"):
+        d["color"] = e["faction_color"]
+    if e.get("notas"):
+        d["notes"] = e["notas"]
+    for k in ("traits", "actions", "opportunities"):
+        entries = s.get(k) or []
+        if entries:
+            d[k] = [{"name": x.get("name", ""), "desc": x.get("desc", "")} for x in entries]
+    return d
+
+
+def export_statblocks(enemies: list[dict]) -> str:
+    """Bestiario completo como YAML multi-documento, re-importable con import-bulk."""
+    docs = [enemy_to_statblock(e) for e in enemies]
+    return yaml.safe_dump_all(docs, sort_keys=False, allow_unicode=True,
+                              explicit_start=True, width=10_000)

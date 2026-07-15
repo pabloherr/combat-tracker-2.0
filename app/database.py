@@ -214,3 +214,15 @@ def init_db():
         cpcols = {r["name"] for r in conn.execute("PRAGMA table_info(campaigns)")}
         if "config" not in cpcols:
             conn.execute("ALTER TABLE campaigns ADD COLUMN config TEXT DEFAULT '{}'")
+
+        # Migración: ajustes de un enemigo dentro de un encuentro (JSON). Solo
+        # aplican a ese encuentro; el bestiario no se toca.
+        eecols = {r["name"] for r in conn.execute("PRAGMA table_info(encounter_enemies)")}
+        if "overrides" not in eecols:
+            conn.execute("ALTER TABLE encounter_enemies ADD COLUMN overrides TEXT DEFAULT '{}'")
+
+        # Migración: el modo (dm | player) se fija al iniciar sesión y no se cambia
+        # sin volver a entrar.
+        scols = {r["name"] for r in conn.execute("PRAGMA table_info(sessions)")}
+        if "role" not in scols:
+            conn.execute("ALTER TABLE sessions ADD COLUMN role TEXT DEFAULT 'dm'")

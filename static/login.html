@@ -103,12 +103,12 @@ async function submit(){
   document.getElementById('err').textContent='';
   if(mode==='login'){
     if(!u||!p){return err('Completá usuario y contraseña.');}
-    if(await post('/api/auth/login',{username:u,password:p})) go();
+    if(await post('/api/auth/login',{username:u,password:p,role:role})) go();
   }else if(mode==='reg'){
     var em=val('email').trim(), p2=val('password2');
     if(!u||!em||!p){return err('Completá todos los campos.');}
     if(p!==p2){return err('Las contraseñas no coinciden.');}
-    if(await post('/api/auth/register',{username:u,email:em,password:p})) go();
+    if(await post('/api/auth/register',{username:u,email:em,password:p,role:role})) go();
   }else{ // reset
     var em2=val('email').trim(), p2b=val('password2');
     if(!u||!em2||!p){return err('Completá todos los campos.');}

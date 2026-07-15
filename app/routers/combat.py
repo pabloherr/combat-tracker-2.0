@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from ..access import require_access, require_dm
 from ..auth import current_user
 from ..database import db
-from ..models import AddEnemyIn, ColorChange, StatChange, StatusToggle, TurnChange
+from ..models import (AddEnemyIn, ColorChange, StatChange, StatusToggle,
+                      TurnChange, VidaMaxIn)
 from ..state import combats, player_view
 from ..ws import push_state
 
@@ -119,22 +120,34 @@ def _build_participants(conn, cid: int, encounter_id: int):
                 user_id=ch["user_id"], pet_id=pet["id"], owner_name=ch["name"],
             ))
 
-    # Enemigos del encuentro.
+    # Enemigos del encuentro. Los overrides ajustan al enemigo solo en este
+    # encuentro (el bestiario queda intacto).
     rows = conn.execute(
-        "SELECT ee.cantidad, e.* FROM encounter_enemies ee "
+        "SELECT ee.cantidad, ee.overrides, e.* FROM encounter_enemies ee "
         "JOIN enemies e ON e.id = ee.enemy_id WHERE ee.encounter_id=?",
         (encounter_id,),
     ).fetchall()
     for r in rows:
         acciones = json.loads(r["acciones"])
         stats = json.loads(r["stats"] or "{}")
+        try:
+            ov = json.loads(r["overrides"] or "{}")
+        except (ValueError, TypeError):
+            ov = {}
+        if not isinstance(ov, dict):
+            ov = {}
+
+        def _f(key):
+            return ov[key] if ov.get(key) not in (None, "") else r[key]
+
+        base_name = _f("name")
         for i in range(1, r["cantidad"] + 1):
-            nm = r["name"] if r["cantidad"] == 1 else f'{r["name"]} {i}'
+            nm = base_name if r["cantidad"] == 1 else f"{base_name} {i}"
             participants.append(_mk_participant(
-                "enemy", nm, r["vida_max"], r["focus_max"], r["inv_max"],
+                "enemy", nm, _f("vida_max"), _f("focus_max"), _f("inv_max"),
                 acciones=acciones, notas=r["notas"],
-                faction_color=r["faction_color"], tipo=r["tipo"], stats=stats,
-                clase=r["clase"],
+                faction_color=_f("faction_color"), tipo=r["tipo"], stats=stats,
+                clase=_f("clase"),
             ))
     return participants
 
@@ -279,6 +292,24 @@ async def change_stat(cid: int, c: StatChange, user=Depends(current_user)):
                                  (max(0, light - gained), p["char_id"]))
     await push_state(cid)
     return {"ok": True}
+
+
+@router.post("/vida_max")
+async def change_vida_max(cid: int, v: VidaMaxIn, user=Depends(current_user)):
+    """El DM ajusta la vida máxima de un participante en este combate.
+    La vida actual se recorta si supera el nuevo máximo. No toca el bestiario."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+    p = _find(cid, v.uid)
+    if not p:
+        raise HTTPException(404, "Participante no encontrado")
+    mx = max(1, v.value)
+    p["vida_max"] = mx
+    p["vida"] = min(p["vida"], mx)
+    p["defeated"] = p["vida"] == 0
+    _persist_participant(p)
+    await push_state(cid)
+    return {"ok": True, "vida": p["vida"], "vida_max": mx}
 
 
 @router.post("/status")

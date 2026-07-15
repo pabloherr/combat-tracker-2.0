@@ -8,10 +8,12 @@ bestiario aparece en todas las campañas de ese DM.
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 
 from ..access import require_dm
 from ..auth import current_user
-from ..cosmere_import import ImportError_, parse_statblock, parse_statblocks_bulk
+from ..cosmere_import import (ImportError_, export_statblocks, parse_statblock,
+                              parse_statblocks_bulk)
 from ..database import db
 from ..models import EnemyImportIn, EnemyIn
 
@@ -39,6 +41,26 @@ def list_enemies(cid: int, user=Depends(current_user)):
             r["acciones"] = json.loads(r["acciones"])
             r["stats"] = json.loads(r["stats"] or "{}")
         return rows
+
+
+@router.get("/export")
+def export_enemies(cid: int, user=Depends(current_user)):
+    """Descarga todo el bestiario del DM como un YAML de statblocks.
+
+    Sirve de backup y para pasárselo a otro DM: el archivo se vuelve a cargar
+    con "Importar en bulk" tal cual."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+        rows = [dict(r) for r in conn.execute(
+            "SELECT * FROM enemies WHERE owner_id=? ORDER BY name", (user["id"],))]
+    for r in rows:
+        r["acciones"] = json.loads(r["acciones"] or "[]")
+        r["stats"] = json.loads(r["stats"] or "{}")
+    text = export_statblocks(rows)
+    return Response(
+        content=text, media_type="text/yaml; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="bestiario.yaml"'},
+    )
 
 
 @router.post("")

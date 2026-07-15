@@ -29,10 +29,17 @@ def verify_password(password: str, salt: str, pass_hash: str) -> bool:
     return secrets.compare_digest(calc, pass_hash)
 
 
-def create_session(user_id: int) -> str:
+ROLES = ("dm", "player")
+
+
+def create_session(user_id: int, role: str = "dm") -> str:
+    """Crea la sesión. El modo (dm | player) se elige al entrar y queda fijo:
+    para cambiarlo hay que cerrar sesión y volver a entrar."""
     token = secrets.token_urlsafe(32)
+    role = role if role in ROLES else "dm"
     with db() as conn:
-        conn.execute("INSERT INTO sessions (token, user_id) VALUES (?,?)", (token, user_id))
+        conn.execute("INSERT INTO sessions (token, user_id, role) VALUES (?,?,?)",
+                     (token, user_id, role))
     return token
 
 
@@ -44,20 +51,28 @@ def delete_session(token: str | None):
 
 
 def user_for_token(token: str | None) -> dict | None:
-    """Devuelve el usuario (dict) para un token de sesión, o None."""
+    """Devuelve el usuario (dict) para un token de sesión, o None.
+
+    Incluye `role`: el modo con el que se inició esta sesión."""
     if not token:
         return None
     with db() as conn:
         row = conn.execute(
-            "SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?",
+            "SELECT u.*, s.role FROM sessions s JOIN users u ON u.id = s.user_id "
+            "WHERE s.token = ?",
             (token,),
         ).fetchone()
-        return dict(row) if row else None
+        if not row:
+            return None
+        u = dict(row)
+        u["role"] = u.get("role") if u.get("role") in ROLES else "dm"
+        return u
 
 
 def public_user(u: dict) -> dict:
     """Datos del usuario seguros para enviar al cliente (sin hash/salt)."""
-    return {"id": u["id"], "username": u["username"], "email": u.get("email", "")}
+    return {"id": u["id"], "username": u["username"], "email": u.get("email", ""),
+            "role": u.get("role", "dm")}
 
 
 # ── Dependencias ───────────────────────────────────────────

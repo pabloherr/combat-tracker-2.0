@@ -24,8 +24,9 @@ Todos (DM y jugadores) entran a la **misma dirección** y se registran / inician
 
 Cada uno crea su cuenta (**usuario + email + contraseña**). En la pantalla de entrada
 elegís si entrás **como DM** o **como Jugador** — cada modo tiene su propio panel
-separado, y podés cambiar de modo con el switch de arriba (una misma cuenta puede ser
-DM de sus campañas y jugador en campañas de otros).
+separado. El modo **queda fijo para esa sesión**: para cambiarlo, cerrá sesión y volvé
+a entrar eligiendo el otro (una misma cuenta puede ser DM de sus campañas y jugador en
+campañas de otros, pero de a un modo por vez).
 
 - **¿Olvidaste la contraseña?** Desde la pantalla de entrada podés restablecerla dando
   tu usuario y el email de la cuenta.
@@ -76,7 +77,9 @@ Al entrar y loguearte llegás al **panel principal** (`/`), con dos zonas:
    podés **ver la ficha** del personaje que trajeron.
 3. **Bestiario:** cargá enemigos o **importalos desde código** (ver abajo). Cada
    campaña tiene su propio bestiario.
-4. **Encuentros:** combiná enemigos del bestiario.
+4. **Encuentros:** combiná enemigos del bestiario. Se pueden **editar después de
+   creados** (botón *editar*), y dentro de un encuentro podés **ajustar a un enemigo**
+   sin tocar el bestiario (ver abajo).
 5. **Combate:** elegí un encuentro e iniciá. Entran automáticamente los personajes de
    los jugadores aceptados + los enemigos del encuentro.
 
@@ -143,9 +146,38 @@ actions:
 Las acciones con `(Costs X)` en el nombre toman ese coste automáticamente, y las
 negritas `**...**` de las descripciones se muestran resaltadas.
 
+### Buscar enemigos
+
+Tanto en el **Bestiario** como en el **creador de encuentros** hay un buscador por
+palabra además de los filtros de tier/rol/tamaño/tipo. Busca en el nombre, el tier y el
+tipo de criatura; si ponés varias palabras, tienen que aparecer todas.
+
+### Exportar el bestiario
+
+**Bestiario → ⭱ Exportar bestiario** descarga todas tus fichas en un solo archivo
+`bestiario.yaml` (statblocks separados por `---`). Sirve de backup y para pasárselo a
+otro DM: se vuelve a cargar tal cual con **⭳⭳ Importar en bulk**. El archivo es
+legible y editable a mano, y conserva también el color y las notas de cada ficha.
+
 La **clase** (Minion / Rival / Boss) se deduce del `tier` (o de un campo `class:`
 explícito) y define un color inicial que podés cambiar. Cada enemigo también se
 puede editar a mano desde el bestiario para ajustar clase y color.
+
+### Ajustar un enemigo dentro de un encuentro
+
+Los encuentros se **editan después de creados**: cambiás nombre, descripción, qué
+enemigos entran y cuántos.
+
+Además, cada enemigo del encuentro tiene un recuadro **"Solo en este encuentro"** donde
+ajustás **nombre, clase, vida/focus/investidura máximas y color**. Ese ajuste:
+
+- **solo vale para ese encuentro** — el bestiario y los demás encuentros no se tocan;
+- se marca en dorado, y con **"volver al bestiario"** lo deshacés;
+- si dejás un campo vacío o igual al del bestiario, el enemigo vuelve a **heredar** ese
+  valor (si después editás la ficha del bestiario, el cambio le llega);
+- cambiar la **clase** recalcula la amenaza del encuentro.
+
+Así armás un "Archer veterano" con más vida y otro color reusando la misma ficha base.
 
 ### Durante el combate
 
@@ -163,6 +195,10 @@ puede editar a mano desde el bestiario para ajustar clase y color.
   "Archer 2" aunque sean del mismo tipo. El cambio es solo para ese combate.
 - **Visibilidad:** el botón 👁 / 🚫 de cada enemigo decide si los jugadores lo ven o
   no en su pantalla (los ocultos desaparecen de la vista de jugadores)
+- **Vida máxima en vivo:** en la tarjeta de un enemigo se puede tocar el número de la
+  derecha ("/ 12") para **cambiarle la vida máxima** a mitad de combate. Si la vida
+  actual supera el nuevo máximo, se recorta. Solo afecta a **ese combate**: ni el
+  bestiario ni el encuentro cambian
 - "Marcar como actuado" atenúa la tarjeta; "Siguiente ronda" limpia todas las marcas
 - Los enemigos muestran sus acciones y su ficha desplegables (▸ Ver acciones / ▸ Ver ficha)
 - **Exhausted** es apilable: click izquierdo agrega una carga, click derecho quita una

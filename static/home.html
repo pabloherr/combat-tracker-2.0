@@ -22,9 +22,8 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .app-title{font-family:'Cinzel',serif;font-size:17px;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;}
 .who{font-size:13px;color:var(--text2);}
 .who b{color:var(--gold2);}
-.modeswitch{display:inline-flex;border:1px solid var(--border2);border-radius:24px;overflow:hidden;}
-.ms-opt{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:6px 14px;color:var(--text3);text-decoration:none;}
-.ms-opt.on{background:rgba(224,189,124,.16);color:var(--gold2);}
+.modebadge{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:6px 14px;border-radius:24px;border:1px solid var(--border2);color:var(--text3);cursor:default;}
+.modebadge.as-dm{background:rgba(224,189,124,.16);color:var(--gold2);border-color:rgba(224,189,124,.4);}
 .fl-lbl{font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin:10px 0 4px;display:block;}
 .section{margin-bottom:2rem;}
 .section-h{font-family:'Cinzel',serif;font-size:13px;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.4rem;}
@@ -76,10 +75,8 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
   <div class="topbar">
     <div class="app-title">Cosmere Combat Tracker</div>
     <div class="row" style="margin:0;gap:10px">
-      <div class="modeswitch">
-        <a class="ms-opt" id="ms-dm" href="/dm">⚔ DM</a>
-        <a class="ms-opt" id="ms-player" href="/jugar">🛡 Jugador</a>
-      </div>
+      <!-- El modo se elige al entrar y queda fijo: para cambiarlo, salí y volvé a entrar. -->
+      <span class="modebadge" id="modeBadge" title="El modo se elige al iniciar sesión. Para cambiarlo, cerrá sesión y volvé a entrar.">…</span>
       <span class="who">Hola, <b id="me">…</b></span>
       <button class="btn sm" onclick="openAccount()">Cuenta</button>
       <button class="btn sm" onclick="logout()">Salir</button>
@@ -145,8 +142,9 @@ async function loadMe(){
 function applyMode(){
   document.getElementById('dmMode').style.display=MODE==='dm'?'':'none';
   document.getElementById('playerMode').style.display=MODE==='player'?'':'none';
-  document.getElementById('ms-dm').classList.toggle('on',MODE==='dm');
-  document.getElementById('ms-player').classList.toggle('on',MODE==='player');
+  var b=document.getElementById('modeBadge');
+  b.textContent=MODE==='dm'?'⚔ DM':'🛡 Jugador';
+  b.classList.toggle('as-dm',MODE==='dm');
 }
 
 // ─── Menú de cuenta ───

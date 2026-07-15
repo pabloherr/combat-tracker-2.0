@@ -43,8 +43,8 @@ def register(r: RegisterIn, response: Response):
             uid = cur.lastrowid
         except sqlite3.IntegrityError:
             raise HTTPException(400, "Ese nombre de usuario ya existe")
-    _set_cookie(response, create_session(uid))
-    return {"id": uid, "username": username, "email": email}
+    _set_cookie(response, create_session(uid, r.role))
+    return {"id": uid, "username": username, "email": email, "role": r.role}
 
 
 @router.post("/login")
@@ -53,8 +53,10 @@ def login(r: LoginIn, response: Response):
         row = conn.execute("SELECT * FROM users WHERE username=?", (r.username.strip(),)).fetchone()
     if not row or not verify_password(r.password, row["salt"], row["pass_hash"]):
         raise HTTPException(400, "Usuario o contraseña incorrectos")
-    _set_cookie(response, create_session(row["id"]))
-    return public_user(dict(row))
+    _set_cookie(response, create_session(row["id"], r.role))
+    u = dict(row)
+    u["role"] = r.role
+    return public_user(u)
 
 
 @router.post("/reset")

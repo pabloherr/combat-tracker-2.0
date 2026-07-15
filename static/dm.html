@@ -153,6 +153,7 @@ select.fi{appearance:auto;}
 .filter-f{display:flex;flex-direction:column;gap:3px;}
 .filter-f .fl{font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--text3);}
 .filter-f select{min-width:120px;}
+.filter-q input{min-width:190px;}
 .filter-clear{margin-left:auto;align-self:center;}
 .meta-badges{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 2px;}
 .meta-badge{font-size:10px;letter-spacing:.03em;padding:1px 8px;border-radius:20px;border:.5px solid var(--border2);color:var(--text2);background:var(--bg3);}
@@ -175,6 +176,24 @@ select.fi{appearance:auto;}
 .qty button{width:28px;height:28px;border:none;background:var(--bg3);color:var(--gold);font-size:16px;cursor:pointer;}
 .qty button:hover{background:var(--bg4);}
 .qty span{min-width:30px;text-align:center;font-family:'Cinzel',serif;font-size:13px;}
+
+/* ajustes de un enemigo válidos solo dentro de un encuentro */
+.ov-box{background:var(--bg3);border:.5px solid var(--border);border-radius:var(--r);padding:8px 10px;margin:6px 0 8px;}
+.ov-h{display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;}
+.ov-reset{background:transparent;border:none;cursor:pointer;color:var(--text3);font-size:11px;font-style:italic;font-family:'Crimson Pro',serif;text-transform:none;letter-spacing:0;}
+.ov-reset:hover{color:var(--gold);}
+.ov-grid{display:flex;flex-wrap:wrap;gap:8px;}
+.ov-f{display:flex;flex-direction:column;gap:3px;flex:1 1 88px;min-width:0;}
+.ov-f>span{font-size:10px;color:var(--text3);letter-spacing:.05em;text-transform:uppercase;}
+.ov-f input,.ov-f select{width:100%;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--r);padding:5px 7px;color:var(--text);font-family:'Crimson Pro',serif;font-size:13px;outline:none;}
+.ov-f input[type=color]{padding:2px;height:28px;cursor:pointer;}
+.ov-f.ov-on>span{color:var(--gold2);}
+.ov-f.ov-on input,.ov-f.ov-on select{border-color:var(--gold2);background:rgba(224,189,124,.08);}
+.ov-tag{font-size:10px;color:var(--gold2);border:.5px solid rgba(224,189,124,.4);border-radius:10px;padding:0 6px;margin-left:4px;}
+/* vida máxima editable de un enemigo en combate */
+.vmax-edit{font-size:11px;color:var(--text3);border-bottom:1px dashed var(--border2);cursor:pointer;}
+.vmax-edit:hover{color:var(--gold2);border-bottom-color:var(--gold2);}
+.vmax-inp{width:56px;background:var(--bg2);border:.5px solid var(--gold2);border-radius:var(--r);padding:1px 4px;color:var(--text);font-family:'Crimson Pro',serif;font-size:13px;outline:none;}
 
 /* medidor de dificultad */
 .diff-panel{background:var(--bg2);border:.5px solid var(--border2);border-radius:var(--rl);padding:14px 16px;margin-bottom:14px;}
@@ -379,6 +398,7 @@ select.fi{appearance:auto;}
       <div class="sep"></div>
       <button class="btn accent" onclick="toggleForm('importForm')">⭳ Importar desde código</button>
       <button class="btn accent" onclick="toggleForm('bulkForm')">⭳⭳ Importar en bulk</button>
+      <button class="btn ghost" id="exportBtn" onclick="exportBestiary()" title="Descarga todo el bestiario en un .yaml. Se vuelve a cargar con Importar en bulk.">⭱ Exportar bestiario</button>
       <button class="btn" onclick="openEnemyEditor()">+ Agregar enemigo</button>
     </div>
     <div class="form-wrap" id="bulkForm" style="display:none">
@@ -418,7 +438,7 @@ select.fi{appearance:auto;}
       <button class="btn" onclick="openEncForm()">+ Armar encuentro</button>
     </div>
     <div class="form-wrap" id="encForm" style="display:none">
-      <div class="form-title">Nuevo encuentro</div>
+      <div class="form-title" id="encFormTitle">Nuevo encuentro</div>
       <div class="fg" style="grid-template-columns:1fr 2fr">
         <div><div class="fl">Nombre</div><input class="fi" id="encfName"/></div>
         <div><div class="fl">Descripción</div><input class="fi" id="encfDesc"/></div>
@@ -435,8 +455,8 @@ select.fi{appearance:auto;}
         <div><div class="enc-col-h">En el encuentro</div><div id="ecfSelected"></div></div>
       </div>
       <div class="form-actions" style="margin-top:14px">
-        <button class="btn ghost" onclick="toggleForm('encForm')">Cancelar</button>
-        <button class="btn accent" onclick="saveEncounter()">Guardar encuentro</button>
+        <button class="btn ghost" onclick="cancelEncForm()">Cancelar</button>
+        <button class="btn accent" id="encSaveBtn" onclick="saveEncounter()">Crear encuentro</button>
       </div>
     </div>
     <div class="grid" id="encountersGrid"></div>
@@ -804,19 +824,30 @@ function renderFilterBar(containerId,prefix,list,fnName){
   var roleInner='<option value="">Todos</option><option value="minion">Minion</option><option value="rival">Rival</option><option value="boss">Boss</option>';
   var sizeInner='<option value="">Todos</option>'+o.sizes.map(function(t){return '<option value="'+t+'">'+t+'</option>';}).join('');
   var typeInner='<option value="">Todos</option>'+o.types.map(function(t){return '<option value="'+t+'">'+esc(t)+'</option>';}).join('');
+  // Buscador por palabra: filtra por nombre, tier/tipo y tipo de criatura.
+  var qBox='<div class="filter-f filter-q"><span class="fl">Buscar</span>'
+    +'<input class="fi" type="search" id="'+prefix+'Q" placeholder="nombre, tipo…" '
+    +'oninput="'+fnName+'()"/></div>';
   document.getElementById(containerId).innerHTML=
-    sel('Tier','Tier',tierInner,o.noTier)+sel('Role','Rol',roleInner,false)
+    qBox+sel('Tier','Tier',tierInner,o.noTier)+sel('Role','Rol',roleInner,false)
     +sel('Size','Tamaño',sizeInner,o.noSize)+sel('Type','Tipo',typeInner,o.noType)
     +'<button class="btn ghost sm filter-clear" onclick="clearFilters(\''+prefix+'\',\''+fnName+'\')">Limpiar</button>';
 }
 function clearFilters(prefix,fnName){
-  ['Tier','Role','Size','Type'].forEach(function(k){var el=document.getElementById(prefix+k);if(el)el.value='';});
+  ['Tier','Role','Size','Type','Q'].forEach(function(k){var el=document.getElementById(prefix+k);if(el)el.value='';});
   if(fnName&&window[fnName])window[fnName]();
 }
 function enemyPasses(e,prefix){
   var m=enemyMeta(e);
   function chk(k,val){var el=document.getElementById(prefix+k);if(!el||!el.value)return true;
     if(el.value==='__none__')return val==null;return String(val)===el.value;}
+  var q=document.getElementById(prefix+'Q');
+  if(q&&q.value.trim()){
+    // todas las palabras tienen que aparecer en algún lado de la ficha
+    var hay=[e.name,e.tipo,m.ctype,m.size,claseLabel(e.clase)].filter(Boolean).join(' ').toLowerCase();
+    var words=q.value.trim().toLowerCase().split(/\s+/);
+    for(var i=0;i<words.length;i++){ if(hay.indexOf(words[i])<0) return false; }
+  }
   return chk('Tier',m.tier)&&chk('Role',m.role)&&chk('Size',m.size)&&chk('Type',m.ctype);
 }
 
@@ -928,6 +959,11 @@ function renderEnemyGrid(){
   var list=enemies.filter(function(e){return enemyPasses(e,'bf');});
   if(enemies.length&&!list.length){g.innerHTML='<div class="empty">Ningún enemigo coincide con los filtros.</div>';return;}
   g.innerHTML=list.map(enemyCard).join('');
+}
+function exportBestiary(){
+  if(!enemies.length){alert('El bestiario está vacío.');return;}
+  // el navegador descarga el .yaml que arma el server (re-importable con bulk)
+  window.location.href=API+'/enemies/export';
 }
 async function importEnemy(){
   var code=document.getElementById('importCode').value.trim();
@@ -1089,7 +1125,8 @@ async function delEnemy(id){
 
 // ═══════════ ENCUENTROS ═══════════
 var PARTY=[];              // jugadores aceptados con su nivel
-var encSel={};             // {enemyId: cantidad} del encuentro en construcción
+var encSel={};             // {enemyId: {qty, ov}} del encuentro en construcción
+var EDIT_ENC=null;         // id del encuentro que se está editando (null = uno nuevo)
 
 async function loadParty(){ try{ PARTY=await api(API+'/party'); }catch(e){ PARTY=[]; } return PARTY; }
 function partyDefaults(){
@@ -1102,22 +1139,34 @@ function partyHint(){
   return PARTY.map(function(p){return esc(p.character_name||p.username)+' (Nvl '+(p.level||'?')+' → T'+levelToTier(p.level)+')';}).join(' · ');
 }
 
-async function openEncForm(){
+// encSel: { enemy_id: {qty, ov} }. `ov` son los ajustes que valen solo en este
+// encuentro (nombre, clase, vida/focus/inv máx, color); el bestiario no se toca.
+async function openEncForm(encId){
   await ensureEnemies();
   await loadParty();
   encSel={};
+  EDIT_ENC=encId||null;
   var d=partyDefaults();
-  document.getElementById('encfName').value='';
-  document.getElementById('encfDesc').value='';
+  var enc=EDIT_ENC?(encounters||[]).find(function(x){return x.id===EDIT_ENC;}):null;
+  document.getElementById('encfName').value=enc?enc.name:'';
+  document.getElementById('encfDesc').value=enc?(enc.descripcion||''):'';
+  if(enc){
+    enc.enemies.forEach(function(x){
+      encSel[x.enemy_id]={qty:x.cantidad, ov:Object.assign({},x.overrides||{})};
+    });
+  }
   document.getElementById('encPartySize').value=d.size;
   document.getElementById('encPartyTier').value=d.tier;
   document.getElementById('encPartyHint').textContent=partyHint();
+  document.getElementById('encFormTitle').textContent=enc?('Editar encuentro: '+enc.name):'Nuevo encuentro';
+  document.getElementById('encSaveBtn').textContent=enc?'Guardar cambios':'Crear encuentro';
   renderFilterBar('ecfBar','ecf',enemies,'renderEncPalette');
   renderEncPalette();
   renderEncSelected();
   updateEncDiff();
   document.getElementById('encForm').style.display='block';
 }
+function cancelEncForm(){ EDIT_ENC=null; encSel={}; document.getElementById('encForm').style.display='none'; }
 function renderEncPalette(){
   var box=document.getElementById('ecfPalette');
   if(!enemies.length){box.innerHTML='<div class="empty">Bestiario vacío. Cargá enemigos primero.</div>';return;}
@@ -1132,28 +1181,107 @@ function renderEncPalette(){
       +'<button class="pal-add" onclick="addToEnc('+e.id+')">+ agregar</button></div>';
   }).join('');
 }
-function addToEnc(id){ encSel[id]=(encSel[id]||0)+1; renderEncSelected(); updateEncDiff(); }
-function incEnc(id,delta){ encSel[id]=(encSel[id]||0)+delta; if(encSel[id]<=0)delete encSel[id]; renderEncSelected(); updateEncDiff(); }
+function addToEnc(id){
+  if(encSel[id]) encSel[id].qty++; else encSel[id]={qty:1,ov:{}};
+  renderEncSelected(); updateEncDiff();
+}
+function incEnc(id,delta){
+  if(!encSel[id])return;
+  encSel[id].qty+=delta;
+  if(encSel[id].qty<=0)delete encSel[id];
+  renderEncSelected(); updateEncDiff();
+}
+var OV_KEYS=['name','clase','vida_max','focus_max','inv_max','faction_color'];
+var OV_NUM={vida_max:1,focus_max:1,inv_max:1};
+// Valor efectivo de un campo: el ajuste del encuentro si existe, si no el del bestiario.
+function ovVal(e,ov,k){ return (ov[k]===undefined||ov[k]===''||ov[k]===null)?e[k]:ov[k]; }
+function encEnemy(id){ return enemies.find(function(x){return x.id===parseInt(id);}); }
+// El DM edita un campo solo para este encuentro. Vacío o igual al bestiario =
+// se borra el ajuste y el enemigo vuelve a heredar del bestiario.
+function setOv(id,k,el){
+  var e=encEnemy(id), ov=encSel[id].ov, raw=el.value;
+  if(OV_NUM[k]){
+    if(String(raw).trim()===''){ delete ov[k]; }
+    else{ var v=Math.max(0,parseInt(raw)||0); if(v===e[k]) delete ov[k]; else ov[k]=v; }
+  }else{
+    var s=String(raw).trim();
+    if(!s||s===e[k]) delete ov[k]; else ov[k]=s;
+  }
+  el.value=ovVal(e,ov,k);   // refleja el valor efectivo (si se borró, el del bestiario)
+  refreshEncCard(id);
+  updateEncDiff();
+}
+function resetOv(id){
+  encSel[id].ov={};
+  var card=document.getElementById('sel-'+id), e=encEnemy(id);
+  if(card) OV_KEYS.forEach(function(k){
+    var f=card.querySelector('[data-k="'+k+'"] input,[data-k="'+k+'"] select');
+    if(f) f.value=e[k]||(k==='faction_color'?'#c87830':'');
+  });
+  refreshEncCard(id); updateEncDiff();
+}
+// Actualiza lo que depende de los ajustes sin re-crear los inputs (no roba el foco).
+function refreshEncCard(id){
+  var card=document.getElementById('sel-'+id); if(!card)return;
+  var e=encEnemy(id), ov=encSel[id].ov;
+  card.querySelector('.sel-name').textContent=ovVal(e,ov,'name');
+  card.querySelector('.sel-badge').innerHTML=claseBadge(ovVal(e,ov,'clase'));
+  OV_KEYS.forEach(function(k){
+    var f=card.querySelector('[data-k="'+k+'"]');
+    if(f) f.classList.toggle('ov-on',ov[k]!==undefined);
+  });
+  var r=card.querySelector('.ov-reset');
+  if(r) r.style.display=Object.keys(ov).length?'':'none';
+}
+function ovNum(id,e,ov,k,label){
+  return '<label class="ov-f'+(ov[k]!==undefined?' ov-on':'')+'" data-k="'+k+'"><span>'+label+'</span>'
+    +'<input type="number" min="0" value="'+ovVal(e,ov,k)+'" '
+    +'onchange="setOv('+id+',\''+k+'\',this)" title="Bestiario: '+e[k]+'"/></label>';
+}
+function ovEditor(id,e){
+  var ov=encSel[id].ov;
+  var cl=ovVal(e,ov,'clase'), col=ovVal(e,ov,'faction_color')||'#c87830';
+  var opts=['minion','rival','boss'].map(function(c){
+    return '<option value="'+c+'"'+(c===cl?' selected':'')+'>'+claseLabel(c)+'</option>';}).join('');
+  return '<div class="ov-box">'
+    +'<div class="ov-h">Solo en este encuentro'
+      +'<button class="ov-reset" onclick="resetOv('+id+')"'+(Object.keys(ov).length?'':' style="display:none"')+'>volver al bestiario</button>'
+    +'</div>'
+    +'<div class="ov-grid">'
+      +'<label class="ov-f'+(ov.name!==undefined?' ov-on':'')+'" data-k="name" style="flex:2 1 140px"><span>Nombre</span>'
+        +'<input type="text" value="'+escA(ovVal(e,ov,'name'))+'" onchange="setOv('+id+',\'name\',this)" title="Bestiario: '+escA(e.name)+'"/></label>'
+      +'<label class="ov-f'+(ov.clase!==undefined?' ov-on':'')+'" data-k="clase"><span>Clase</span>'
+        +'<select onchange="setOv('+id+',\'clase\',this)">'+opts+'</select></label>'
+      +ovNum(id,e,ov,'vida_max','Vida máx')
+      +ovNum(id,e,ov,'focus_max','Focus máx')
+      +ovNum(id,e,ov,'inv_max','Invest. máx')
+      +'<label class="ov-f'+(ov.faction_color!==undefined?' ov-on':'')+'" data-k="faction_color"><span>Color</span>'
+        +'<input type="color" value="'+col+'" onchange="setOv('+id+',\'faction_color\',this)"/></label>'
+    +'</div></div>';
+}
 function renderEncSelected(){
   var box=document.getElementById('ecfSelected');
   var ids=Object.keys(encSel);
   if(!ids.length){box.innerHTML='<div class="empty">Todavía no agregaste enemigos.</div>';return;}
   box.innerHTML=ids.map(function(id){
-    var e=enemies.find(function(x){return x.id===parseInt(id);});
+    var e=encEnemy(id);
     if(!e)return '';
-    return '<div class="sel-card">'
-      +'<div class="sel-head"><span class="cname">'+esc(e.name)+'</span>'
-      +'<div class="qty"><button onclick="incEnc('+id+',-1)">−</button><span>'+encSel[id]+'</span><button onclick="incEnc('+id+',1)">+</button></div>'
+    var ov=encSel[id].ov;
+    return '<div class="sel-card" id="sel-'+id+'">'
+      +'<div class="sel-head"><span class="cname sel-name">'+esc(ovVal(e,ov,'name'))+'</span>'
+      +'<div class="qty"><button onclick="incEnc('+id+',-1)">−</button><span>'+encSel[id].qty+'</span><button onclick="incEnc('+id+',1)">+</button></div>'
       +'<button class="del-btn" onclick="incEnc('+id+',-99)">✕</button></div>'
-      +'<div style="margin-bottom:4px">'+claseBadge(e.clase)+'</div>'
-      +metaBadges(e)+renderStatblock(e,true)+'</div>';
+      +'<div class="sel-badge" style="margin-bottom:4px">'+claseBadge(ovVal(e,ov,'clase'))+'</div>'
+      +metaBadges(e)+ovEditor(id,e)+renderStatblock(e,true)+'</div>';
   }).join('');
 }
 function encItems(){
   return Object.keys(encSel).map(function(id){
     var e=enemies.find(function(x){return x.id===parseInt(id);});
     var m=e?enemyMeta(e):{tier:null,role:'rival'};
-    return {tier:m.tier,role:m.role,qty:encSel[id]};
+    // la clase ajustada cambia la amenaza del encuentro
+    var role=(encSel[id].ov&&encSel[id].ov.clase)||m.role;
+    return {tier:m.tier,role:role,qty:encSel[id].qty};
   });
 }
 function renderDiffPanel(elId,items,size,tier){
@@ -1181,11 +1309,16 @@ async function loadEncounters(){
   document.getElementById('encountersEmpty').style.display=encounters.length?'none':'block';
   var d=partyDefaults();
   g.innerHTML=encounters.map(function(enc){
-    var items=enc.enemies.map(function(x){var be=enemies.find(function(e){return e.id===x.enemy_id;});var m=be?enemyMeta(be):{tier:null,role:'rival'};return {tier:m.tier,role:m.role,qty:x.cantidad};});
-    var list=enc.enemies.map(function(e){return '<div class="cstats">'+e.cantidad+'x '+esc(e.name)+'</div>';}).join('');
+    // la clase puede estar ajustada en el encuentro: eso cambia la amenaza
+    var items=enc.enemies.map(function(x){var be=enemies.find(function(e){return e.id===x.enemy_id;});var m=be?enemyMeta(be):{tier:null,role:'rival'};return {tier:m.tier,role:x.clase||m.role,qty:x.cantidad};});
+    var list=enc.enemies.map(function(e){
+      var tweak=Object.keys(e.overrides||{}).length?' <span class="ov-tag" title="Ajustado solo en este encuentro">ajustado</span>':'';
+      return '<div class="cstats">'+e.cantidad+'x '+esc(e.name)+tweak+'</div>';
+    }).join('');
     return '<div class="card">'
       +'<div class="card-head"><span class="cname">'+esc(enc.name)+'</span>'
-      +'<button class="del-btn" onclick="delEncounter('+enc.id+')">✕</button></div>'
+      +'<div><button class="edit-btn" onclick="openEncForm('+enc.id+')">editar</button> '
+      +'<button class="del-btn" onclick="delEncounter('+enc.id+')">✕</button></div></div>'
       +(enc.descripcion?'<div class="ctype">'+esc(enc.descripcion)+'</div>':'')
       +'<div style="margin:6px 0">'+diffBadge(items,d.size,d.tier)+'</div>'
       +list+'</div>';
@@ -1194,11 +1327,15 @@ async function loadEncounters(){
 async function saveEncounter(){
   var name=document.getElementById('encfName').value.trim();
   if(!name){alert('Poné un nombre.');return;}
-  var enemiesList=Object.keys(encSel).map(function(id){return {enemy_id:parseInt(id),cantidad:encSel[id]};});
+  var enemiesList=Object.keys(encSel).map(function(id){
+    return {enemy_id:parseInt(id),cantidad:encSel[id].qty,overrides:encSel[id].ov||{}};
+  });
   if(!enemiesList.length){alert('Agregá al menos un enemigo.');return;}
-  await api(API+'/encounters','POST',{name:name,descripcion:document.getElementById('encfDesc').value.trim(),enemies:enemiesList});
-  encSel={};
-  toggleForm('encForm');
+  var body={name:name,descripcion:document.getElementById('encfDesc').value.trim(),enemies:enemiesList};
+  if(EDIT_ENC) await api(API+'/encounters/'+EDIT_ENC,'PUT',body);
+  else await api(API+'/encounters','POST',body);
+  EDIT_ENC=null; encSel={};
+  document.getElementById('encForm').style.display='none';
   loadEncounters();
 }
 async function delEncounter(id){
@@ -1268,12 +1405,28 @@ async function chActed(uid,slow){await api(API+'/combat/acted/'+uid+(slow?'?slow
 async function chHidden(uid){await api(API+'/combat/hidden/'+uid,'POST');}
 async function chColor(uid,color){await api(API+'/combat/color','POST',{uid:uid,color:color});}
 
+// La vida máxima de un enemigo se edita en el combate (solo afecta a este combate).
+function editVidaMax(el,uid){
+  if(el.querySelector('input'))return;
+  var cur=parseInt(String(el.textContent).replace(/[^0-9]/g,''))||1;
+  el.innerHTML='<input class="vmax-inp" type="number" min="1" value="'+cur+'"/>';
+  var inp=el.firstChild, done=false;
+  inp.focus(); inp.select();
+  inp.onclick=function(e){e.stopPropagation();};
+  inp.onkeydown=function(e){ if(e.key==='Enter')inp.blur(); else if(e.key==='Escape'){done=true;renderCombat();} };
+  inp.onblur=function(){ if(done)return; done=true; saveVidaMax(uid,Math.max(1,parseInt(inp.value)||1)); };
+}
+async function saveVidaMax(uid,v){ await api(API+'/combat/vida_max','POST',{uid:uid,value:v}); }
+
 function statBlock(p,stat,color,lblPlus,lblMinus,clsPlus,clsMinus){
   var mx=p[stat+'_max'];
   if(stat!=='vida'&&mx===0)return '';
   var pct=mx>0?Math.round(p[stat]/mx*100):0;
+  var maxPart=(stat==='vida'&&p.kind==='enemy')
+    ? '<span class="vmax-edit" onclick="editVidaMax(this,\''+p.uid+'\')" title="Editar vida máxima (solo este combate)">/ '+mx+'</span>'
+    : '<span style="font-size:11px;color:var(--text3)">/ '+mx+'</span>';
   return '<div class="stat-line"><span class="stat-lbl">'+(stat==='vida'?'Vida':stat==='focus'?'Focus':'Investidura')+'</span>'
-    +'<span class="stat-val" style="color:'+color+'">'+p[stat]+' <span style="font-size:11px;color:var(--text3)">/ '+mx+'</span></span></div>'
+    +'<span class="stat-val" style="color:'+color+'">'+p[stat]+' '+maxPart+'</span></div>'
     +'<div class="bar"><div class="bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
     +'<div class="adj">'
     +'<button class="'+clsMinus+'" onclick="chStat(\''+p.uid+'\',\''+stat+'\',-1,document.getElementById(\'i-'+p.uid+'-'+stat+'\'))">'+lblMinus+'</button>'

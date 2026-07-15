@@ -9,11 +9,13 @@ class RegisterIn(BaseModel):
     username: str
     email: str = ""
     password: str
+    role: str = "dm"           # modo de la sesión: dm | player (no se cambia sin re-loguear)
 
 
 class LoginIn(BaseModel):
     username: str
     password: str
+    role: str = "dm"
 
 
 class ResetIn(BaseModel):
@@ -133,7 +135,9 @@ class EnemyImportIn(BaseModel):
 class EncounterIn(BaseModel):
     name: str
     descripcion: str = ""
-    enemies: list[dict] = []   # [{enemy_id, cantidad}]
+    # [{enemy_id, cantidad, overrides}] — overrides ajusta al enemigo solo en este
+    # encuentro (name, clase, vida_max, focus_max, inv_max, faction_color).
+    enemies: list[dict] = []
 
 
 class AddEnemyIn(BaseModel):
@@ -145,6 +149,11 @@ class StatChange(BaseModel):
     uid: str
     stat: str                  # vida | focus | inv
     delta: int
+
+
+class VidaMaxIn(BaseModel):
+    uid: str
+    value: int                 # nueva vida máxima en este combate (la actual se recorta)
 
 
 class StatusToggle(BaseModel):
