@@ -237,3 +237,9 @@ def init_db():
         chcols = {r["name"] for r in conn.execute("PRAGMA table_info(characters)")}
         if "dnd_resources" not in chcols:
             conn.execute("ALTER TABLE characters ADD COLUMN dnd_resources TEXT DEFAULT '{}'")
+
+        # Migración: los bestiarios no se mezclan entre sistemas. Cada enemigo
+        # pertenece a un sistema (cosmere | dnd) y solo aparece en campañas de ese.
+        ecols = {r["name"] for r in conn.execute("PRAGMA table_info(enemies)")}
+        if "system" not in ecols:
+            conn.execute("ALTER TABLE enemies ADD COLUMN system TEXT DEFAULT 'cosmere'")

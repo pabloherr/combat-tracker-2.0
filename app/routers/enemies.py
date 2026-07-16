@@ -20,13 +20,18 @@ from ..models import EnemyImportIn, EnemyIn
 router = APIRouter(prefix="/api/campaigns/{cid}/enemies", tags=["enemies"])
 
 
-def _insert_enemy(conn, owner_id: int, e: EnemyIn) -> int:
+def _sys(c) -> str:
+    """Sistema de la campaña: los bestiarios de cada sistema no se mezclan."""
+    return (c["system"] if "system" in c.keys() else None) or "cosmere"
+
+
+def _insert_enemy(conn, owner_id: int, e: EnemyIn, system: str = "cosmere") -> int:
     cur = conn.execute(
-        "INSERT INTO enemies (owner_id, name, tipo, clase, vida_max, focus_max, inv_max, acciones, notas, faction_color, stats) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO enemies (owner_id, name, tipo, clase, vida_max, focus_max, inv_max, acciones, notas, faction_color, stats, system) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (owner_id, e.name, e.tipo, e.clase, e.vida_max, e.focus_max, e.inv_max,
          json.dumps([a.model_dump() for a in e.acciones]), e.notas, e.faction_color,
-         json.dumps(e.stats)),
+         json.dumps(e.stats), system),
     )
     return cur.lastrowid
 
@@ -34,9 +39,10 @@ def _insert_enemy(conn, owner_id: int, e: EnemyIn) -> int:
 @router.get("")
 def list_enemies(cid: int, user=Depends(current_user)):
     with db() as conn:
-        require_dm(conn, cid, user)
+        c = require_dm(conn, cid, user)
         rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM enemies WHERE owner_id=? ORDER BY name", (user["id"],))]
+            "SELECT * FROM enemies WHERE owner_id=? AND COALESCE(system,'cosmere')=? ORDER BY name",
+            (user["id"], _sys(c)))]
         for r in rows:
             r["acciones"] = json.loads(r["acciones"])
             r["stats"] = json.loads(r["stats"] or "{}")
@@ -50,9 +56,10 @@ def export_enemies(cid: int, user=Depends(current_user)):
     Sirve de backup y para pasárselo a otro DM: el archivo se vuelve a cargar
     con "Importar en bulk" tal cual."""
     with db() as conn:
-        require_dm(conn, cid, user)
+        c = require_dm(conn, cid, user)
         rows = [dict(r) for r in conn.execute(
-            "SELECT * FROM enemies WHERE owner_id=? ORDER BY name", (user["id"],))]
+            "SELECT * FROM enemies WHERE owner_id=? AND COALESCE(system,'cosmere')=? ORDER BY name",
+            (user["id"], _sys(c)))]
     for r in rows:
         r["acciones"] = json.loads(r["acciones"] or "[]")
         r["stats"] = json.loads(r["stats"] or "{}")
@@ -66,8 +73,8 @@ def export_enemies(cid: int, user=Depends(current_user)):
 @router.post("")
 def create_enemy(cid: int, e: EnemyIn, user=Depends(current_user)):
     with db() as conn:
-        require_dm(conn, cid, user)
-        return {"id": _insert_enemy(conn, user["id"], e)}
+        c = require_dm(conn, cid, user)
+        return {"id": _insert_enemy(conn, user["id"], e, _sys(c))}
 
 
 @router.post("/import")
@@ -78,8 +85,8 @@ def import_enemy(cid: int, payload: EnemyImportIn, user=Depends(current_user)):
         raise HTTPException(400, str(e))
     enemy = EnemyIn(**parsed)
     with db() as conn:
-        require_dm(conn, cid, user)
-        eid = _insert_enemy(conn, user["id"], enemy)
+        c = require_dm(conn, cid, user)
+        eid = _insert_enemy(conn, user["id"], enemy, _sys(c))
     return {"id": eid, "name": enemy.name}
 
 
@@ -91,9 +98,9 @@ def import_bulk(cid: int, payload: EnemyImportIn, user=Depends(current_user)):
     except ImportError_ as e:
         raise HTTPException(400, str(e))
     with db() as conn:
-        require_dm(conn, cid, user)
+        c = require_dm(conn, cid, user)
         for p in parsed:
-            _insert_enemy(conn, user["id"], EnemyIn(**p))
+            _insert_enemy(conn, user["id"], EnemyIn(**p), _sys(c))
     return {"added": len(parsed), "errors": errors, "names": [p["name"] for p in parsed]}
 
 

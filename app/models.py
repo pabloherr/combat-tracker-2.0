@@ -191,3 +191,8 @@ class TurnChange(BaseModel):
 class ColorChange(BaseModel):
     uid: str
     color: str                 # color de esta instancia en combate (hex)
+
+
+class InitiativeIn(BaseModel):
+    uid: str
+    value: int                 # iniciativa del participante (D&D)

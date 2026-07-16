@@ -212,7 +212,7 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
   <div id="tabCombate" class="tabpanel" style="display:none">
     <div class="empty-msg" id="noCombat">No hay combate activo. Cuando el DM lo inicie, aparece acá.</div>
     <div id="activeCombat" style="display:none">
-      <div class="phase-bar">
+      <div class="phase-bar" id="phaseBarP">
         <div class="phase p1">1 · PJ rápidos</div>
         <div class="phase p2">2 · Enemigos rápidos</div>
         <div class="phase p3">3 · PJ lentos</div>
@@ -224,7 +224,7 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
       <div class="section-lbl" id="playersLbl">Personajes</div>
       <div class="grid" id="playersGrid"></div>
 
-      <div class="section-lbl">Enemigos</div>
+      <div class="section-lbl" id="enemiesLbl">Enemigos</div>
       <div class="grid" id="enemiesGrid"></div>
     </div>
   </div>
@@ -269,6 +269,15 @@ async function chStat(uid,stat,sign){
 async function chStatus(uid,status){await api(API+'/combat/status','POST',{uid:uid,status:status});}
 async function rmStatus(uid,status){await api(API+'/combat/status/remove_one','POST',{uid:uid,status:status});}
 async function chTurn(uid,turn){await api(API+'/combat/turn','POST',{uid:uid,turn:turn});}
+// D&D: iniciativa
+function isDndCombat(){ return ((COMBAT&&COMBAT.system)||SYSTEM)==='dnd'; }
+function initOf(p){ return p.initiative==null?-999:p.initiative; }
+async function saveInit(uid){
+  var el=document.getElementById('init-'+uid);
+  var v=parseInt(el&&el.value);
+  if(isNaN(v)){alert('Poné tu iniciativa (d20 + modificador de DEX).');return;}
+  await api(API+'/combat/initiative','POST',{uid:uid,value:v});
+}
 
 // control de un stat: [−] a la izquierda, [+] a la derecha
 function statCtl(p,stat,label,color){
@@ -311,7 +320,13 @@ function meControls(p){
 // tarjeta con controles (personaje propio o mascota propia)
 function controlCard(p,tagHTML,turnLabel,isPet,marcosHTML){
   var turnCtl;
-  if(isPet){
+  if(isDndCombat()){
+    // D&D: cada uno anota su iniciativa (los enemigos la tiran solos)
+    turnLabel='Iniciativa';
+    turnCtl='<span style="display:flex;gap:6px;align-items:center">'
+      +'<input type="number" class="oc-fi" style="width:70px" id="init-'+p.uid+'" value="'+(p.initiative==null?'':p.initiative)+'" placeholder="—"/>'
+      +'<button class="btn-sheet" onclick="saveInit(\''+p.uid+'\')">Anotar</button></span>';
+  }else if(isPet){
     // las mascotas toman turno al azar: se muestra pero no se edita
     var ti=turnInfo(p);
     turnCtl='<span class="turn-tag '+ti.cls+'">'+ti.lbl+'</span>';
@@ -369,8 +384,53 @@ function shRes(p){
     +(p.focus_max?'<span>Focus <b style="color:#6aaae8">'+p.focus_max+'</b></span>':'')
     +(p.inv_max?'<span>Investidura <b style="color:#aa8aec">'+p.inv_max+'</b></span>':'')+'</div>';
 }
+// ficha de personaje de D&D 5e (leída del PDF rellenable)
+function dnd5eSheetHTML(c){
+  var s=c.stats||{},ab=s.abilities||{},mods=s.mods||{};
+  function mod(k){
+    if(mods[k])return mods[k];
+    var v=ab[k]; if(v==null)return '';
+    var n=Math.floor((v-10)/2); return (n>=0?'+':'')+n;
+  }
+  function block(t){ return esc(t).replace(/\n/g,'<br>'); }
+  var h='<div class="sh-name">'+esc(c.name)+'</div>';
+  var meta=[s.race,s.paths,s.background,s.alignment].filter(Boolean).map(esc).join(' · ');
+  if(meta)h+='<div class="sh-meta">'+meta+'</div>';
+  h+='<div class="sh-attrs" style="grid-template-columns:repeat(6,1fr)">'+['STR','DEX','CON','INT','WIS','CHA'].map(function(k){
+    return '<div class="sh-col" style="text-align:center;padding:5px 2px"><div class="sh-col-h">'+k+'</div>'
+      +'<div style="font-family:\'Cinzel\',serif;font-size:15px">'+(ab[k]==null?'—':ab[k])+'</div>'
+      +'<div style="font-size:11px;color:var(--text3)">'+esc(mod(k))+'</div></div>';
+  }).join('')+'</div>';
+  h+='<div class="sh-res"><span>Vida <b style="color:#e05050">'+c.vida_max+'</b></span>'
+    +(s.ac?'<span>CA <b style="color:#6aaae8">'+esc(s.ac)+'</b></span>':'')
+    +(s.initiative?'<span>Iniciativa <b style="color:var(--gold)">'+esc(s.initiative)+'</b></span>':'')
+    +(s.speed?'<span>Velocidad <b>'+esc(s.speed)+'</b></span>':'')
+    +(s.prof?'<span>Prof. <b>'+esc(s.prof)+'</b></span>':'')+'</div>';
+  h+=shLn('Percepción pasiva',s.passive)+shLn('Hit dice',s.hd);
+  var saves=Object.keys(s.saves||{}).map(function(k){return '<span class="chip">'+k+' '+esc(s.saves[k])+'</span>';}).join('');
+  if(saves)h+='<div class="sh-h">Salvaciones</div><div class="chips">'+saves+'</div>';
+  var sk=(s.skills||[]).map(function(x){return '<span class="chip">'+esc(x.name)+' '+esc(x.value)+'</span>';}).join('');
+  if(sk)h+='<div class="sh-h">Habilidades</div><div class="chips">'+sk+'</div>';
+  if((s.attacks||[]).length)h+='<div class="sh-h">Ataques</div>'+s.attacks.map(function(a){
+    return '<div class="sh-item"><span class="n">'+esc(a.name)+'</span> '+esc(a.bonus||'')+(a.damage?' · '+esc(a.damage):'')+'</div>';}).join('');
+  if(s.attacks_text)h+='<div class="sh-item">'+block(s.attacks_text)+'</div>';
+  var sc=s.spellcasting||{};
+  if(sc.class||sc.dc||Object.keys(s.spells||{}).length){
+    h+='<div class="sh-h">Conjuros</div>';
+    var scl=[sc.class,(sc.ability?'('+sc.ability+')':''),(sc.dc?'DC '+sc.dc:''),(sc.atk?'ataque '+sc.atk:'')].filter(Boolean).join(' · ');
+    if(scl)h+='<div class="sh-line">'+esc(scl)+'</div>';
+    Object.keys(s.spells||{}).sort(function(a,b){return a-b;}).forEach(function(l){
+      h+='<div class="sh-line"><span class="l">'+(l==='0'?'Trucos':'Nivel '+l)+':</span> '+(s.spells[l]||[]).map(esc).join(', ')+'</div>';});
+  }
+  if(s.features)h+='<div class="sh-h">Rasgos y aptitudes</div><div class="sh-item">'+block(s.features)+'</div>';
+  if(s.features2)h+='<div class="sh-item">'+block(s.features2)+'</div>';
+  if(s.prof_lang)h+='<div class="sh-h">Competencias e idiomas</div><div class="sh-item">'+block(s.prof_lang)+'</div>';
+  if(s.equipment)h+='<div class="sh-h">Equipo</div><div class="sh-item">'+block(s.equipment)+'</div>';
+  return h;
+}
 // ficha de personaje (formato PDF)
 function charSheetHTML(c){
+  if((c.stats||{}).dnd) return dnd5eSheetHTML(c);
   var s=c.stats||{},a=s.attributes||{},d=s.defenses||{};
   var h='<div class="sh-name">'+esc(c.name)+'</div>';
   if(s.paths||s.ancestry||s.level) h+='<div class="sh-meta">'+[s.ancestry,s.paths,(s.level?'Nivel '+s.level:'')].filter(Boolean).map(esc).join(' · ')+'</div>';
@@ -446,11 +506,15 @@ function card(p,enemyView){
   var acted=p.turn==='both'?(p.acted&&p.acted_slow):p.acted;
   var ti=turnInfo(p);
   var col=p.faction_color||'';
+  var dnd=isDndCombat();
+  var turnTag=dnd
+    ? '<span class="turn-tag" style="color:var(--gold);border-color:var(--gold)">⚡ '+(p.initiative==null?'—':p.initiative)+'</span>'
+    : (enemyView?'':'<span class="turn-tag '+ti.cls+'">'+ti.lbl+'</span>');
   return '<div class="card'+(p.defeated?' defeated':'')+(acted?' acted':'')+'"'+(col?' style="border-left:3px solid '+col+'"':'')+'>'
     +'<div class="cname">'+(col?'<span class="color-dot" style="background:'+col+'"></span>':'')+esc(p.name)+'</div>'
     +(p.kind==='pet'?'<div class="ctype">🐾 mascota'+(p.owner_name?' de '+esc(p.owner_name):'')+'</div>':'')
-    +(enemyView?'':(p.tipo?'<div class="ctype">'+esc(p.tipo)+'</div>':''))
-    +(enemyView?'':'<span class="turn-tag '+ti.cls+'">'+ti.lbl+'</span>')
+    +(enemyView&&!dnd?'':(p.tipo?'<div class="ctype">'+esc(p.tipo)+'</div>':''))
+    +turnTag
     +'<div class="health-text" style="color:'+h.c+'">'+h.t+'</div>'
     +'<div class="hbar"><div class="hbar-fill" style="background:'+h.c+'"></div></div>'
     +(t?'<div class="stags">'+t+'</div>':'')
@@ -476,16 +540,33 @@ function render(combat){
   document.getElementById('noCombat').style.display=active?'none':'';
   document.getElementById('activeCombat').style.display=active?'':'none';
   document.getElementById('combBadge').style.display=active?'':'none';
+  var isDnd=(combat&&combat.system?combat.system:SYSTEM)==='dnd';
+  document.getElementById('phaseBarP').style.display=isDnd?'none':'';
   if(active){
     var myUid=renderMe(combat);
-    var pl=combat.participants.filter(function(p){return (p.kind==='player'||p.kind==='pet')&&p.user_id!==myUid;});
-    var en=combat.participants.filter(function(p){return p.kind==='enemy'&&!p.hidden;});
-    // los personajes se ordenan por turno; los enemigos quedan en orden fijo
-    // (no por turno) para no revelar quién es rápido o lento
-    pl.sort(function(a,b){return (a.turn==='slow'?1:0)-(b.turn==='slow'?1:0);});
-    document.getElementById('playersLbl').style.display=pl.length?'':'none';
-    document.getElementById('playersGrid').innerHTML=pl.map(card).join('');
-    document.getElementById('enemiesGrid').innerHTML=en.map(function(p){return card(p,true);}).join('');
+    if(isDnd){
+      // D&D: todos juntos, ordenados por iniciativa (mayor primero)
+      var others=combat.participants.filter(function(p){
+        return !((p.kind==='player'||p.kind==='pet')&&p.user_id===myUid) && !(p.kind==='enemy'&&p.hidden);
+      });
+      others.sort(function(a,b){return initOf(b)-initOf(a);});
+      document.getElementById('playersLbl').textContent='Orden de iniciativa';
+      document.getElementById('playersLbl').style.display=others.length?'':'none';
+      document.getElementById('playersGrid').innerHTML=others.map(function(p){return card(p,p.kind==='enemy');}).join('');
+      document.getElementById('enemiesLbl').style.display='none';
+      document.getElementById('enemiesGrid').innerHTML='';
+    }else{
+      var pl=combat.participants.filter(function(p){return (p.kind==='player'||p.kind==='pet')&&p.user_id!==myUid;});
+      var en=combat.participants.filter(function(p){return p.kind==='enemy'&&!p.hidden;});
+      // los personajes se ordenan por turno; los enemigos quedan en orden fijo
+      // (no por turno) para no revelar quién es rápido o lento
+      pl.sort(function(a,b){return (a.turn==='slow'?1:0)-(b.turn==='slow'?1:0);});
+      document.getElementById('playersLbl').textContent='Personajes';
+      document.getElementById('playersLbl').style.display=pl.length?'':'none';
+      document.getElementById('enemiesLbl').style.display='';
+      document.getElementById('playersGrid').innerHTML=pl.map(card).join('');
+      document.getElementById('enemiesGrid').innerHTML=en.map(function(p){return card(p,true);}).join('');
+    }
   }else{
     document.getElementById('mePanel').innerHTML='';
   }
@@ -827,7 +908,7 @@ function renderRoster(){
         +'<button class="btn-sheet" onclick="openPets()">🐾 Mascotas</button>'
         +'<label class="btn-sheet" style="cursor:pointer">🖼 Imagen<input type="file" accept="image/*" hidden onchange="uploadImg(this)"/></label>'
         +(c.has_image?'<button class="btn-sheet" onclick="removeImg()">Quitar imagen</button>':'')
-        +(SYSTEM==='dnd'?'':'<label class="btn-sheet" style="cursor:pointer">⭳ Actualizar PDF<input type="file" accept="application/pdf" hidden onchange="reimportPDF(this)"/></label>')
+        +'<label class="btn-sheet" style="cursor:pointer">⭳ Actualizar PDF<input type="file" accept="application/pdf" hidden onchange="reimportPDF(this)"/></label>'
         +(c.has_pdf?'<a class="btn-sheet" href="/api/characters/'+c.id+'/pdf" target="_blank">Ver PDF</a>':'')
       +'</div>'
       +'<div class="me-card">'

@@ -266,11 +266,12 @@ function openJoin(cid){
   var iv=INVITES.find(function(x){return x.campaign_id===cid;});
   var name=iv?iv.name:'';
   var dnd=iv&&iv.system==='dnd';
-  var pdfBlock=dnd?''
-    :'<div class="card-actions" style="margin:2px 0 14px">'
+  var pdfBlock='<div class="card-actions" style="margin:2px 0 14px">'
+      +(dnd?'<a class="btn" href="/static/5e_sheet.pdf" download="Ficha_DnD_5e.pdf">⭱ Descargar ficha vacía</a>':'')
       +'<button class="btn accent" onclick="document.getElementById(\'joinPdf\').click()">⭳ Subir ficha PDF</button>'
       +'<input type="file" id="joinPdf" accept="application/pdf" style="display:none" onchange="joinUpload('+cid+',this)"/>'
     +'</div>'
+    +(dnd?'<div style="font-size:12px;color:var(--text3);font-style:italic;margin-bottom:10px">Descargá la ficha rellenable de D&D 5e, completala (con Adobe/lector de PDF) y subila: se leen tus stats, vida y spell slots.</div>':'')
     +'<div style="border-top:1px solid var(--border);padding-top:12px;font-size:13px;color:var(--text3);font-style:italic;margin-bottom:10px">…o cargalo a mano:</div>';
   var statLabel=dnd?'Vida máx':'Vida / Focus / Investidura máx';
   var statInputs='<input class="fi" id="j-vida" type="number" value="20" title="Vida máx" style="width:70px"/>'

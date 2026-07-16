@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from ..auth import current_user
 from ..cosmere_import import ImportError_, parse_statblock
 from ..database import db
+from ..dnd_pdf import parse_dnd_pdf
 from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
                       LiveStat, LiveStatus, MarcosChange, MarcosSet, PetImportIn,
                       SlotsConfigIn, SlotSpend)
@@ -74,13 +75,37 @@ def _link_membership(conn, campaign_id, user: dict, char_id: int):
     )
 
 
-def _require_cosmere(conn, campaign_id):
-    """La ficha PDF es del sistema Cosmere: en campañas de D&D el PJ se carga a mano."""
+def _campaign_system(conn, campaign_id) -> str:
+    """Sistema de la campaña (cosmere | dnd): decide qué parser de PDF usar."""
     if not campaign_id:
-        return
+        return "cosmere"
     c = conn.execute("SELECT system FROM campaigns WHERE id=?", (campaign_id,)).fetchone()
-    if c and (c["system"] or "cosmere") == "dnd":
-        raise HTTPException(400, "Esta campaña es de D&D: el personaje se carga a mano, sin PDF")
+    return (c["system"] if c else None) or "cosmere"
+
+
+def _parse_sheet_pdf(system: str, data: bytes) -> dict:
+    """Parsea la ficha según el sistema. Devuelve el mismo shape para ambos:
+    name, vida_max, vida, focus_max, focus, inv_max, inv, sheet y slots (dnd)."""
+    if system == "dnd":
+        p = parse_dnd_pdf(data)
+        return {"name": p["name"], "vida_max": p["vida_max"], "vida": p["vida"],
+                "focus_max": 0, "focus": 0, "inv_max": 0, "inv": 0,
+                "sheet": p["sheet"], "slots": p["slots"]}
+    p = parse_character_pdf(data)
+    p["slots"] = None
+    return p
+
+
+def _apply_pdf_slots(conn, char_id: int, slots):
+    """Precarga los spell slots leídos del PDF en dnd_resources (los contadores
+    personalizados del jugador no se tocan)."""
+    if slots is None:
+        return
+    row = conn.execute("SELECT dnd_resources FROM characters WHERE id=?", (char_id,)).fetchone()
+    d = json.loads((row["dnd_resources"] if row else None) or "{}")
+    d.setdefault("counters", [])
+    d["slots"] = slots
+    conn.execute("UPDATE characters SET dnd_resources=? WHERE id=?", (json.dumps(d), char_id))
 
 
 def _store_extracted_image(conn, char_id: int, pdf_bytes: bytes):
@@ -150,19 +175,22 @@ def update_character(cid: int, c: CharacterIn, user=Depends(current_user)):
 async def reimport_pdf(cid: int, file: UploadFile = File(...), user=Depends(current_user)):
     """Reemplaza la ficha PDF de un personaje existente y re-extrae sus datos."""
     data = await file.read()
+    with db() as conn:
+        r = _owned(conn, cid, user)
+        system = _campaign_system(conn, r["campaign_id"])
     try:
-        p = parse_character_pdf(data)
+        p = _parse_sheet_pdf(system, data)
     except ValueError as e:
         raise HTTPException(400, str(e))
     with db() as conn:
-        r = _owned(conn, cid, user)
-        _require_cosmere(conn, r["campaign_id"])
+        _owned(conn, cid, user)
         conn.execute(
             "UPDATE characters SET name=?, vida_max=?, focus_max=?, inv_max=?, "
             "vida=?, focus=?, inv=?, sheet=?, has_pdf=1 WHERE id=?",
             (p["name"], p["vida_max"], p["focus_max"], p["inv_max"],
              p["vida"], p["focus"], p["inv"], json.dumps(p["sheet"]), cid),
         )
+        _apply_pdf_slots(conn, cid, p["slots"])
         conn.execute(
             "INSERT INTO character_pdfs (character_id, pdf) VALUES (?,?) "
             "ON CONFLICT(character_id) DO UPDATE SET pdf=excluded.pdf",
@@ -186,15 +214,18 @@ def delete_character(cid: int, user=Depends(current_user)):
 
 @router.post("/import-pdf")
 async def import_pdf(campaign_id: int, file: UploadFile = File(...), user=Depends(current_user)):
-    """Crea un personaje para una campaña a partir de la ficha PDF."""
+    """Crea un personaje para una campaña a partir de la ficha PDF
+    (Cosmere o la ficha rellenable de D&D 5e, según el sistema de la campaña)."""
     data = await file.read()
+    with db() as conn:
+        _joinable_membership(conn, campaign_id, user)
+        system = _campaign_system(conn, campaign_id)
     try:
-        p = parse_character_pdf(data)
+        p = _parse_sheet_pdf(system, data)
     except ValueError as e:
         raise HTTPException(400, str(e))
     with db() as conn:
         _joinable_membership(conn, campaign_id, user)
-        _require_cosmere(conn, campaign_id)
         cur = conn.execute(
             "INSERT INTO characters (owner_id, campaign_id, name, vida_max, focus_max, inv_max, vida, focus, inv, statuses, sheet, has_pdf) "
             "VALUES (?,?,?,?,?,?,?,?,?,'[]',?,1)",
@@ -203,6 +234,7 @@ async def import_pdf(campaign_id: int, file: UploadFile = File(...), user=Depend
         )
         cid = cur.lastrowid
         conn.execute("INSERT INTO character_pdfs (character_id, pdf) VALUES (?,?)", (cid, data))
+        _apply_pdf_slots(conn, cid, p["slots"])
         _link_membership(conn, campaign_id, user, cid)
         _store_extracted_image(conn, cid, data)
     return {"id": cid, "name": p["name"]}
