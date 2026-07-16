@@ -385,7 +385,8 @@ select.fi{appearance:auto;}
     </div>
     <div class="row" style="margin-bottom:14px">
       <button class="btn" onclick="longRest()">🛌 Descanso largo</button>
-      <span style="font-size:12px;color:var(--text3);font-style:italic">Cura vida y focus a full, limpia estados y baja 1 día las heridas (la investidura ya no se recarga sola: la cargan con marcos).</span>
+      <button class="btn" id="shortRestBtn" style="display:none" onclick="shortRest()">🌙 Descanso corto</button>
+      <span style="font-size:12px;color:var(--text3);font-style:italic" id="restHint">Cura vida y focus a full, limpia estados y baja 1 día las heridas (la investidura ya no se recarga sola: la cargan con marcos).</span>
     </div>
     <div class="grid" id="membersGrid"></div>
     <div class="empty" id="membersEmpty">Sin jugadores todavía. Invitá a alguien por su nombre de usuario.</div>
@@ -472,6 +473,7 @@ select.fi{appearance:auto;}
 // ═══════════ campaña + estado ═══════════
 var CID=parseInt(location.pathname.split('/').filter(Boolean).pop());
 var API='/api/campaigns/'+CID;
+var SYSTEM='cosmere';   // sistema de la campaña (cosmere | dnd)
 var enemies=[], encounters=[], combat={active:false,participants:[]};
 var POS=['Determined','Enhanced','Empowered','Focus'];
 var NEG=['Restrained','Surprised','Stunned','Slowed','Disoriented','Prone','Exhausted','Unconscious','Immobilized','Afflicted'];
@@ -491,6 +493,11 @@ async function loadCampaign(){
     var c=await api(API);
     document.getElementById('campName').textContent=c.name;
     if(!c.is_dm){alert('Esta campaña no es tuya.');location.href='/';}
+    SYSTEM=c.system||'cosmere';
+    if(SYSTEM==='dnd'){
+      document.getElementById('shortRestBtn').style.display='';
+      document.getElementById('restHint').textContent='Largo: cura vida a full, limpia estados, baja heridas y recupera conjuros y contadores. Corto: solo recupera los contadores de descanso corto.';
+    }
   }catch(e){}
 }
 
@@ -571,10 +578,10 @@ function memberCard(m){
       +'<button class="del-btn" onclick="kickMember('+m.user_id+')" title="Sacar de la campaña">✕</button></div>'
     +'<div class="mem-bars">'
       +memBar('Vida',m.vida,m.vida_max,'#e05050')
-      +memBar('Focus',m.focus,m.focus_max,'#6aaae8')
-      +memBar('Inv',m.inv,m.inv_max,'#aa8aec')+'</div>'
+      +(SYSTEM==='dnd'?'':memBar('Focus',m.focus,m.focus_max,'#6aaae8')
+        +memBar('Inv',m.inv,m.inv_max,'#aa8aec'))+'</div>'
     +memChips(m)
-    +marcosDmBlock(m)
+    +(SYSTEM==='dnd'?dndDmBlock(m):marcosDmBlock(m))
     +'<div class="card-actions" style="margin-top:10px">'
       +'<button class="btn sm" onclick="viewMemberSheet('+m.user_id+')">Ver ficha</button>'
       +(m.has_pdf?'<a class="btn sm" href="/api/characters/'+m.character_id+'/pdf" target="_blank">PDF</a>':'')
@@ -604,7 +611,37 @@ async function dmMarcosLight(uid,sign){
   await api(API+'/members/'+uid+'/marcos/light','POST',{delta:sign*amt});
   loadMembers();
 }
-async function longRest(){
+// ─── D&D: spell slots y contadores del jugador (vista DM) ───
+function dndDmBlock(m){
+  var d=m.dnd||{}, slots=d.slots||{}, ctrs=d.counters||[];
+  var rows='';
+  Object.keys(slots).map(Number).sort(function(a,b){return a-b;}).forEach(function(n){
+    var s=slots[String(n)];
+    rows+='<div class="mem-bar-row"><span class="mem-bar-l">✨ N'+n+'</span>'
+      +'<button class="btn sm" onclick="dmSlot('+m.character_id+','+n+',-1)">−</button>'
+      +'<span class="mem-bar-v" style="width:auto;color:var(--gold2)">'+s.cur+' / '+s.max+'</span>'
+      +'<button class="btn sm" onclick="dmSlot('+m.character_id+','+n+',1)">+</button></div>';
+  });
+  ctrs.forEach(function(k){
+    rows+='<div class="mem-bar-row"><span class="mem-bar-l" style="width:auto;max-width:110px;overflow:hidden;text-overflow:ellipsis" title="'+esc(k.name)+'">'+esc(k.name)+'</span>'
+      +'<button class="btn sm" onclick="dmCounter('+m.character_id+',\''+k.id+'\',-1)">−</button>'
+      +'<span class="mem-bar-v" style="width:auto;color:var(--gold2)">'+k.cur+' / '+k.max+'</span>'
+      +'<button class="btn sm" onclick="dmCounter('+m.character_id+',\''+k.id+'\',1)">+</button></div>';
+  });
+  if(!rows) rows='<div style="font-size:11px;color:var(--text3);font-style:italic">Sin slots ni contadores configurados.</div>';
+  return '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">'
+    +'<div style="font-size:12px;margin-bottom:6px">🎲 Recursos D&D</div>'
+    +'<div class="mem-bars">'+rows+'</div></div>';
+}
+async function dmSlot(charId,level,delta){
+  await api('/api/characters/'+charId+'/slots/spend','POST',{level:level,delta:delta});
+  loadMembers();
+}
+async function dmCounter(charId,kid,delta){
+  await api('/api/characters/'+charId+'/counters/'+kid+'/value','POST',{delta:delta});
+  loadMembers();
+}
+async function _restModal(title,desc,applyFn){
   var members=await api(API+'/members');
   var accepted=members.filter(function(m){return m.status==='accepted'&&m.character_id;});
   if(!accepted.length){alert('No hay jugadores aceptados con personaje.');return;}
@@ -614,21 +651,38 @@ async function longRest(){
       +'<span>'+esc(m.username)+' <span style="color:var(--text3)">— '+esc(m.character_name||'sin personaje')+'</span></span></label>';
   }).join('');
   document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
-    +'<div class="cname" style="font-size:18px">🛌 Descanso largo</div>'
-    +'<div style="font-size:13px;color:var(--text2);margin:6px 0 12px">Cura vida y focus a full y limpia estados a los jugadores elegidos y sus mascotas, y baja 1 día sus heridas (las permanentes no cambian). La investidura ya no se recarga: la cargan con sus marcos. <b>Destildá</b> a quien quieras dejar afuera.</div>'
+    +'<div class="cname" style="font-size:18px">'+title+'</div>'
+    +'<div style="font-size:13px;color:var(--text2);margin:6px 0 12px">'+desc+' <b>Destildá</b> a quien quieras dejar afuera.</div>'
     +'<div>'+rows+'</div>'
-    +'<div class="form-actions" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="doLongRest()">Aplicar descanso</button></div>';
+    +'<div class="form-actions" style="margin-top:14px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="'+applyFn+'()">Aplicar descanso</button></div>';
   document.getElementById('overlay').classList.add('on');
 }
+function longRest(){
+  var desc=SYSTEM==='dnd'
+    ?'Cura vida a full, limpia estados, baja 1 día las heridas (las permanentes no cambian) y recupera todos los spell slots y los contadores de descanso largo y corto.'
+    :'Cura vida y focus a full y limpia estados a los jugadores elegidos y sus mascotas, y baja 1 día sus heridas (las permanentes no cambian). La investidura ya no se recarga: la cargan con sus marcos.';
+  _restModal('🛌 Descanso largo',desc,'doLongRest');
+}
+function shortRest(){
+  _restModal('🌙 Descanso corto','Recupera solo los contadores de descanso corto (ki, channel divinity, etc.). No cura vida ni devuelve spell slots.','doShortRest');
+}
+function _restExcludes(){
+  return [].slice.call(document.querySelectorAll('.lr-chk:not(:checked)')).map(function(c){return parseInt(c.value);});
+}
 async function doLongRest(){
-  var exclude=[].slice.call(document.querySelectorAll('.lr-chk:not(:checked)')).map(function(c){return parseInt(c.value);});
-  var r=await api(API+'/long_rest','POST',{exclude:exclude});
+  var r=await api(API+'/long_rest','POST',{exclude:_restExcludes()});
   closeModal();
   loadMembers();
-  if(r.state) renderStorm(r.state); else loadStorm();
+  if(SYSTEM!=='dnd'){ if(r.state) renderStorm(r.state); else loadStorm(); }
   var msg='Descanso largo aplicado a '+r.characters+' personaje(s).';
   if(r.storm&&r.storm.stormed) msg+='\n\n⚡ ¡Alta tormenta! Cayó el día '+r.storm.storm_day+' '+r.storm.storm_moment+'.';
   alert(msg);
+}
+async function doShortRest(){
+  var r=await api(API+'/short_rest','POST',{exclude:_restExcludes()});
+  closeModal();
+  loadMembers();
+  alert('Descanso corto aplicado a '+r.characters+' personaje(s).');
 }
 
 // ─── Tracker de altas tormentas (DM: ve día y momento exactos) ───
@@ -1519,8 +1573,8 @@ function participantCard(p){
     +(p.tipo?'<div class="ctype">'+esc(p.tipo)+'</div>':'')
     +(p.hidden?'<div class="hidden-mark">Oculto a jugadores</div>':'')
     +statBlock(p,'vida','#e05050','+HP','−HP','heal','dmg')
-    +statBlock(p,'focus','#6aaae8','+F','−F','heal','fu')
-    +statBlock(p,'inv','#aa8aec','+I','−I','heal','iu')
+    +(SYSTEM==='dnd'&&p.kind==='player'?'':statBlock(p,'focus','#6aaae8','+F','−F','heal','fu')
+      +statBlock(p,'inv','#aa8aec','+I','−I','heal','iu'))
     +'<div class="spills">'+statusBtns+'</div>'
     +ficha
     +acciones
@@ -1577,11 +1631,10 @@ function toggleSection(gridId,toggleId,label){
 }
 
 // init
-loadCampaign();
+loadCampaign().then(function(){ if(SYSTEM!=='dnd') loadStorm(); });
 connectWS();
 renderCombatSetup();
 loadEnemies();
-loadStorm();
 </script>
 </body>
 </html>

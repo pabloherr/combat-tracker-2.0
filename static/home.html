@@ -90,6 +90,10 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
     <div class="section-sub">Creá campañas, invitá jugadores y armá encuentros.</div>
     <div class="row">
       <input class="fi" id="campName" placeholder="Nombre de la campaña" style="min-width:240px"/>
+      <select class="fi" id="campSystem" title="Sistema de juego">
+        <option value="cosmere">Cosmere RPG</option>
+        <option value="dnd">D&amp;D 5e</option>
+      </select>
       <button class="btn accent" onclick="createCampaign()">+ Crear campaña</button>
     </div>
     <div class="grid" id="campGrid"></div>
@@ -190,7 +194,7 @@ async function saveAccount(){
 async function createCampaign(){
   var name=document.getElementById('campName').value.trim();
   if(!name){alert('Poné un nombre.');return;}
-  await api('/api/campaigns','POST',{name:name});
+  await api('/api/campaigns','POST',{name:name,system:document.getElementById('campSystem').value});
   document.getElementById('campName').value='';
   loadCampaigns();
 }
@@ -198,7 +202,8 @@ async function loadCampaigns(){
   var camps=await api('/api/campaigns');
   document.getElementById('campEmpty').style.display=camps.length?'none':'block';
   document.getElementById('campGrid').innerHTML=camps.map(function(c){
-    return '<div class="card"><div class="cname">'+esc(c.name)+'</div>'
+    return '<div class="card"><div class="cname">'+esc(c.name)
+      +' <span class="pill">'+(c.system==='dnd'?'D&D 5e':'Cosmere')+'</span></div>'
       +'<div class="cmeta">'+c.players+' jugador(es)</div>'
       +'<div class="card-actions">'
       +'<a class="btn accent sm" href="/campaign/'+c.id+'">Abrir (DM)</a>'
@@ -260,34 +265,39 @@ async function loadInvitations(){
 function openJoin(cid){
   var iv=INVITES.find(function(x){return x.campaign_id===cid;});
   var name=iv?iv.name:'';
-  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
-    +'<div class="cname" style="font-size:18px">Unirme a '+esc(name)+'</div>'
-    +'<div class="section-sub">Creá tu personaje para esta campaña: subí la ficha PDF o cargalo a mano.</div>'
-    +'<div class="card-actions" style="margin:2px 0 14px">'
+  var dnd=iv&&iv.system==='dnd';
+  var pdfBlock=dnd?''
+    :'<div class="card-actions" style="margin:2px 0 14px">'
       +'<button class="btn accent" onclick="document.getElementById(\'joinPdf\').click()">⭳ Subir ficha PDF</button>'
       +'<input type="file" id="joinPdf" accept="application/pdf" style="display:none" onchange="joinUpload('+cid+',this)"/>'
     +'</div>'
-    +'<div style="border-top:1px solid var(--border);padding-top:12px;font-size:13px;color:var(--text3);font-style:italic;margin-bottom:10px">…o cargalo a mano:</div>'
+    +'<div style="border-top:1px solid var(--border);padding-top:12px;font-size:13px;color:var(--text3);font-style:italic;margin-bottom:10px">…o cargalo a mano:</div>';
+  var statLabel=dnd?'Vida máx':'Vida / Focus / Investidura máx';
+  var statInputs='<input class="fi" id="j-vida" type="number" value="20" title="Vida máx" style="width:70px"/>'
+    +(dnd?'':'<input class="fi" id="j-focus" type="number" value="10" title="Focus máx" style="width:70px"/>'
+      +'<input class="fi" id="j-inv" type="number" value="0" title="Investidura máx" style="width:70px"/>');
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cname" style="font-size:18px">Unirme a '+esc(name)+'</div>'
+    +'<div class="section-sub">'+(dnd?'Creá tu personaje de D&D para esta campaña.':'Creá tu personaje para esta campaña: subí la ficha PDF o cargalo a mano.')+'</div>'
+    +pdfBlock
     +'<div style="display:flex;flex-direction:column;gap:9px">'
       +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nombre</span><input class="fi" id="j-name" style="flex:1;max-width:280px"/></label>'
-      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Clase / senda</span><input class="fi" id="j-class" style="flex:1;max-width:280px" placeholder="ej: Windrunner"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>'+(dnd?'Clase':'Clase / senda')+'</span><input class="fi" id="j-class" style="flex:1;max-width:280px" placeholder="'+(dnd?'ej: Mago':'ej: Windrunner')+'"/></label>'
       +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nivel</span><input class="fi" id="j-level" style="width:90px" placeholder="1"/></label>'
-      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Vida / Focus / Investidura máx</span><span style="display:flex;gap:6px">'
-        +'<input class="fi" id="j-vida" type="number" value="20" title="Vida máx" style="width:70px"/>'
-        +'<input class="fi" id="j-focus" type="number" value="10" title="Focus máx" style="width:70px"/>'
-        +'<input class="fi" id="j-inv" type="number" value="0" title="Investidura máx" style="width:70px"/></span></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>'+statLabel+'</span><span style="display:flex;gap:6px">'+statInputs+'</span></label>'
     +'</div>'
-    +'<div class="card-actions" style="justify-content:flex-end;margin-top:16px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="joinCreate('+cid+')">Crear personaje</button></div>';
+    +(dnd?'<div style="font-size:13px;color:var(--text3);font-style:italic;margin-top:10px">Los spell slots y contadores (furia, ki, etc.) se configuran después, desde la ficha del personaje.</div>':'')
+    +'<div class="card-actions" style="justify-content:flex-end;margin-top:16px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="joinCreate('+cid+','+(dnd?'true':'false')+')">Crear personaje</button></div>';
   document.getElementById('overlay').classList.add('on');
 }
-async function joinCreate(cid){
+async function joinCreate(cid,dnd){
   var name=document.getElementById('j-name').value.trim();
   if(!name){alert('Poné un nombre al personaje.');return;}
   await api('/api/characters','POST',{
     name:name, campaign_id:cid,
     vida_max:parseInt(document.getElementById('j-vida').value)||20,
-    focus_max:parseInt(document.getElementById('j-focus').value)||0,
-    inv_max:parseInt(document.getElementById('j-inv').value)||0,
+    focus_max:dnd?0:(parseInt(document.getElementById('j-focus').value)||0),
+    inv_max:dnd?0:(parseInt(document.getElementById('j-inv').value)||0),
     sheet:{paths:document.getElementById('j-class').value.trim(),level:document.getElementById('j-level').value.trim()}
   });
   closeModal();
