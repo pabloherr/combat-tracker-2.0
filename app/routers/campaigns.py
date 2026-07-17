@@ -132,9 +132,12 @@ def create_campaign(c: CampaignIn, user=Depends(current_user)):
     name = c.name.strip()
     if not name:
         raise HTTPException(400, "Poné un nombre a la campaña")
+    if c.system not in ("cosmere", "dnd"):
+        raise HTTPException(400, "Sistema desconocido")
     with db() as conn:
-        cur = conn.execute("INSERT INTO campaigns (name, dm_id) VALUES (?,?)", (name, user["id"]))
-        return {"id": cur.lastrowid, "name": name}
+        cur = conn.execute("INSERT INTO campaigns (name, dm_id, system) VALUES (?,?,?)",
+                           (name, user["id"], c.system))
+        return {"id": cur.lastrowid, "name": name, "system": c.system}
 
 
 @router.delete("/campaigns/{cid}")
@@ -150,7 +153,8 @@ def get_campaign(cid: int, user=Depends(current_user)):
     """Datos básicos de la campaña (para el DM). Incluye si el usuario es el DM."""
     with db() as conn:
         c = campaign_or_404(conn, cid)
-        return {"id": c["id"], "name": c["name"], "is_dm": c["dm_id"] == user["id"]}
+        return {"id": c["id"], "name": c["name"], "system": c["system"] or "cosmere",
+                "is_dm": c["dm_id"] == user["id"]}
 
 
 # ── Miembros (DM) ──────────────────────────────────────────
@@ -163,7 +167,7 @@ def list_members(cid: int, user=Depends(current_user)):
             "SELECT m.user_id, m.status, m.character_id, u.username, ch.name AS character_name, "
             "ch.has_pdf, ch.has_image, ch.marcos, ch.marcos_light, ch.sheet, "
             "ch.vida, ch.vida_max, ch.focus, ch.focus_max, ch.inv, ch.inv_max, "
-            "ch.statuses, ch.injuries "
+            "ch.statuses, ch.injuries, ch.dnd_resources "
             "FROM campaign_members m JOIN users u ON u.id=m.user_id "
             "LEFT JOIN characters ch ON ch.id=m.character_id "
             "WHERE m.campaign_id=? ORDER BY u.username",
@@ -178,9 +182,11 @@ def list_members(cid: int, user=Depends(current_user)):
                 d["nivel"] = sheet.get("level") or ""
                 d["statuses"] = json.loads(d.get("statuses") or "[]")
                 d["injuries"] = json.loads(d.get("injuries") or "[]")
+                d["dnd"] = json.loads(d.get("dnd_resources") or "{}")
                 d["has_pdf"] = bool(d.get("has_pdf"))
                 d["has_image"] = bool(d.get("has_image"))
             d.pop("sheet", None)
+            d.pop("dnd_resources", None)
             out.append(d)
         return out
 
@@ -302,7 +308,7 @@ def campaign_roster(cid: int, user=Depends(current_user)):
     """Estado en vivo de los personajes de la campaña (para gestionar fuera de
     combate y ver a los demás). Accesible al DM y a cualquier miembro aceptado."""
     with db() as conn:
-        require_access(conn, cid, user)
+        c, _ = require_access(conn, cid, user)
         rows = conn.execute(
             "SELECT m.user_id, u.username, ch.* FROM campaign_members m "
             "JOIN users u ON u.id=m.user_id "
@@ -337,10 +343,11 @@ def campaign_roster(cid: int, user=Depends(current_user)):
                     "has_image": bool(r["has_image"]),
                     "marcos": r["marcos"] or 0,
                     "marcos_light": r["marcos_light"] or 0,
+                    "dnd": json.loads(r["dnd_resources"] or "{}"),
                 },
                 "pets": pets,
             })
-        return {"members": members}
+        return {"system": c["system"] or "cosmere", "members": members}
 
 
 @router.post("/campaigns/{cid}/long_rest")
@@ -350,7 +357,8 @@ def long_rest(cid: int, payload: LongRestIn, user=Depends(current_user)):
     excluir jugadores con `exclude` (lista de user_id)."""
     excl = set(payload.exclude or [])
     with db() as conn:
-        require_dm(conn, cid, user)
+        c = require_dm(conn, cid, user)
+        is_dnd = (c["system"] or "cosmere") == "dnd"
         chars = conn.execute(
             "SELECT m.user_id, ch.* FROM campaign_members m JOIN characters ch ON ch.id=m.character_id "
             "WHERE m.campaign_id=? AND m.status='accepted' AND m.character_id IS NOT NULL",
@@ -361,12 +369,28 @@ def long_rest(cid: int, payload: LongRestIn, user=Depends(current_user)):
             if ch["user_id"] in excl:
                 continue
             done += 1
-            # El descanso ya NO recarga investidura: el jugador la carga cuando quiere
-            # desde sus marcos. Sí cura vida/focus y limpia estados.
-            conn.execute(
-                "UPDATE characters SET vida=vida_max, focus=focus_max, statuses='[]' WHERE id=?",
-                (ch["id"],),
-            )
+            if is_dnd:
+                # D&D: cura vida y limpia estados (focus/inv no se usan). Recupera
+                # todos los spell slots y los contadores de descanso largo o corto.
+                conn.execute(
+                    "UPDATE characters SET vida=vida_max, statuses='[]' WHERE id=?",
+                    (ch["id"],),
+                )
+                d = json.loads(ch["dnd_resources"] or "{}")
+                for slot in (d.get("slots") or {}).values():
+                    slot["cur"] = slot.get("max", 0)
+                for k in (d.get("counters") or []):
+                    if k.get("recovery") in ("long", "short"):
+                        k["cur"] = k.get("max", 0)
+                conn.execute("UPDATE characters SET dnd_resources=? WHERE id=?",
+                             (json.dumps(d), ch["id"]))
+            else:
+                # El descanso ya NO recarga investidura: el jugador la carga cuando quiere
+                # desde sus marcos. Sí cura vida/focus y limpia estados.
+                conn.execute(
+                    "UPDATE characters SET vida=vida_max, focus=focus_max, statuses='[]' WHERE id=?",
+                    (ch["id"],),
+                )
             conn.execute(
                 "UPDATE pets SET vida=vida_max, focus=focus_max, inv=inv_max, statuses='[]' WHERE character_id=?",
                 (ch["id"],),
@@ -381,9 +405,40 @@ def long_rest(cid: int, payload: LongRestIn, user=Depends(current_user)):
                 if it["days"] >= 0:      # al bajar de 0, la herida se curó
                     kept.append(it)
             conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(kept), ch["id"]))
+        if is_dnd:
+            return {"ok": True, "characters": done}
         storm = _advance_storm(conn, cid)   # el día pasa para todos, con o sin descanso
         _marcos_tick(conn, cid, storm["stormed"], _get_storm(conn, cid)["day"])
     return {"ok": True, "characters": done, "storm": storm}
+
+
+@router.post("/campaigns/{cid}/short_rest")
+def short_rest(cid: int, payload: LongRestIn, user=Depends(current_user)):
+    """Descanso corto (DM, solo D&D): recupera únicamente los contadores con
+    recuperación 'short'. No cura vida ni devuelve spell slots."""
+    excl = set(payload.exclude or [])
+    with db() as conn:
+        c = require_dm(conn, cid, user)
+        if (c["system"] or "cosmere") != "dnd":
+            raise HTTPException(400, "El descanso corto solo existe en campañas de D&D")
+        chars = conn.execute(
+            "SELECT m.user_id, ch.id, ch.dnd_resources FROM campaign_members m "
+            "JOIN characters ch ON ch.id=m.character_id "
+            "WHERE m.campaign_id=? AND m.status='accepted' AND m.character_id IS NOT NULL",
+            (cid,),
+        ).fetchall()
+        done = 0
+        for ch in chars:
+            if ch["user_id"] in excl:
+                continue
+            done += 1
+            d = json.loads(ch["dnd_resources"] or "{}")
+            for k in (d.get("counters") or []):
+                if k.get("recovery") == "short":
+                    k["cur"] = k.get("max", 0)
+            conn.execute("UPDATE characters SET dnd_resources=? WHERE id=?",
+                         (json.dumps(d), ch["id"]))
+    return {"ok": True, "characters": done}
 
 
 def _storm_view(row, is_dm: bool, cfg: dict) -> dict:
@@ -485,7 +540,7 @@ def put_config(cid: int, c: ConfigIn, user=Depends(current_user)):
 def my_invitations(user=Depends(current_user)):
     with db() as conn:
         rows = conn.execute(
-            "SELECT c.id AS campaign_id, c.name, u.username AS dm "
+            "SELECT c.id AS campaign_id, c.name, c.system, u.username AS dm "
             "FROM campaign_members m JOIN campaigns c ON c.id=m.campaign_id "
             "JOIN users u ON u.id=c.dm_id "
             "WHERE m.user_id=? AND m.status='invited' ORDER BY m.created_at DESC",
@@ -498,7 +553,7 @@ def my_invitations(user=Depends(current_user)):
 def my_campaigns_as_player(user=Depends(current_user)):
     with db() as conn:
         rows = conn.execute(
-            "SELECT c.id, c.name, u.username AS dm, m.character_id, ch.name AS character_name "
+            "SELECT c.id, c.name, c.system, u.username AS dm, m.character_id, ch.name AS character_name "
             "FROM campaign_members m JOIN campaigns c ON c.id=m.campaign_id "
             "JOIN users u ON u.id=c.dm_id "
             "LEFT JOIN characters ch ON ch.id=m.character_id "

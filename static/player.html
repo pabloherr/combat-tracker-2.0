@@ -160,6 +160,20 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .marcos-w-inp{width:100%;background:var(--bg2);border:none;color:inherit;font-family:'Cinzel',serif;font-size:15px;text-align:center;outline:none;padding:0;-moz-appearance:textfield;}
 .marcos-w-inp::-webkit-outer-spin-button,.marcos-w-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
 .marcos-w-lbl{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin:14px 0 6px;}
+/* D&D: spell slots y contadores */
+.dnd-slot-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);}
+.dnd-slot-lvl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);width:58px;flex:none;}
+.dnd-pips{display:flex;flex-wrap:wrap;gap:5px;flex:1;}
+.slot-pip{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--gold);cursor:pointer;background:transparent;display:inline-block;padding:0;}
+.slot-pip.on{background:var(--gold);}
+.slot-pip:active{transform:scale(.88);}
+.dnd-slot-n{font-family:'Cinzel',serif;font-size:13px;color:var(--gold2);width:40px;text-align:right;flex:none;}
+.dnd-ctr-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.dnd-ctr-name{flex:1;min-width:100px;}
+.dnd-ctr-v{font-family:'Cinzel',serif;font-size:15px;color:var(--gold2);white-space:nowrap;min-width:52px;text-align:center;}
+.dnd-ctr-btn{width:36px;height:32px;border:.5px solid var(--border);border-radius:var(--r);font-family:'Cinzel',serif;font-size:17px;cursor:pointer;background:var(--bg3);}
+.dnd-ctr-btn:active{background:var(--bg4);}
+.dnd-rec-tag{font-size:9px;font-family:'Cinzel',serif;letter-spacing:.05em;text-transform:uppercase;padding:1px 7px;border-radius:20px;border:.5px solid var(--border2);color:var(--text3);white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -198,7 +212,7 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
   <div id="tabCombate" class="tabpanel" style="display:none">
     <div class="empty-msg" id="noCombat">No hay combate activo. Cuando el DM lo inicie, aparece acá.</div>
     <div id="activeCombat" style="display:none">
-      <div class="phase-bar">
+      <div class="phase-bar" id="phaseBarP">
         <div class="phase p1">1 · PJ rápidos</div>
         <div class="phase p2">2 · Enemigos rápidos</div>
         <div class="phase p3">3 · PJ lentos</div>
@@ -210,7 +224,7 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
       <div class="section-lbl" id="playersLbl">Personajes</div>
       <div class="grid" id="playersGrid"></div>
 
-      <div class="section-lbl">Enemigos</div>
+      <div class="section-lbl" id="enemiesLbl">Enemigos</div>
       <div class="grid" id="enemiesGrid"></div>
     </div>
   </div>
@@ -255,6 +269,15 @@ async function chStat(uid,stat,sign){
 async function chStatus(uid,status){await api(API+'/combat/status','POST',{uid:uid,status:status});}
 async function rmStatus(uid,status){await api(API+'/combat/status/remove_one','POST',{uid:uid,status:status});}
 async function chTurn(uid,turn){await api(API+'/combat/turn','POST',{uid:uid,turn:turn});}
+// D&D: iniciativa
+function isDndCombat(){ return ((COMBAT&&COMBAT.system)||SYSTEM)==='dnd'; }
+function initOf(p){ return p.initiative==null?-999:p.initiative; }
+async function saveInit(uid){
+  var el=document.getElementById('init-'+uid);
+  var v=parseInt(el&&el.value);
+  if(isNaN(v)){alert('Poné tu iniciativa (d20 + modificador de DEX).');return;}
+  await api(API+'/combat/initiative','POST',{uid:uid,value:v});
+}
 
 // control de un stat: [−] a la izquierda, [+] a la derecha
 function statCtl(p,stat,label,color){
@@ -288,6 +311,7 @@ function statusPanel(p){
   return '<div class="mstatuses">'+btns+'</div>';
 }
 function meControls(p){
+  if(SYSTEM==='dnd') return statCtl(p,'vida','Vida','#e05050')+statusPanel(p);
   return statCtl(p,'vida','Vida','#e05050')
     +statCtl(p,'focus','Focus','#6aaae8')
     +(p.inv_max>0?statCtl(p,'inv','Investidura','#aa8aec'):'')
@@ -296,7 +320,13 @@ function meControls(p){
 // tarjeta con controles (personaje propio o mascota propia)
 function controlCard(p,tagHTML,turnLabel,isPet,marcosHTML){
   var turnCtl;
-  if(isPet){
+  if(isDndCombat()){
+    // D&D: cada uno anota su iniciativa (los enemigos la tiran solos)
+    turnLabel='Iniciativa';
+    turnCtl='<span style="display:flex;gap:6px;align-items:center">'
+      +'<input type="number" class="oc-fi" style="width:70px" id="init-'+p.uid+'" value="'+(p.initiative==null?'':p.initiative)+'" placeholder="—"/>'
+      +'<button class="btn-sheet" onclick="saveInit(\''+p.uid+'\')">Anotar</button></span>';
+  }else if(isPet){
     // las mascotas toman turno al azar: se muestra pero no se edita
     var ti=turnInfo(p);
     turnCtl='<span class="turn-tag '+ti.cls+'">'+ti.lbl+'</span>';
@@ -325,7 +355,8 @@ function renderMe(combat){
   }
   var html='';
   var mc=meChar();
-  if(me) html+='<div class="section-lbl">Mi personaje</div>'+controlCard(me,'','Tu turno',false,mc?marcosWidget(mc):'');
+  if(me) html+='<div class="section-lbl">Mi personaje</div>'+controlCard(me,'','Tu turno',false,(mc&&SYSTEM!=='dnd')?marcosWidget(mc):'');
+  if(me&&mc&&SYSTEM==='dnd') html+='<div class="me-card" style="margin-top:10px">'+dndSlotsHTML(mc)+dndCountersHTML(mc)+'</div>';
   if(pets.length) html+='<div class="section-lbl">Mis mascotas</div>'
     +pets.map(function(pt){return controlCard(pt,' <span class="pet-tag">Mascota</span>','Turno',true);}).join('');
   // no pisar el panel si el jugador está editando algún campo (marcos, cantidades)
@@ -350,11 +381,56 @@ function openSheet(uid){
 }
 function shRes(p){
   return '<div class="sh-res"><span>Vida <b style="color:#e05050">'+p.vida_max+'</b></span>'
-    +'<span>Focus <b style="color:#6aaae8">'+p.focus_max+'</b></span>'
+    +(p.focus_max?'<span>Focus <b style="color:#6aaae8">'+p.focus_max+'</b></span>':'')
     +(p.inv_max?'<span>Investidura <b style="color:#aa8aec">'+p.inv_max+'</b></span>':'')+'</div>';
+}
+// ficha de personaje de D&D 5e (leída del PDF rellenable)
+function dnd5eSheetHTML(c){
+  var s=c.stats||{},ab=s.abilities||{},mods=s.mods||{};
+  function mod(k){
+    if(mods[k])return mods[k];
+    var v=ab[k]; if(v==null)return '';
+    var n=Math.floor((v-10)/2); return (n>=0?'+':'')+n;
+  }
+  function block(t){ return esc(t).replace(/\n/g,'<br>'); }
+  var h='<div class="sh-name">'+esc(c.name)+'</div>';
+  var meta=[s.race,s.paths,s.background,s.alignment].filter(Boolean).map(esc).join(' · ');
+  if(meta)h+='<div class="sh-meta">'+meta+'</div>';
+  h+='<div class="sh-attrs" style="grid-template-columns:repeat(6,1fr)">'+['STR','DEX','CON','INT','WIS','CHA'].map(function(k){
+    return '<div class="sh-col" style="text-align:center;padding:5px 2px"><div class="sh-col-h">'+k+'</div>'
+      +'<div style="font-family:\'Cinzel\',serif;font-size:15px">'+(ab[k]==null?'—':ab[k])+'</div>'
+      +'<div style="font-size:11px;color:var(--text3)">'+esc(mod(k))+'</div></div>';
+  }).join('')+'</div>';
+  h+='<div class="sh-res"><span>Vida <b style="color:#e05050">'+c.vida_max+'</b></span>'
+    +(s.ac?'<span>CA <b style="color:#6aaae8">'+esc(s.ac)+'</b></span>':'')
+    +(s.initiative?'<span>Iniciativa <b style="color:var(--gold)">'+esc(s.initiative)+'</b></span>':'')
+    +(s.speed?'<span>Velocidad <b>'+esc(s.speed)+'</b></span>':'')
+    +(s.prof?'<span>Prof. <b>'+esc(s.prof)+'</b></span>':'')+'</div>';
+  h+=shLn('Percepción pasiva',s.passive)+shLn('Hit dice',s.hd);
+  var saves=Object.keys(s.saves||{}).map(function(k){return '<span class="chip">'+k+' '+esc(s.saves[k])+'</span>';}).join('');
+  if(saves)h+='<div class="sh-h">Salvaciones</div><div class="chips">'+saves+'</div>';
+  var sk=(s.skills||[]).map(function(x){return '<span class="chip">'+esc(x.name)+' '+esc(x.value)+'</span>';}).join('');
+  if(sk)h+='<div class="sh-h">Habilidades</div><div class="chips">'+sk+'</div>';
+  if((s.attacks||[]).length)h+='<div class="sh-h">Ataques</div>'+s.attacks.map(function(a){
+    return '<div class="sh-item"><span class="n">'+esc(a.name)+'</span> '+esc(a.bonus||'')+(a.damage?' · '+esc(a.damage):'')+'</div>';}).join('');
+  if(s.attacks_text)h+='<div class="sh-item">'+block(s.attacks_text)+'</div>';
+  var sc=s.spellcasting||{};
+  if(sc.class||sc.dc||Object.keys(s.spells||{}).length){
+    h+='<div class="sh-h">Conjuros</div>';
+    var scl=[sc.class,(sc.ability?'('+sc.ability+')':''),(sc.dc?'DC '+sc.dc:''),(sc.atk?'ataque '+sc.atk:'')].filter(Boolean).join(' · ');
+    if(scl)h+='<div class="sh-line">'+esc(scl)+'</div>';
+    Object.keys(s.spells||{}).sort(function(a,b){return a-b;}).forEach(function(l){
+      h+='<div class="sh-line"><span class="l">'+(l==='0'?'Trucos':'Nivel '+l)+':</span> '+(s.spells[l]||[]).map(esc).join(', ')+'</div>';});
+  }
+  if(s.features)h+='<div class="sh-h">Rasgos y aptitudes</div><div class="sh-item">'+block(s.features)+'</div>';
+  if(s.features2)h+='<div class="sh-item">'+block(s.features2)+'</div>';
+  if(s.prof_lang)h+='<div class="sh-h">Competencias e idiomas</div><div class="sh-item">'+block(s.prof_lang)+'</div>';
+  if(s.equipment)h+='<div class="sh-h">Equipo</div><div class="sh-item">'+block(s.equipment)+'</div>';
+  return h;
 }
 // ficha de personaje (formato PDF)
 function charSheetHTML(c){
+  if((c.stats||{}).dnd) return dnd5eSheetHTML(c);
   var s=c.stats||{},a=s.attributes||{},d=s.defenses||{};
   var h='<div class="sh-name">'+esc(c.name)+'</div>';
   if(s.paths||s.ancestry||s.level) h+='<div class="sh-meta">'+[s.ancestry,s.paths,(s.level?'Nivel '+s.level:'')].filter(Boolean).map(esc).join(' · ')+'</div>';
@@ -430,11 +506,15 @@ function card(p,enemyView){
   var acted=p.turn==='both'?(p.acted&&p.acted_slow):p.acted;
   var ti=turnInfo(p);
   var col=p.faction_color||'';
+  var dnd=isDndCombat();
+  var turnTag=dnd
+    ? '<span class="turn-tag" style="color:var(--gold);border-color:var(--gold)">⚡ '+(p.initiative==null?'—':p.initiative)+'</span>'
+    : (enemyView?'':'<span class="turn-tag '+ti.cls+'">'+ti.lbl+'</span>');
   return '<div class="card'+(p.defeated?' defeated':'')+(acted?' acted':'')+'"'+(col?' style="border-left:3px solid '+col+'"':'')+'>'
     +'<div class="cname">'+(col?'<span class="color-dot" style="background:'+col+'"></span>':'')+esc(p.name)+'</div>'
     +(p.kind==='pet'?'<div class="ctype">🐾 mascota'+(p.owner_name?' de '+esc(p.owner_name):'')+'</div>':'')
-    +(enemyView?'':(p.tipo?'<div class="ctype">'+esc(p.tipo)+'</div>':''))
-    +(enemyView?'':'<span class="turn-tag '+ti.cls+'">'+ti.lbl+'</span>')
+    +(enemyView&&!dnd?'':(p.tipo?'<div class="ctype">'+esc(p.tipo)+'</div>':''))
+    +turnTag
     +'<div class="health-text" style="color:'+h.c+'">'+h.t+'</div>'
     +'<div class="hbar"><div class="hbar-fill" style="background:'+h.c+'"></div></div>'
     +(t?'<div class="stags">'+t+'</div>':'')
@@ -460,16 +540,33 @@ function render(combat){
   document.getElementById('noCombat').style.display=active?'none':'';
   document.getElementById('activeCombat').style.display=active?'':'none';
   document.getElementById('combBadge').style.display=active?'':'none';
+  var isDnd=(combat&&combat.system?combat.system:SYSTEM)==='dnd';
+  document.getElementById('phaseBarP').style.display=isDnd?'none':'';
   if(active){
     var myUid=renderMe(combat);
-    var pl=combat.participants.filter(function(p){return (p.kind==='player'||p.kind==='pet')&&p.user_id!==myUid;});
-    var en=combat.participants.filter(function(p){return p.kind==='enemy'&&!p.hidden;});
-    // los personajes se ordenan por turno; los enemigos quedan en orden fijo
-    // (no por turno) para no revelar quién es rápido o lento
-    pl.sort(function(a,b){return (a.turn==='slow'?1:0)-(b.turn==='slow'?1:0);});
-    document.getElementById('playersLbl').style.display=pl.length?'':'none';
-    document.getElementById('playersGrid').innerHTML=pl.map(card).join('');
-    document.getElementById('enemiesGrid').innerHTML=en.map(function(p){return card(p,true);}).join('');
+    if(isDnd){
+      // D&D: todos juntos, ordenados por iniciativa (mayor primero)
+      var others=combat.participants.filter(function(p){
+        return !((p.kind==='player'||p.kind==='pet')&&p.user_id===myUid) && !(p.kind==='enemy'&&p.hidden);
+      });
+      others.sort(function(a,b){return initOf(b)-initOf(a);});
+      document.getElementById('playersLbl').textContent='Orden de iniciativa';
+      document.getElementById('playersLbl').style.display=others.length?'':'none';
+      document.getElementById('playersGrid').innerHTML=others.map(function(p){return card(p,p.kind==='enemy');}).join('');
+      document.getElementById('enemiesLbl').style.display='none';
+      document.getElementById('enemiesGrid').innerHTML='';
+    }else{
+      var pl=combat.participants.filter(function(p){return (p.kind==='player'||p.kind==='pet')&&p.user_id!==myUid;});
+      var en=combat.participants.filter(function(p){return p.kind==='enemy'&&!p.hidden;});
+      // los personajes se ordenan por turno; los enemigos quedan en orden fijo
+      // (no por turno) para no revelar quién es rápido o lento
+      pl.sort(function(a,b){return (a.turn==='slow'?1:0)-(b.turn==='slow'?1:0);});
+      document.getElementById('playersLbl').textContent='Personajes';
+      document.getElementById('playersLbl').style.display=pl.length?'':'none';
+      document.getElementById('enemiesLbl').style.display='';
+      document.getElementById('playersGrid').innerHTML=pl.map(card).join('');
+      document.getElementById('enemiesGrid').innerHTML=en.map(function(p){return card(p,true);}).join('');
+    }
   }else{
     document.getElementById('mePanel').innerHTML='';
   }
@@ -485,6 +582,7 @@ function render(combat){
 
 // ─── Gestión fuera de combate (mi personaje/mascotas + ver al grupo) ───
 var ROSTER=null, MYCHAR=null;
+var SYSTEM='cosmere';   // sistema de la campaña (cosmere | dnd), viene del roster
 var INJURY_EFFECTS=['Exhausted [−1]','Exhausted [−2]','Slowed','Disoriented','Surprised','Can only use one hand'];
 // Heridas que imponen un estado: [estado, cargas]. Se fija mientras dure la herida.
 var INJURY_STATUS={'Exhausted [−1]':['Exhausted',1],'Exhausted [−2]':['Exhausted',2],
@@ -499,6 +597,7 @@ function injLockMsg(){ alert('Este estado lo fija una herida. Se quita al curar 
 async function loadRoster(){
   if(MY_UID==null)return;
   try{ ROSTER=await api(API+'/roster'); }catch(e){ return; }
+  SYSTEM=ROSTER.system||'cosmere';
   renderRoster();
   if(COMBAT&&COMBAT.active) renderMe(COMBAT);   // refresca el recuadro de marcos del combate
 }
@@ -650,6 +749,121 @@ async function saveMarcoField(which, v){
   loadRoster();
 }
 
+// ─── D&D: spell slots y contadores de clase ───
+function dndSlotsHTML(c){
+  var slots=(c.dnd&&c.dnd.slots)||{};
+  var lvls=Object.keys(slots).map(Number).sort(function(a,b){return a-b;});
+  var rows=lvls.map(function(n){
+    var s=slots[String(n)];
+    var pips='';
+    for(var i=0;i<s.max;i++){
+      var on=i<s.cur;
+      pips+='<button class="slot-pip'+(on?' on':'')+'" onclick="dndSpendSlot('+n+','+(on?-1:1)+')" title="'+(on?'Gastar slot':'Recuperar slot')+'"></button>';
+    }
+    return '<div class="dnd-slot-row"><span class="dnd-slot-lvl">Nivel '+n+'</span>'
+      +'<span class="dnd-pips">'+pips+'</span>'
+      +'<span class="dnd-slot-n">'+s.cur+'/'+s.max+'</span></div>';
+  }).join('');
+  return '<div class="mstat" style="margin-top:8px"><div class="mstat-head"><span class="mstat-l">✨ Spell slots</span>'
+    +'<button class="me-change" onclick="openSlotsCfg()">⚙ Configurar</button></div>'
+    +(rows||'<div style="font-size:12px;color:var(--text3)">Sin slots configurados. Si tu clase lanza conjuros, tocá ⚙ Configurar.</div>')
+    +'</div>';
+}
+function recTag(r){
+  if(r==='short')return '<span class="dnd-rec-tag" style="color:#6aaae8;border-color:#4a8ac8">🌙 corto</span>';
+  if(r==='long')return '<span class="dnd-rec-tag" style="color:#aa8aec;border-color:#aa8aec">🛌 largo</span>';
+  return '<span class="dnd-rec-tag">manual</span>';
+}
+function dndCountersHTML(c){
+  var ctrs=(c.dnd&&c.dnd.counters)||[];
+  var rows=ctrs.map(function(k){
+    return '<div class="dnd-ctr-row">'
+      +'<span class="dnd-ctr-name">'+esc(k.name)+' '+recTag(k.recovery)+'</span>'
+      +'<button class="dnd-ctr-btn" style="color:#e05050" onclick="dndCtrDelta(\''+k.id+'\',-1)">−</button>'
+      +'<span class="dnd-ctr-v">'+k.cur+' / '+k.max+'</span>'
+      +'<button class="dnd-ctr-btn" style="color:#4a9a60" onclick="dndCtrDelta(\''+k.id+'\',1)">+</button>'
+      +'<button class="me-change" onclick="openEditCounter(\''+k.id+'\')" title="Editar">✎</button>'
+      +'</div>';
+  }).join('');
+  return '<div class="mstat" style="margin-top:8px"><div class="mstat-head"><span class="mstat-l">🎲 Contadores</span>'
+    +'<button class="me-change" onclick="openAddCounter()">+ Nuevo</button></div>'
+    +(rows||'<div style="font-size:12px;color:var(--text3)">Sin contadores. Creá uno para furia, ki, channel divinity, etc.</div>')
+    +'</div>';
+}
+async function dndSpendSlot(level,delta){
+  await api('/api/characters/'+MYCHAR+'/slots/spend','POST',{level:level,delta:delta});
+  loadRoster();
+}
+async function dndCtrDelta(kid,delta){
+  await api('/api/characters/'+MYCHAR+'/counters/'+kid+'/value','POST',{delta:delta});
+  loadRoster();
+}
+function openSlotsCfg(){
+  var c=meChar(); if(!c)return;
+  var slots=(c.dnd&&c.dnd.slots)||{};
+  var rows='';
+  for(var n=1;n<=9;n++){
+    var s=slots[String(n)];
+    rows+='<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Slots de nivel '+n+'</span>'
+      +'<input class="oc-fi" type="number" min="0" max="12" id="cfg-slot-'+n+'" value="'+(s?s.max:0)+'" style="width:80px"/></label>';
+  }
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">✨ Configurar spell slots</div>'
+    +'<div class="sh-meta" style="margin-bottom:10px">Poné cuántos slots máximos tenés de cada nivel. 0 = no usás ese nivel.</div>'
+    +'<div style="display:flex;flex-direction:column;gap:8px">'+rows+'</div>'
+    +'<div class="me-sheet-row" style="justify-content:flex-end;border:none;margin-top:16px"><button class="btn-sheet" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn-sheet" style="background:var(--gold);color:#1c1915;border-color:var(--gold)" onclick="saveSlotsCfg()">Guardar</button></div>';
+  document.getElementById('overlay').classList.add('on');
+}
+async function saveSlotsCfg(){
+  var levels={};
+  for(var n=1;n<=9;n++){
+    var v=parseInt(document.getElementById('cfg-slot-'+n).value)||0;
+    if(v>0) levels[String(n)]=v;
+  }
+  await api('/api/characters/'+MYCHAR+'/slots','PUT',{levels:levels});
+  closeModal(); loadRoster();
+}
+function counterModal(k){
+  var lbl='display:flex;justify-content:space-between;align-items:center;gap:10px';
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">'+(k?'✎ Editar contador':'🎲 Nuevo contador')+'</div>'
+    +'<div class="sh-meta" style="margin-bottom:10px">Para recursos de clase: furia, ki, channel divinity, superiority dice…</div>'
+    +'<div style="display:flex;flex-direction:column;gap:9px">'
+    +'<label style="'+lbl+'"><span>Nombre</span><input class="oc-fi" id="ctr-name" value="'+(k?esc(k.name):'')+'" placeholder="ej: Furia" style="flex:1;max-width:260px"/></label>'
+    +'<label style="'+lbl+'"><span>Máximo</span><input class="oc-fi" type="number" min="1" id="ctr-max" value="'+(k?k.max:2)+'" style="width:80px"/></label>'
+    +'<label style="'+lbl+'"><span>Se recupera en</span><select class="oc-fi" id="ctr-rec">'
+      +'<option value="long"'+(!k||k.recovery==='long'?' selected':'')+'>Descanso largo</option>'
+      +'<option value="short"'+(k&&k.recovery==='short'?' selected':'')+'>Descanso corto</option>'
+      +'<option value="none"'+(k&&k.recovery==='none'?' selected':'')+'>Manual (no se recupera solo)</option>'
+    +'</select></label></div>'
+    +'<div class="me-sheet-row" style="justify-content:'+(k?'space-between':'flex-end')+';border:none;margin-top:16px">'
+    +(k?'<button class="btn-sheet" style="color:#e05050;border-color:#e05050" onclick="dndDelCounter(\''+k.id+'\')">Borrar</button>':'')
+    +'<span style="display:flex;gap:8px"><button class="btn-sheet" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn-sheet" style="background:var(--gold);color:#1c1915;border-color:var(--gold)" onclick="saveCounter('+(k?'\''+k.id+'\'':'null')+')">Guardar</button></span></div>';
+  document.getElementById('overlay').classList.add('on');
+}
+function openAddCounter(){ counterModal(null); }
+function openEditCounter(kid){
+  var c=meChar(); if(!c)return;
+  var k=((c.dnd&&c.dnd.counters)||[]).find(function(x){return x.id===kid;});
+  if(k) counterModal(k);
+}
+async function saveCounter(kid){
+  var name=document.getElementById('ctr-name').value.trim();
+  if(!name){alert('Poné un nombre al contador.');return;}
+  var body={name:name,max:Math.max(1,parseInt(document.getElementById('ctr-max').value)||1),
+    recovery:document.getElementById('ctr-rec').value};
+  if(kid) await api('/api/characters/'+MYCHAR+'/counters/'+kid,'PUT',body);
+  else await api('/api/characters/'+MYCHAR+'/counters','POST',body);
+  closeModal(); loadRoster();
+}
+async function dndDelCounter(kid){
+  if(!confirm('¿Borrar este contador?'))return;
+  await api('/api/characters/'+MYCHAR+'/counters/'+kid,'DELETE');
+  closeModal(); loadRoster();
+}
+
 function allyCard(m){
   var c=m.character;
   var cur=(c.vida==null?c.vida_max:c.vida);
@@ -657,11 +871,20 @@ function allyCard(m){
   var h=hl(pct); var t=mkTags(c.statuses);
   var inj=(c.injuries||[]).length?'<div class="stags">'+(c.injuries||[]).map(function(i){
     return '<span class="stag" style="border-color:#c87830;color:#c87830">🩹 '+esc(i.name)+(i.permanent?'':' ('+i.days+'d)')+'</span>';}).join('')+'</div>':'';
+  var dndChips='';
+  if(SYSTEM==='dnd'&&c.dnd){
+    var parts=[]; var slots=c.dnd.slots||{};
+    Object.keys(slots).map(Number).sort(function(a,b){return a-b;}).forEach(function(n){
+      var s=slots[String(n)]; parts.push('✨N'+n+' '+s.cur+'/'+s.max);});
+    (c.dnd.counters||[]).forEach(function(k){parts.push(esc(k.name)+' '+k.cur+'/'+k.max);});
+    if(parts.length) dndChips='<div class="stags">'+parts.map(function(x){
+      return '<span class="stag" style="border-color:var(--border2);color:var(--text2)">'+x+'</span>';}).join('')+'</div>';
+  }
   return '<div class="card"><div class="cname">'+esc(c.name)+'</div>'
     +'<div class="ctype">'+esc(m.username)+'</div>'
     +'<div class="health-text" style="color:'+h.c+'">'+h.t+'</div>'
     +'<div class="hbar"><div class="hbar-fill" style="background:'+h.c+'"></div></div>'
-    +(t?'<div class="stags">'+t+'</div>':'')+inj+'</div>';
+    +(t?'<div class="stags">'+t+'</div>':'')+inj+dndChips+'</div>';
 }
 function renderRoster(){
   if(!ROSTER)return;
@@ -679,7 +902,7 @@ function renderRoster(){
     html+='<div class="pj-hero">'+portrait
       +'<div style="flex:1;min-width:0"><div class="pj-hero-name">'+esc(c.name)+'</div>'
       +(sub?'<div class="pj-hero-sub">'+sub+'</div>':'')+lvl+'</div>'
-      +marcosWidget(c)+'</div>'
+      +(SYSTEM==='dnd'?'':marcosWidget(c))+'</div>'
       +'<div class="pj-actions">'
         +'<button class="btn-sheet" onclick="openEditChar()">✎ Editar</button>'
         +'<button class="btn-sheet" onclick="openPets()">🐾 Mascotas</button>'
@@ -689,8 +912,10 @@ function renderRoster(){
         +(c.has_pdf?'<a class="btn-sheet" href="/api/characters/'+c.id+'/pdf" target="_blank">Ver PDF</a>':'')
       +'</div>'
       +'<div class="me-card">'
-      +ocStatCtl('c',c,'vida','Vida','#e05050')+ocStatCtl('c',c,'focus','Focus','#6aaae8')+ocStatCtl('c',c,'inv','Investidura','#aa8aec')
-      +ocStatuses('c',c.statuses,c.injuries)+ocInjuriesHTML(c)+'</div>';
+      +ocStatCtl('c',c,'vida','Vida','#e05050')
+      +(SYSTEM==='dnd'?'':ocStatCtl('c',c,'focus','Focus','#6aaae8')+ocStatCtl('c',c,'inv','Investidura','#aa8aec'))
+      +ocStatuses('c',c.statuses,c.injuries)+ocInjuriesHTML(c)
+      +(SYSTEM==='dnd'?dndSlotsHTML(c)+dndCountersHTML(c):'')+'</div>';
     if(meM.pets&&meM.pets.length){
       html+='<div class="section-lbl">Mis mascotas</div>'+meM.pets.map(function(p){
         return '<div class="me-card"><div class="me-head"><span class="me-name">'+esc(p.name)+' <span class="pet-tag">Mascota</span></span>'
@@ -753,8 +978,8 @@ function openEditChar(){
     +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Clase / senda</span><input class="oc-fi" id="ec-class" value="'+esc(s.paths||'')+'" style="flex:1;max-width:260px"/></label>'
     +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nivel</span><input class="oc-fi" id="ec-level" value="'+esc(s.level||'')+'" style="width:90px"/></label>'
     +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Vida (actual / máx)</span><span style="display:flex;gap:6px">'+_num('ec-vida',c.vida)+'<span style="color:var(--text3)">/</span>'+_num('ec-vidam',c.vida_max)+'</span></label>'
-    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Focus (actual / máx)</span><span style="display:flex;gap:6px">'+_num('ec-focus',c.focus)+'<span style="color:var(--text3)">/</span>'+_num('ec-focusm',c.focus_max)+'</span></label>'
-    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Investidura (actual / máx)</span><span style="display:flex;gap:6px">'+_num('ec-inv',c.inv)+'<span style="color:var(--text3)">/</span>'+_num('ec-invm',c.inv_max)+'</span></label>'
+    +(SYSTEM==='dnd'?'':'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Focus (actual / máx)</span><span style="display:flex;gap:6px">'+_num('ec-focus',c.focus)+'<span style="color:var(--text3)">/</span>'+_num('ec-focusm',c.focus_max)+'</span></label>'
+    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Investidura (actual / máx)</span><span style="display:flex;gap:6px">'+_num('ec-inv',c.inv)+'<span style="color:var(--text3)">/</span>'+_num('ec-invm',c.inv_max)+'</span></label>')
     +'</div>'
     +'<div class="me-sheet-row" style="justify-content:flex-end;border:none;margin-top:16px"><button class="btn-sheet" onclick="closeModal()">Cancelar</button>'
     +'<button class="btn-sheet" style="background:var(--gold);color:#1c1915;border-color:var(--gold)" onclick="saveEditChar()">Guardar</button></div>';
@@ -765,10 +990,12 @@ async function saveEditChar(){
   var c=meChar(); if(!c)return; var s=Object.assign({},c.sheet||{});
   s.paths=document.getElementById('ec-class').value.trim();
   s.level=document.getElementById('ec-level').value.trim();
+  var dnd=SYSTEM==='dnd';
   await api('/api/characters/'+MYCHAR,'PUT',{
     name:document.getElementById('ec-name').value.trim()||'Personaje',
-    vida_max:_iv('ec-vidam')||0, focus_max:_iv('ec-focusm')||0, inv_max:_iv('ec-invm')||0,
-    vida:_iv('ec-vida'), focus:_iv('ec-focus'), inv:_iv('ec-inv'), sheet:s
+    vida_max:_iv('ec-vidam')||0,
+    focus_max:dnd?0:(_iv('ec-focusm')||0), inv_max:dnd?0:(_iv('ec-invm')||0),
+    vida:_iv('ec-vida'), focus:dnd?0:_iv('ec-focus'), inv:dnd?0:_iv('ec-inv'), sheet:s
   });
   closeModal(); loadRoster();
 }
@@ -841,11 +1068,11 @@ async function init(){
   catch(e){ return; }   // 401 ya redirige a /login
   setTab(TAB);
   connect();
-  loadRoster();
-  loadStorm();
+  await loadRoster();               // fija SYSTEM antes de decidir si hay tormentas
+  if(SYSTEM!=='dnd') loadStorm();   // en D&D no hay altas tormentas
   // refresco periódico: la ficha del personaje / grupo y el tracker de tormentas
   // (esos cambios no viajan por WS)
-  setInterval(function(){ loadStorm(); loadRoster(); }, 5000);
+  setInterval(function(){ if(SYSTEM!=='dnd') loadStorm(); loadRoster(); }, 5000);
 }
 init();
 </script>

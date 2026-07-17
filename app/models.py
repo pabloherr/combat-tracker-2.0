@@ -39,6 +39,7 @@ class DeleteAccount(BaseModel):
 
 class CampaignIn(BaseModel):
     name: str
+    system: str = "cosmere"    # cosmere | dnd (se fija al crear la campaña)
 
 
 class InviteIn(BaseModel):
@@ -109,6 +110,27 @@ class MarcosSet(BaseModel):
     opacos: int = 0         # marcos sin luz (total = cargados + opacos)
 
 
+# ── Recursos D&D (spell slots y contadores) ────────────────
+
+class SlotsConfigIn(BaseModel):
+    levels: dict[str, int] = {}   # "1".."9" -> máximo de slots (0/ausente = quitar nivel)
+
+
+class SlotSpend(BaseModel):
+    level: int                 # 1..9
+    delta: int                 # -1 gastar / +1 recuperar
+
+
+class CounterIn(BaseModel):
+    name: str
+    max: int = 1
+    recovery: str = "long"     # long | short | none (cuándo se recupera)
+
+
+class CounterValue(BaseModel):
+    delta: int
+
+
 class AccionIn(BaseModel):
     nombre: str
     coste: str = ""          # ej: "1 acción", "2 focus"
@@ -169,3 +191,8 @@ class TurnChange(BaseModel):
 class ColorChange(BaseModel):
     uid: str
     color: str                 # color de esta instancia en combate (hex)
+
+
+class InitiativeIn(BaseModel):
+    uid: str
+    value: int                 # iniciativa del participante (D&D)

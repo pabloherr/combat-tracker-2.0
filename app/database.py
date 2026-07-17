@@ -51,6 +51,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             dm_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            system TEXT DEFAULT 'cosmere',  -- cosmere | dnd
             created_at TEXT DEFAULT (datetime('now'))
         );
 
@@ -67,6 +68,7 @@ def init_db():
             inv INTEGER,
             statuses TEXT DEFAULT '[]',
             sheet TEXT DEFAULT '{}',        -- JSON: ficha completa extraída del PDF
+            dnd_resources TEXT DEFAULT '{}', -- JSON: spell slots y contadores (solo D&D)
             has_pdf INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now'))
         );
@@ -226,3 +228,18 @@ def init_db():
         scols = {r["name"] for r in conn.execute("PRAGMA table_info(sessions)")}
         if "role" not in scols:
             conn.execute("ALTER TABLE sessions ADD COLUMN role TEXT DEFAULT 'dm'")
+
+        # Migración: sistema de juego por campaña (cosmere | dnd) y recursos de
+        # D&D por personaje (JSON: {"slots": {...}, "counters": [...]}).
+        cpcols = {r["name"] for r in conn.execute("PRAGMA table_info(campaigns)")}
+        if "system" not in cpcols:
+            conn.execute("ALTER TABLE campaigns ADD COLUMN system TEXT DEFAULT 'cosmere'")
+        chcols = {r["name"] for r in conn.execute("PRAGMA table_info(characters)")}
+        if "dnd_resources" not in chcols:
+            conn.execute("ALTER TABLE characters ADD COLUMN dnd_resources TEXT DEFAULT '{}'")
+
+        # Migración: los bestiarios no se mezclan entre sistemas. Cada enemigo
+        # pertenece a un sistema (cosmere | dnd) y solo aparece en campañas de ese.
+        ecols = {r["name"] for r in conn.execute("PRAGMA table_info(enemies)")}
+        if "system" not in ecols:
+            conn.execute("ALTER TABLE enemies ADD COLUMN system TEXT DEFAULT 'cosmere'")

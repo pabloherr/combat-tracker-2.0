@@ -9,8 +9,10 @@ from fastapi.responses import Response
 from ..auth import current_user
 from ..cosmere_import import ImportError_, parse_statblock
 from ..database import db
-from ..models import (CharacterIn, DaysChange, InjuryIn, LiveStat, LiveStatus,
-                      MarcosChange, MarcosSet, PetImportIn)
+from ..dnd_pdf import parse_dnd_pdf
+from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
+                      LiveStat, LiveStatus, MarcosChange, MarcosSet, PetImportIn,
+                      SlotsConfigIn, SlotSpend)
 from ..pdf_import import extract_pdf_image, parse_character_pdf
 
 router = APIRouter(prefix="/api/characters", tags=["characters"])
@@ -21,14 +23,28 @@ def _serialize(r) -> dict:
     d["statuses"] = json.loads(d.get("statuses") or "[]")
     d["sheet"] = json.loads(d.get("sheet") or "{}")
     d["injuries"] = json.loads(d.get("injuries") or "[]")
+    d["dnd"] = json.loads(d.get("dnd_resources") or "{}")
     d["has_pdf"] = bool(d.get("has_pdf"))
     d["has_image"] = bool(d.get("has_image"))
+    d.pop("dnd_resources", None)
     return d
 
 
 def _owned(conn, cid: int, user: dict):
     r = conn.execute("SELECT * FROM characters WHERE id=?", (cid,)).fetchone()
     if not r or r["owner_id"] != user["id"]:
+        raise HTTPException(404, "Personaje no encontrado")
+    return r
+
+
+def _owned_or_dm(conn, cid: int, user: dict):
+    """Personaje propio, o de un jugador de una campaña donde el usuario es DM."""
+    r = conn.execute(
+        "SELECT ch.*, camp.dm_id FROM characters ch "
+        "LEFT JOIN campaigns camp ON camp.id=ch.campaign_id WHERE ch.id=?",
+        (cid,),
+    ).fetchone()
+    if not r or (r["owner_id"] != user["id"] and r["dm_id"] != user["id"]):
         raise HTTPException(404, "Personaje no encontrado")
     return r
 
@@ -57,6 +73,39 @@ def _link_membership(conn, campaign_id, user: dict, char_id: int):
         "WHERE campaign_id=? AND user_id=?",
         (char_id, campaign_id, user["id"]),
     )
+
+
+def _campaign_system(conn, campaign_id) -> str:
+    """Sistema de la campaña (cosmere | dnd): decide qué parser de PDF usar."""
+    if not campaign_id:
+        return "cosmere"
+    c = conn.execute("SELECT system FROM campaigns WHERE id=?", (campaign_id,)).fetchone()
+    return (c["system"] if c else None) or "cosmere"
+
+
+def _parse_sheet_pdf(system: str, data: bytes) -> dict:
+    """Parsea la ficha según el sistema. Devuelve el mismo shape para ambos:
+    name, vida_max, vida, focus_max, focus, inv_max, inv, sheet y slots (dnd)."""
+    if system == "dnd":
+        p = parse_dnd_pdf(data)
+        return {"name": p["name"], "vida_max": p["vida_max"], "vida": p["vida"],
+                "focus_max": 0, "focus": 0, "inv_max": 0, "inv": 0,
+                "sheet": p["sheet"], "slots": p["slots"]}
+    p = parse_character_pdf(data)
+    p["slots"] = None
+    return p
+
+
+def _apply_pdf_slots(conn, char_id: int, slots):
+    """Precarga los spell slots leídos del PDF en dnd_resources (los contadores
+    personalizados del jugador no se tocan)."""
+    if slots is None:
+        return
+    row = conn.execute("SELECT dnd_resources FROM characters WHERE id=?", (char_id,)).fetchone()
+    d = json.loads((row["dnd_resources"] if row else None) or "{}")
+    d.setdefault("counters", [])
+    d["slots"] = slots
+    conn.execute("UPDATE characters SET dnd_resources=? WHERE id=?", (json.dumps(d), char_id))
 
 
 def _store_extracted_image(conn, char_id: int, pdf_bytes: bytes):
@@ -126,8 +175,11 @@ def update_character(cid: int, c: CharacterIn, user=Depends(current_user)):
 async def reimport_pdf(cid: int, file: UploadFile = File(...), user=Depends(current_user)):
     """Reemplaza la ficha PDF de un personaje existente y re-extrae sus datos."""
     data = await file.read()
+    with db() as conn:
+        r = _owned(conn, cid, user)
+        system = _campaign_system(conn, r["campaign_id"])
     try:
-        p = parse_character_pdf(data)
+        p = _parse_sheet_pdf(system, data)
     except ValueError as e:
         raise HTTPException(400, str(e))
     with db() as conn:
@@ -138,6 +190,7 @@ async def reimport_pdf(cid: int, file: UploadFile = File(...), user=Depends(curr
             (p["name"], p["vida_max"], p["focus_max"], p["inv_max"],
              p["vida"], p["focus"], p["inv"], json.dumps(p["sheet"]), cid),
         )
+        _apply_pdf_slots(conn, cid, p["slots"])
         conn.execute(
             "INSERT INTO character_pdfs (character_id, pdf) VALUES (?,?) "
             "ON CONFLICT(character_id) DO UPDATE SET pdf=excluded.pdf",
@@ -161,10 +214,14 @@ def delete_character(cid: int, user=Depends(current_user)):
 
 @router.post("/import-pdf")
 async def import_pdf(campaign_id: int, file: UploadFile = File(...), user=Depends(current_user)):
-    """Crea un personaje para una campaña a partir de la ficha PDF."""
+    """Crea un personaje para una campaña a partir de la ficha PDF
+    (Cosmere o la ficha rellenable de D&D 5e, según el sistema de la campaña)."""
     data = await file.read()
+    with db() as conn:
+        _joinable_membership(conn, campaign_id, user)
+        system = _campaign_system(conn, campaign_id)
     try:
-        p = parse_character_pdf(data)
+        p = _parse_sheet_pdf(system, data)
     except ValueError as e:
         raise HTTPException(400, str(e))
     with db() as conn:
@@ -177,6 +234,7 @@ async def import_pdf(campaign_id: int, file: UploadFile = File(...), user=Depend
         )
         cid = cur.lastrowid
         conn.execute("INSERT INTO character_pdfs (character_id, pdf) VALUES (?,?)", (cid, data))
+        _apply_pdf_slots(conn, cid, p["slots"])
         _link_membership(conn, campaign_id, user, cid)
         _store_extracted_image(conn, cid, data)
     return {"id": cid, "name": p["name"]}
@@ -361,6 +419,122 @@ def delete_injury(cid: int, iid: str, user=Depends(current_user)):
         lst = [it for it in json.loads(r["injuries"] or "[]") if it["id"] != iid]
         conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(lst), cid))
     return {"ok": True, "injuries": lst}
+
+
+# ── Recursos D&D: spell slots y contadores de clase ────────
+# Editables por el dueño del personaje o por el DM de su campaña.
+
+_RECOVERIES = {"long", "short", "none"}
+
+
+def _dnd(row) -> dict:
+    d = json.loads(row["dnd_resources"] or "{}")
+    d.setdefault("slots", {})
+    d.setdefault("counters", [])
+    return d
+
+
+def _save_dnd(conn, cid: int, d: dict):
+    conn.execute("UPDATE characters SET dnd_resources=? WHERE id=?", (json.dumps(d), cid))
+
+
+@router.put("/{cid}/slots")
+def configure_slots(cid: int, cfg: SlotsConfigIn, user=Depends(current_user)):
+    """Fija el máximo de spell slots por nivel (1-9). 0 o ausente quita el nivel.
+    Un nivel nuevo arranca con todos los slots disponibles."""
+    with db() as conn:
+        r = _owned_or_dm(conn, cid, user)
+        d = _dnd(r)
+        slots = {}
+        for lvl in range(1, 10):
+            key = str(lvl)
+            mx = max(0, min(12, int(cfg.levels.get(key, 0))))
+            if mx <= 0:
+                continue
+            prev = d["slots"].get(key)
+            cur = mx if prev is None else min(prev.get("cur", mx), mx)
+            slots[key] = {"max": mx, "cur": cur}
+        d["slots"] = slots
+        _save_dnd(conn, cid, d)
+    return {"ok": True, "dnd": d}
+
+
+@router.post("/{cid}/slots/spend")
+def spend_slot(cid: int, s: SlotSpend, user=Depends(current_user)):
+    with db() as conn:
+        r = _owned_or_dm(conn, cid, user)
+        d = _dnd(r)
+        slot = d["slots"].get(str(s.level))
+        if not slot:
+            raise HTTPException(404, "No tenés slots de ese nivel")
+        slot["cur"] = max(0, min(slot.get("max", 0), slot.get("cur", 0) + s.delta))
+        _save_dnd(conn, cid, d)
+    return {"ok": True, "dnd": d}
+
+
+@router.post("/{cid}/counters")
+def add_counter(cid: int, c: CounterIn, user=Depends(current_user)):
+    name = c.name.strip()
+    if not name:
+        raise HTTPException(400, "Poné un nombre al contador")
+    if c.recovery not in _RECOVERIES:
+        raise HTTPException(400, "Recuperación inválida")
+    mx = max(1, c.max)
+    with db() as conn:
+        r = _owned_or_dm(conn, cid, user)
+        d = _dnd(r)
+        d["counters"].append({"id": uuid.uuid4().hex[:8], "name": name,
+                              "max": mx, "cur": mx, "recovery": c.recovery})
+        _save_dnd(conn, cid, d)
+    return {"ok": True, "dnd": d}
+
+
+@router.put("/{cid}/counters/{kid}")
+def update_counter(cid: int, kid: str, c: CounterIn, user=Depends(current_user)):
+    name = c.name.strip()
+    if not name:
+        raise HTTPException(400, "Poné un nombre al contador")
+    if c.recovery not in _RECOVERIES:
+        raise HTTPException(400, "Recuperación inválida")
+    with db() as conn:
+        r = _owned_or_dm(conn, cid, user)
+        d = _dnd(r)
+        for k in d["counters"]:
+            if k["id"] == kid:
+                k["name"] = name
+                k["max"] = max(1, c.max)
+                k["cur"] = min(k.get("cur", 0), k["max"])
+                k["recovery"] = c.recovery
+                break
+        else:
+            raise HTTPException(404, "Contador no encontrado")
+        _save_dnd(conn, cid, d)
+    return {"ok": True, "dnd": d}
+
+
+@router.post("/{cid}/counters/{kid}/value")
+def counter_value(cid: int, kid: str, v: CounterValue, user=Depends(current_user)):
+    with db() as conn:
+        r = _owned_or_dm(conn, cid, user)
+        d = _dnd(r)
+        for k in d["counters"]:
+            if k["id"] == kid:
+                k["cur"] = max(0, min(k.get("max", 0), k.get("cur", 0) + v.delta))
+                break
+        else:
+            raise HTTPException(404, "Contador no encontrado")
+        _save_dnd(conn, cid, d)
+    return {"ok": True, "dnd": d}
+
+
+@router.delete("/{cid}/counters/{kid}")
+def delete_counter(cid: int, kid: str, user=Depends(current_user)):
+    with db() as conn:
+        r = _owned_or_dm(conn, cid, user)
+        d = _dnd(r)
+        d["counters"] = [k for k in d["counters"] if k["id"] != kid]
+        _save_dnd(conn, cid, d)
+    return {"ok": True, "dnd": d}
 
 
 # ── Marcos (esferas) del personaje ────────────────────────

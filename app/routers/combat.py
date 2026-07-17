@@ -6,11 +6,11 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from ..access import require_access, require_dm
+from ..access import campaign_or_404, require_access, require_dm
 from ..auth import current_user
 from ..database import db
-from ..models import (AddEnemyIn, ColorChange, StatChange, StatusToggle,
-                      TurnChange, VidaMaxIn)
+from ..models import (AddEnemyIn, ColorChange, InitiativeIn, StatChange,
+                      StatusToggle, TurnChange, VidaMaxIn)
 from ..state import combats, player_view
 from ..ws import push_state
 
@@ -21,12 +21,30 @@ def _roll_enemy_turn(clase: str) -> str:
     return "both" if clase == "boss" else random.choice(["fast", "slow"])
 
 
+def _dex_mod(stats: dict) -> int:
+    """Modificador de DEX de un statblock de D&D (0 si no tiene)."""
+    try:
+        dex = (stats or {}).get("abilities", {}).get("DEX")
+        return (int(dex) - 10) // 2 if dex is not None else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def _roll_initiative(stats: dict) -> int:
+    return random.randint(1, 20) + _dex_mod(stats)
+
+
 def _mk_participant(kind, name, vida, focus, inv, acciones=None, notas="", faction_color="",
                     tipo="", stats=None, clase="rival", cur_vida=None, cur_focus=None,
                     cur_inv=None, statuses=None, char_id=None, user_id=None, pet_id=None,
-                    owner_name="", has_pdf=False):
+                    owner_name="", has_pdf=False, system="cosmere"):
     # Enemigos y mascotas toman turno al azar; los jugadores lo eligen.
     turn = _roll_enemy_turn(clase) if kind in ("enemy", "pet") else "slow"
+    # D&D: los enemigos y mascotas tiran iniciativa solos (d20 + mod de DEX);
+    # los jugadores anotan la suya al arrancar el combate.
+    initiative = None
+    if system == "dnd" and kind in ("enemy", "pet"):
+        initiative = _roll_initiative(stats)
     cur_vida = vida if cur_vida is None else cur_vida
     cur_focus = focus if cur_focus is None else cur_focus
     cur_inv = inv if cur_inv is None else cur_inv
@@ -46,6 +64,7 @@ def _mk_participant(kind, name, vida, focus, inv, acciones=None, notas="", facti
         "inv": cur_inv, "inv_max": inv,
         "statuses": statuses or [],
         "turn": turn,
+        "initiative": initiative,
         "acted": False,
         "acted_slow": False,
         "hidden": False,
@@ -89,7 +108,7 @@ def _guard_participant(is_dm: bool, p: dict, user: dict):
     raise HTTPException(403, "Solo podés modificar tu propio personaje o tus mascotas")
 
 
-def _build_participants(conn, cid: int, encounter_id: int):
+def _build_participants(conn, cid: int, encounter_id: int, system: str = "cosmere"):
     """Arma la lista de participantes: personajes aceptados (+ mascotas) + enemigos."""
     participants = []
 
@@ -108,6 +127,7 @@ def _build_participants(conn, cid: int, encounter_id: int):
             statuses=json.loads(ch["statuses"] or "[]"),
             stats=json.loads(ch["sheet"] or "{}"),
             char_id=ch["id"], user_id=ch["user_id"], has_pdf=bool(ch["has_pdf"]),
+            system=system,
         ))
         # Mascotas del personaje: entran como aliados que el jugador controla.
         for pet in conn.execute("SELECT * FROM pets WHERE character_id=? ORDER BY name", (ch["id"],)):
@@ -118,6 +138,7 @@ def _build_participants(conn, cid: int, encounter_id: int):
                 statuses=json.loads(pet["statuses"] or "[]"),
                 stats=json.loads(pet["stats"] or "{}"),
                 user_id=ch["user_id"], pet_id=pet["id"], owner_name=ch["name"],
+                system=system,
             ))
 
     # Enemigos del encuentro. Los overrides ajustan al enemigo solo en este
@@ -147,7 +168,7 @@ def _build_participants(conn, cid: int, encounter_id: int):
                 "enemy", nm, _f("vida_max"), _f("focus_max"), _f("inv_max"),
                 acciones=acciones, notas=r["notas"],
                 faction_color=_f("faction_color"), tipo=r["tipo"], stats=stats,
-                clase=_f("clase"),
+                clase=_f("clase"), system=system,
             ))
     return participants
 
@@ -158,13 +179,15 @@ def _new_combat(conn, cid: int, encounter_id: int, staged: bool):
     ).fetchone()
     if not enc:
         raise HTTPException(404, "Encuentro no encontrado")
+    system = (campaign_or_404(conn, cid)["system"]) or "cosmere"
     return {
         "active": True,
         "staged": staged,   # en preparación: el DM lo ve, los jugadores no
         "round": 1,
         "phase": "fast_players",
+        "system": system,   # dnd: orden por iniciativa en vez de fases
         "encounter_name": enc["name"],
-        "participants": _build_participants(conn, cid, encounter_id),
+        "participants": _build_participants(conn, cid, encounter_id, system),
     }
 
 
@@ -252,6 +275,7 @@ async def add_enemy(cid: int, payload: AddEnemyIn, user=Depends(current_user)):
             "enemy", nm, e["vida_max"], e["focus_max"], e["inv_max"],
             acciones=acciones, notas=e["notas"], faction_color=e["faction_color"],
             tipo=e["tipo"], stats=stats, clase=e["clase"],
+            system=combat.get("system") or "cosmere",
         ))
     await push_state(cid)
     return {"ok": True, "added": cantidad}
@@ -360,6 +384,21 @@ async def set_turn(cid: int, t: TurnChange, user=Depends(current_user)):
     return {"ok": True}
 
 
+@router.post("/initiative")
+async def set_initiative(cid: int, t: InitiativeIn, user=Depends(current_user)):
+    """Anota la iniciativa de un participante (D&D). El jugador la de su
+    personaje o mascotas; el DM la de cualquiera."""
+    with db() as conn:
+        _, is_dm = require_access(conn, cid, user)
+    p = _find(cid, t.uid)
+    if not p:
+        raise HTTPException(404, "Participante no encontrado")
+    _guard_participant(is_dm, p, user)
+    p["initiative"] = max(-10, min(99, t.value))
+    await push_state(cid)
+    return {"ok": True, "initiative": p["initiative"]}
+
+
 @router.post("/color")
 async def set_color(cid: int, c: ColorChange, user=Depends(current_user)):
     with db() as conn:
@@ -403,10 +442,13 @@ async def next_round(cid: int, user=Depends(current_user)):
         require_dm(conn, cid, user)
     combat = combats.get(cid)
     combat["round"] += 1
+    is_dnd = (combat.get("system") or "cosmere") == "dnd"
     for p in combat["participants"]:
         p["acted"] = False
         p["acted_slow"] = False
-        if p["kind"] in ("enemy", "pet"):
+        # D&D: la iniciativa se mantiene todo el combate; en Cosmere los
+        # enemigos vuelven a sortear su turno cada ronda.
+        if not is_dnd and p["kind"] in ("enemy", "pet"):
             p["turn"] = _roll_enemy_turn(p.get("clase") or "rival")
     await push_state(cid)
     return {"ok": True}
