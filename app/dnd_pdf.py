@@ -92,7 +92,10 @@ def parse_dnd_pdf(data: bytes) -> dict:
     def g(name):
         return vals.get(name, "")
 
-    if not g("CharacterName") and not g("HPMax"):
+    # Se identifica por la presencia de los campos (no por su valor): una ficha
+    # en blanco o con esos campos vacíos igual es una ficha de D&D 5e válida.
+    present = {" ".join(str(k).split()) for k in fields}
+    if "CharacterName" not in present and "HPMax" not in present:
         raise ValueError("El PDF no parece la ficha rellenable de D&D 5e (no encontré los campos).")
 
     name = g("CharacterName") or "Personaje"

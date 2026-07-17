@@ -340,4 +340,18 @@ campaña.
 - Los **enemigos** arrancan cada combate con su vida completa (son plantillas del
   encuentro); su vida solo se mantiene mientras ese combate siga activo.
 
-Para hacer backup, copiá el archivo `cosmere.db`.
+Para hacer backup, copiá el archivo `cosmere.db`. La base corre en modo **WAL**, así que
+además del `.db` pueden existir `cosmere.db-wal` y `cosmere.db-shm`: lo más seguro es
+**parar el servidor antes de copiar** (al cerrarse deja todo en el `.db`), o copiar los
+tres archivos juntos.
+
+## Tests
+
+Hay una suite de pruebas automatizadas (pytest) que cubre cuentas, campañas, personajes,
+bestiario, encuentros, mascotas y combate. Corre siempre contra una base temporal, nunca
+toca tu `cosmere.db`:
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+```
