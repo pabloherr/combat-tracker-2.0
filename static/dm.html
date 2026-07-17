@@ -53,6 +53,10 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .del-btn:hover{color:#e05050;}
 .edit-btn{background:transparent;border:none;cursor:pointer;color:var(--text3);font-size:12px;font-style:italic;font-family:'Crimson Pro',serif;}
 .edit-btn:hover{color:var(--gold);}
+.pet-btn{background:transparent;border:none;cursor:pointer;font-size:13px;filter:grayscale(1) opacity(.45);padding:0 2px;}
+.pet-btn:hover{filter:grayscale(.3) opacity(.9);}
+.pet-btn.on{filter:none;}
+.pet-badge{font-size:10px;color:var(--gold2);border:.5px solid rgba(224,189,124,.4);border-radius:10px;padding:0 6px;font-style:normal;}
 
 .form-wrap{background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--rl);padding:1.1rem;margin-bottom:1.1rem;}
 .form-title{font-family:'Cinzel',serif;font-size:12px;color:var(--gold);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.9rem;}
@@ -482,6 +486,7 @@ var CID=parseInt(location.pathname.split('/').filter(Boolean).pop());
 var API='/api/campaigns/'+CID;
 var SYSTEM='cosmere';   // sistema de la campaña (cosmere | dnd)
 var enemies=[], encounters=[], combat={active:false,participants:[]};
+var PET_OPTS=new Set();     // ids de enemigos habilitados como mascota en esta campaña
 var POS=['Determined','Enhanced','Empowered','Focus'];
 var NEG=['Restrained','Surprised','Stunned','Slowed','Disoriented','Prone','Exhausted','Unconscious','Immobilized','Afflicted'];
 var SC={Determined:'#5aaa70',Enhanced:'#6aaae8',Empowered:'#e8c840',Focus:'#aa8aec',Restrained:'#e07070',Surprised:'#e8a840',Stunned:'#c87830',Slowed:'#a09070',Disoriented:'#e07070',Prone:'#c84040',Exhausted:'#bf4a20',Unconscious:'#804040',Immobilized:'#aa8aec',Afflicted:'#5aaa70'};
@@ -1131,9 +1136,17 @@ function anyStatblock(e,skipActions){
 async function ensureEnemies(){ if(!enemies.length) enemies=await api(API+'/enemies'); }
 async function loadEnemies(){
   enemies=await api(API+'/enemies');
+  try{ var po=await api(API+'/pet-options'); PET_OPTS=new Set(po.map(function(e){return e.id;})); }
+  catch(e){ PET_OPTS=new Set(); }
   renderFilterBar('bfBar','bf',enemies,'renderEnemyGrid');
   renderEnemyGrid();
   populateAddEnemySelect();
+}
+// Habilita/deshabilita un enemigo como mascota elegible en esta campaña.
+async function togglePetOption(id){
+  if(PET_OPTS.has(id)){ await api(API+'/pet-options/'+id,'DELETE'); PET_OPTS.delete(id); }
+  else{ await api(API+'/pet-options/'+id,'POST'); PET_OPTS.add(id); }
+  renderEnemyGrid();
 }
 function enemyCard(e){
   var dnd=(e.stats||{}).dnd;
@@ -1144,9 +1157,11 @@ function enemyCard(e){
       +(a.descripcion?'<div class="accion-desc">'+esc(a.descripcion)+'</div>':'')+'</div>';
   }).join('');
   var col=e.faction_color||'';
+  var isPet=PET_OPTS.has(e.id);
   return '<div class="card"'+(col?' style="border-left:3px solid '+col+'"':'')+'>'
-    +'<div class="card-head"><span class="cname">'+(col?'<span class="color-dot" style="background:'+col+'"></span>':'')+esc(e.name)+'</span>'
-    +'<div><button class="edit-btn" onclick="openEnemyEditor('+e.id+')">editar</button> '
+    +'<div class="card-head"><span class="cname">'+(col?'<span class="color-dot" style="background:'+col+'"></span>':'')+esc(e.name)+(isPet?' <span class="pet-badge" title="Disponible como mascota en esta campaña">🐾 mascota</span>':'')+'</span>'
+    +'<div><button class="pet-btn'+(isPet?' on':'')+'" onclick="togglePetOption('+e.id+')" title="'+(isPet?'Quitar de las mascotas disponibles':'Habilitar como mascota para los jugadores')+'">🐾</button> '
+    +'<button class="edit-btn" onclick="openEnemyEditor('+e.id+')">editar</button> '
     +'<button class="del-btn" onclick="delEnemy('+e.id+')">✕</button></div></div>'
     +(dnd?'':'<div style="margin-bottom:6px">'+claseBadge(e.clase)+'</div>'+metaBadges(e))
     +(e.tipo?'<div class="ctype">'+esc(e.tipo)+'</div>':'')

@@ -47,7 +47,9 @@ def parse_character_pdf(data: bytes) -> dict:
         f = fields.get(name)
         return f.get("/V") if f is not None else None
 
-    if g("char_health_max") is None and g("char_name") is None:
+    # Se identifica por la presencia de los campos (no por su valor): una ficha
+    # en blanco o con esos campos vacíos igual es una ficha de Cosmere válida.
+    if "char_health_max" not in fields and "char_name" not in fields:
         raise ValueError("El PDF no parece una ficha de Cosmere RPG (no encontré los campos).")
 
     def collect(prefix):

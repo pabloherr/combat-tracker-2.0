@@ -229,6 +229,16 @@ def init_db():
         if "role" not in scols:
             conn.execute("ALTER TABLE sessions ADD COLUMN role TEXT DEFAULT 'dm'")
 
+        # Enemigos del bestiario que el DM habilita como mascota en una campaña.
+        # El jugador elige uno de esta lista (se copia como mascota). Por campaña.
+        conn.execute("""
+        CREATE TABLE IF NOT EXISTS campaign_pet_options (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+            enemy_id INTEGER NOT NULL REFERENCES enemies(id) ON DELETE CASCADE,
+            UNIQUE(campaign_id, enemy_id)
+        )""")
+
         # Migración: sistema de juego por campaña (cosmere | dnd) y recursos de
         # D&D por personaje (JSON: {"slots": {...}, "counters": [...]}).
         cpcols = {r["name"] for r in conn.execute("PRAGMA table_info(campaigns)")}

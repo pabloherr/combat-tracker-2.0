@@ -279,6 +279,56 @@ def dm_member_marcos_light(cid: int, uid: int, ch: MarcosChange, user=Depends(cu
     return {"ok": True, "marcos": total, "marcos_light": light}
 
 
+# ── Mascotas disponibles: enemigos del bestiario que el DM habilita por campaña ──
+
+@router.get("/campaigns/{cid}/pet-options")
+def list_pet_options(cid: int, user=Depends(current_user)):
+    """Enemigos habilitados como mascota en esta campaña. Lo ven el DM y los
+    miembros (el jugador elige de acá)."""
+    with db() as conn:
+        require_access(conn, cid, user)
+        rows = conn.execute(
+            "SELECT e.id, e.name, e.clase, e.tipo, e.vida_max, e.focus_max, e.inv_max, "
+            "e.faction_color, e.acciones, e.stats "
+            "FROM campaign_pet_options po JOIN enemies e ON e.id = po.enemy_id "
+            "WHERE po.campaign_id=? ORDER BY e.name",
+            (cid,),
+        ).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["acciones"] = json.loads(d.get("acciones") or "[]")
+            d["stats"] = json.loads(d.get("stats") or "{}")
+            out.append(d)
+        return out
+
+
+@router.post("/campaigns/{cid}/pet-options/{eid}")
+def add_pet_option(cid: int, eid: int, user=Depends(current_user)):
+    with db() as conn:
+        require_dm(conn, cid, user)
+        owned = conn.execute(
+            "SELECT 1 FROM enemies WHERE id=? AND owner_id=?", (eid, user["id"])
+        ).fetchone()
+        if not owned:
+            raise HTTPException(404, "Enemigo no encontrado en tu bestiario")
+        conn.execute(
+            "INSERT OR IGNORE INTO campaign_pet_options (campaign_id, enemy_id) VALUES (?,?)",
+            (cid, eid),
+        )
+    return {"ok": True}
+
+
+@router.delete("/campaigns/{cid}/pet-options/{eid}")
+def remove_pet_option(cid: int, eid: int, user=Depends(current_user)):
+    with db() as conn:
+        require_dm(conn, cid, user)
+        conn.execute(
+            "DELETE FROM campaign_pet_options WHERE campaign_id=? AND enemy_id=?", (cid, eid)
+        )
+    return {"ok": True}
+
+
 @router.get("/campaigns/{cid}/party")
 def campaign_party(cid: int, user=Depends(current_user)):
     """Jugadores aceptados con el nivel de su personaje (para calcular dificultad)."""

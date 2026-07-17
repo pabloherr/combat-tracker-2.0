@@ -1021,27 +1021,39 @@ async function removeImg(){
 function openPets(){
   document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
     +'<div class="sh-name">🐾 Mis mascotas</div>'
-    +'<div class="sh-meta" style="margin-bottom:10px">Cargá la ficha de la mascota (mismo formato de código que los enemigos).</div>'
-    +'<div id="petsList" style="margin-bottom:12px"></div>'
-    +'<textarea class="import-ta" id="petCode" placeholder="name: &quot;Axehound&quot;&#10;tier: &quot;Tier 1 Rival&quot;&#10;str: 3&#10;hp: 18&#10;actions:&#10;  - name: &quot;Bite&quot;&#10;    desc: &quot;Attack +4...&quot;"></textarea>'
-    +'<div class="me-sheet-row" style="justify-content:flex-end;border:none;margin-top:10px"><button class="btn-sheet" style="background:var(--gold);color:#1c1915;border-color:var(--gold)" onclick="importPet()">Cargar mascota</button></div>';
+    +'<div class="sh-meta" style="margin-bottom:10px">Elegí una mascota de las que habilitó el DM para esta campaña.</div>'
+    +'<div id="petsList" style="margin-bottom:14px"></div>'
+    +'<div class="section-lbl" style="margin-bottom:6px">Disponibles</div>'
+    +'<div id="petOptions">Cargando…</div>';
   document.getElementById('overlay').classList.add('on');
   loadPetsInto();
+  loadPetOptions();
 }
 async function loadPetsInto(){
   var pets=await api('/api/characters/'+MYCHAR+'/pets');
   var el=document.getElementById('petsList'); if(!el)return;
-  el.innerHTML=pets.length?pets.map(function(p){
+  el.innerHTML='<div class="section-lbl" style="margin-bottom:6px">Tus mascotas</div>'
+    +(pets.length?pets.map(function(p){
     return '<div class="inv-row"><span><b style="color:var(--gold2)">'+esc(p.name)+'</b> <span style="color:var(--text3);font-size:12px">Vida '+p.vida_max+' · Focus '+p.focus_max+(p.inv_max?' · Inv '+p.inv_max:'')+'</span></span>'
       +'<div style="flex:1"></div><button class="btn-sheet" style="color:#e05050;border-color:#e05050" onclick="delPet('+p.id+')">✕</button></div>';
-  }).join(''):'<div style="color:var(--text3);font-style:italic">Todavía no tiene mascotas.</div>';
+  }).join(''):'<div style="color:var(--text3);font-style:italic">Todavía no tiene mascotas.</div>');
 }
-async function importPet(){
-  var code=document.getElementById('petCode').value.trim();
-  if(!code){alert('Pegá la ficha de la mascota.');return;}
-  var r=await fetch('/api/characters/'+MYCHAR+'/pets/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code})});
-  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo leer la ficha');return;}
-  document.getElementById('petCode').value=''; loadPetsInto(); loadRoster();
+async function loadPetOptions(){
+  var el=document.getElementById('petOptions'); if(!el)return;
+  var opts;
+  try{ opts=await api('/api/campaigns/'+CID+'/pet-options'); }
+  catch(e){ el.innerHTML='<div style="color:var(--text3);font-style:italic">No se pudieron cargar las mascotas.</div>'; return; }
+  if(!opts.length){ el.innerHTML='<div style="color:var(--text3);font-style:italic">El DM todavía no habilitó mascotas en esta campaña.</div>'; return; }
+  el.innerHTML=opts.map(function(e){
+    var meta='Vida '+e.vida_max+' · Focus '+e.focus_max+(e.inv_max?' · Inv '+e.inv_max:'');
+    return '<div class="inv-row"><span><b style="color:var(--gold2)">'+esc(e.name)+'</b> <span style="color:var(--text3);font-size:12px">'+meta+'</span></span>'
+      +'<div style="flex:1"></div><button class="btn-sheet" style="background:var(--gold);color:#1c1915;border-color:var(--gold)" onclick="addPetFromEnemy('+e.id+')">+ Agregar</button></div>';
+  }).join('');
+}
+async function addPetFromEnemy(enemyId){
+  var r=await fetch('/api/characters/'+MYCHAR+'/pets/from-enemy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enemy_id:enemyId})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo agregar la mascota');return;}
+  loadPetsInto(); loadRoster();
 }
 async function delPet(petId){
   if(!confirm('¿Borrar esta mascota?'))return;
