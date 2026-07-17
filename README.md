@@ -88,16 +88,18 @@ Al entrar y loguearte llegás al **panel principal** (`/`), con dos zonas:
    clases, nivel y campaña). Cada personaje **pertenece a una campaña** (uno por campaña):
    no hay personajes sueltos.
 2. **Aceptá invitaciones** creando el personaje ahí mismo: **a mano** o **subiendo la
-   ficha PDF** (formato oficial de Cosmere RPG), que extrae automáticamente **vida, focus
+   ficha PDF**. Podés **descargar la ficha vacía** (rellenable) desde ese mismo diálogo,
+   completarla con un lector de PDF y subirla: se extraen automáticamente **vida, focus
    e investidura** (y el resto de la ficha: atributos, defensas, habilidades, talentos,
-   armas, equipo) e intenta sacar un **retrato** del PDF. Eso enlaza al personaje con la
-   campaña y acepta la invitación en un paso.
+   armas, equipo) y se intenta sacar un **retrato** del PDF. Eso enlaza al personaje con
+   la campaña y acepta la invitación en un paso. (En campañas de D&D 5e, la ficha vacía y
+   el parser son los de D&D.)
 3. Al **entrar a un personaje** llegás a su ficha detallada (pestaña **Mi personaje**),
    con botones para **editarlo**, gestionar sus **🐾 mascotas**, subir/cambiar su
    **retrato** y **actualizar el PDF**.
-4. **Mascotas:** cargás sus statblocks (mismo formato de código que los enemigos). Entran
-   al combate como aliados que **vos controlás**, con seguimiento propio (vida, focus,
-   estados, turno).
+4. **Mascotas:** elegís una de las que el **DM habilitó** para tu campaña (una lista que
+   arma con enemigos de su bestiario). Entran al combate como aliados que **vos
+   controlás**, con seguimiento propio (vida, focus, estados, turno).
 5. Dentro de una campaña tenés tres pestañas: **Mi personaje** (tu ficha y gestión fuera
    de combate), **Grupo** (el resto del grupo) y **Combate** (tu turno en vivo). Podés
    **salir** de la campaña cuando quieras (esto borra tu personaje de esa campaña).
@@ -145,6 +147,15 @@ actions:
 
 Las acciones con `(Costs X)` en el nombre toman ese coste automáticamente, y las
 negritas `**...**` de las descripciones se muestran resaltadas.
+
+### Mascotas para los jugadores
+
+En el **Bestiario**, cada enemigo tiene un botón 🐾 para **habilitarlo como mascota** en
+la campaña actual. Los enemigos habilitados quedan marcados (🐾 mascota) y los jugadores
+pueden **elegir uno como mascota** desde su ficha (botón 🐾 Mascotas). La lista es **por
+campaña**: el mismo bestiario puede ofrecer mascotas distintas en cada campaña. Al elegir
+una, se guarda una **copia** de la ficha, así que si después editás el enemigo la mascota
+ya agregada no cambia.
 
 ### Buscar enemigos
 

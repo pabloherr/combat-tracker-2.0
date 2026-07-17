@@ -78,8 +78,8 @@ class CharacterIn(BaseModel):
     inv: int | None = None
 
 
-class PetImportIn(BaseModel):
-    code: str                  # statblock YAML (mismo formato que los enemigos)
+class PetFromEnemy(BaseModel):
+    enemy_id: int              # enemigo del bestiario habilitado como mascota por el DM
 
 
 class LiveStat(BaseModel):

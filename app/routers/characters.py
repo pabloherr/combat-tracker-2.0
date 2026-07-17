@@ -7,11 +7,10 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from ..auth import current_user
-from ..cosmere_import import ImportError_, parse_statblock
 from ..database import db
 from ..dnd_pdf import parse_dnd_pdf
 from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
-                      LiveStat, LiveStatus, MarcosChange, MarcosSet, PetImportIn,
+                      LiveStat, LiveStatus, MarcosChange, MarcosSet, PetFromEnemy,
                       SlotsConfigIn, SlotSpend)
 from ..pdf_import import extract_pdf_image, parse_character_pdf
 
@@ -258,24 +257,30 @@ def list_pets(cid: int, user=Depends(current_user)):
         return [_pet_serialize(r) for r in rows]
 
 
-@router.post("/{cid}/pets/import")
-def import_pet(cid: int, payload: PetImportIn, user=Depends(current_user)):
-    """Carga una mascota desde un statblock (mismo formato que los enemigos)."""
+@router.post("/{cid}/pets/from-enemy")
+def add_pet_from_enemy(cid: int, payload: PetFromEnemy, user=Depends(current_user)):
+    """El jugador agrega como mascota un enemigo que el DM habilitó en su campaña.
+
+    Se copia una foto (snapshot) de la ficha: si el DM edita el enemigo después,
+    la mascota ya agregada no cambia."""
     with db() as conn:
-        _owned(conn, cid, user)
-    try:
-        p = parse_statblock(payload.code)
-    except ImportError_ as e:
-        raise HTTPException(400, str(e))
-    with db() as conn:
+        ch = _owned(conn, cid, user)
+        # El enemigo tiene que estar habilitado como mascota en la campaña del PJ.
+        e = conn.execute(
+            "SELECT e.* FROM campaign_pet_options po JOIN enemies e ON e.id = po.enemy_id "
+            "WHERE po.campaign_id=? AND po.enemy_id=?",
+            (ch["campaign_id"], payload.enemy_id),
+        ).fetchone()
+        if not e:
+            raise HTTPException(404, "Esa mascota no está disponible en esta campaña")
         cur = conn.execute(
             "INSERT INTO pets (owner_id, character_id, name, vida_max, focus_max, inv_max, vida, focus, inv, statuses, acciones, stats) "
             "VALUES (?,?,?,?,?,?,?,?,?,'[]',?,?)",
-            (user["id"], cid, p["name"], p["vida_max"], p["focus_max"], p["inv_max"],
-             p["vida_max"], p["focus_max"], p["inv_max"],
-             json.dumps(p["acciones"]), json.dumps(p["stats"])),
+            (user["id"], cid, e["name"], e["vida_max"], e["focus_max"], e["inv_max"],
+             e["vida_max"], e["focus_max"], e["inv_max"],
+             e["acciones"] or "[]", e["stats"] or "{}"),
         )
-        return {"id": cur.lastrowid, "name": p["name"]}
+        return {"id": cur.lastrowid, "name": e["name"]}
 
 
 @router.delete("/{cid}/pets/{pid}")
