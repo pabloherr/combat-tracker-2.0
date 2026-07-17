@@ -15,11 +15,24 @@ DB_PATH = ROOT / "cosmere.db"
 STATIC = ROOT / "static"
 
 
-@contextmanager
-def db():
-    conn = sqlite3.connect(DB_PATH)
+def _configure(conn):
+    """PRAGMAs por conexión, compartidos por la app y los tests.
+
+    - foreign_keys: hace que las cascadas ON DELETE funcionen.
+    - busy_timeout: ante un lock, el escritor espera hasta 5 s en vez de fallar
+      al toque (varios clientes escriben/leen a la vez: WS + polling).
+    - synchronous NORMAL: seguro y más rápido junto con WAL.
+    """
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")
+    conn.execute("PRAGMA synchronous = NORMAL")
+
+
+@contextmanager
+def db():
+    conn = sqlite3.connect(DB_PATH, timeout=5.0)
+    _configure(conn)
     try:
         yield conn
         conn.commit()
@@ -29,6 +42,9 @@ def db():
 
 def init_db():
     with db() as conn:
+        # WAL: lecturas concurrentes mientras hay una escritura. Es persistente
+        # en el archivo (basta setearlo una vez), ideal para WS + polling.
+        conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript("""
         -- ── Cuentas y sesiones ─────────────────────────────
         CREATE TABLE IF NOT EXISTS users (
