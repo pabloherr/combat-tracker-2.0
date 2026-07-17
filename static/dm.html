@@ -410,7 +410,7 @@ select.fi{appearance:auto;}
     </div>
     <div class="form-wrap" id="bulkForm" style="display:none">
       <div class="form-title">Importar muchas fichas de una vez</div>
-      <div class="import-hint">Pegá varias fichas separadas por una línea <b>---</b> (o subí un archivo .yaml/.txt). Cada ficha usa el mismo formato Cosmere RPG que la importación individual.</div>
+      <div class="import-hint" id="bulkHint">Pegá varias fichas separadas por una línea <b>---</b> (o subí un archivo .yaml/.txt). Cada ficha usa el mismo formato Cosmere RPG que la importación individual.</div>
       <div class="row" style="margin-bottom:8px">
         <button class="btn" onclick="document.getElementById('bulkFile').click()">⭳ Subir archivo</button>
         <input type="file" id="bulkFile" accept=".yaml,.yml,.txt,.md,text/plain" style="display:none" onchange="bulkLoadFile(this)"/>
@@ -425,9 +425,10 @@ select.fi{appearance:auto;}
     </div>
     <div class="form-wrap" id="importForm" style="display:none">
       <div class="form-title">Importar ficha desde código</div>
-      <div class="import-hint">Pegá el statblock en formato Cosmere RPG (YAML) y el sistema arma la ficha completa.</div>
+      <div class="import-hint" id="importHint">Pegá el statblock en formato Cosmere RPG (YAML) y el sistema arma la ficha completa.</div>
       <textarea class="import-ta" id="importCode" placeholder="layout: Cosmere RPG&#10;name: &quot;Archer&quot;&#10;tier: &quot;Tier 1 Minion – Medium Humanoid&quot;&#10;str: 2&#10;pdef: 13&#10;..."></textarea>
       <div class="form-actions" style="margin-top:10px">
+        <button class="btn ghost" id="dndExampleBtn" style="display:none" onclick="fillDndExample()">Pegar ejemplo completo (Lich)</button>
         <button class="btn ghost" onclick="toggleForm('importForm')">Cancelar</button>
         <button class="btn accent" onclick="importEnemy()">Importar</button>
       </div>
@@ -503,12 +504,65 @@ async function loadCampaign(){
     if(SYSTEM==='dnd'){
       document.getElementById('shortRestBtn').style.display='';
       document.getElementById('restHint').textContent='Largo: cura vida a full, limpia estados, baja heridas y recupera conjuros y contadores. Corto: solo recupera los contadores de descanso corto.';
-      // el import/export YAML es del formato Cosmere: en D&D los enemigos se cargan con el editor
-      ['importBtn','bulkBtn','exportBtn'].forEach(function(id){
-        var el=document.getElementById(id); if(el)el.style.display='none';
-      });
+      // import/export en formato D&D 5e (YAML propio, distinto del de Cosmere)
+      document.getElementById('importHint').textContent='Pegá el statblock en formato D&D 5e (YAML) y el sistema arma la ficha completa. Tocá "Pegar ejemplo completo" para ver todos los campos.';
+      document.getElementById('bulkHint').innerHTML='Pegá varias fichas separadas por una línea <b>---</b> (o subí un archivo .yaml/.txt). Cada ficha usa el mismo formato D&D 5e que la importación individual.';
+      document.getElementById('importCode').placeholder='layout: D&D 5e\nname: "Goblin"\ntype: "Small Humanoid (Goblinoid), Neutral Evil"\nac: "15 (leather armor, shield)"\nhp: 7\nspeed: "30 ft."\ncr: "1/4 (50 XP)"\nstr: 8\ndex: 14\n...';
+      document.getElementById('bulkCode').placeholder='layout: D&D 5e\nname: "Goblin"\nhp: 7\n---\nlayout: D&D 5e\nname: "Hobgoblin"\nhp: 11';
+      document.getElementById('dndExampleBtn').style.display='';
     }
   }catch(e){}
+}
+
+// Ejemplo completo de statblock D&D 5e (el Lich del manual) para copiar el formato.
+var DND_EXAMPLE='layout: D&D 5e\n'
+  +'name: "Lich"\n'
+  +'type: "Medium Undead, Any Evil Alignment"\n'
+  +'ac: "17 (natural armor)"\n'
+  +'hp: 135\n'
+  +'speed: "30 ft."\n'
+  +'cr: "21 (33,000 XP)"\n'
+  +'str: 11\n'
+  +'dex: 16\n'
+  +'con: 16\n'
+  +'int: 20\n'
+  +'wis: 14\n'
+  +'cha: 16\n'
+  +'saves: "CON +10, INT +12, WIS +9"\n'
+  +'skills: "Arcana +19, History +12, Insight +9, Perception +9"\n'
+  +'vulnerabilities: ""\n'
+  +'resistances: "Cold, Lightning, Necrotic"\n'
+  +'immunities: "Poison; Bludgeoning, Piercing, and Slashing from Nonmagical Attacks"\n'
+  +'condition_immunities: "Charmed, Exhaustion, Frightened, Paralyzed, Poisoned"\n'
+  +'senses: "Truesight 120 ft., Passive Perception 19"\n'
+  +'languages: "Common plus up to five other languages"\n'
+  +'color: "#a06ad0"\n'
+  +'notes: "Guarda su filacteria en la cripta."\n'
+  +'traits:\n'
+  +'  - name: "Legendary Resistance (3/Day)"\n'
+  +'    desc: "If the lich fails a saving throw, it can choose to succeed instead."\n'
+  +'  - name: "Rejuvenation"\n'
+  +'    desc: "If it has a phylactery, a destroyed lich gains a new body in 1d10 days."\n'
+  +'  - name: "Turn Resistance"\n'
+  +'    desc: "The lich has advantage on saving throws against any effect that turns undead."\n'
+  +'  - name: "Spellcasting"\n'
+  +'    desc: "18th-level spellcaster (INT, spell save DC 20, +12 to hit). Cantrips: mage hand, prestidigitation, ray of frost. 1st (4 slots): detect magic, magic missile, shield, thunderwave. 2nd (3): acid arrow, detect thoughts, invisibility, mirror image. 3rd (3): animate dead, counterspell, dispel magic, fireball. 4th (3): blight, dimension door. 5th (3): cloudkill, scrying. 6th (1): disintegrate, globe of invulnerability. 7th (1): finger of death, plane shift. 8th (1): dominate monster, power word stun. 9th (1): power word kill."\n'
+  +'actions:\n'
+  +'  - name: "Paralyzing Touch"\n'
+  +'    desc: "Melee Spell Attack: +12 to hit, reach 5 ft., one creature. Hit: 10 (3d6) cold damage. The target must succeed on a DC 18 CON save or be **paralyzed** for 1 minute."\n'
+  +'legendary:\n'
+  +'  - name: "Cantrip"\n'
+  +'    desc: "The lich casts a cantrip."\n'
+  +'  - name: "Paralyzing Touch (Costs 2 Actions)"\n'
+  +'    desc: "The lich uses its Paralyzing Touch."\n'
+  +'  - name: "Frightening Gaze (Costs 2 Actions)"\n'
+  +'    desc: "DC 18 WIS save or be **frightened** for 1 minute."\n'
+  +'  - name: "Disrupt Life (Costs 3 Actions)"\n'
+  +'    desc: "Each non-undead creature within 20 ft. makes a DC 18 CON save, taking 21 (6d6) necrotic damage on a failure, half on a success."\n';
+function fillDndExample(){
+  var ta=document.getElementById('importCode');
+  if(ta.value.trim()&&!confirm('Esto reemplaza lo que hay en el cuadro. ¿Seguir?'))return;
+  ta.value=DND_EXAMPLE;
 }
 
 // ═══════════ WebSocket (por campaña) ═══════════
