@@ -1,19 +1,39 @@
 """Rutas que sirven las páginas HTML."""
 
 from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from ..auth import optional_user
 from ..database import STATIC
+from ..version import VERSION
 
 router = APIRouter(tags=["frontend"])
 
 # El navegador siempre revalida el HTML para no quedarse con una versión vieja.
 _NO_CACHE = {"Cache-Control": "no-cache"}
 
+# Cartel con la versión, abajo a la derecha. Se inyecta al servir la página en
+# vez de escribirlo en cada HTML: así aparece en todas (incluidas las que se
+# agreguen después) y para publicar una versión nueva solo se toca version.py.
+_VERSION_TAG = (
+    '<div class="app-version" style="position:fixed;right:8px;bottom:6px;z-index:60;'
+    "font-family:'Cinzel',serif;font-size:10px;letter-spacing:.08em;"
+    'color:#6b6255;opacity:.75;pointer-events:none;user-select:none">'
+    f"v{VERSION}</div>"
+)
 
-def _page(name: str) -> FileResponse:
-    return FileResponse(STATIC / name, headers=_NO_CACHE)
+
+def _page(name: str) -> HTMLResponse:
+    html = (STATIC / name).read_text(encoding="utf-8")
+    # `1` = solo la primera aparición; si el HTML no tuviera </body>, queda igual.
+    return HTMLResponse(html.replace("</body>", _VERSION_TAG + "</body>", 1),
+                        headers=_NO_CACHE)
+
+
+@router.get("/api/version")
+def api_version():
+    """Para saber qué versión está corriendo el servidor sin abrir una página."""
+    return {"version": VERSION}
 
 
 def _role_home(u: dict) -> str:
