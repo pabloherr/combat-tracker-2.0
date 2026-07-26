@@ -1062,15 +1062,41 @@ async function delPet(petId){
   loadRoster();
 }
 
+// ─── WebSocket con heartbeat y reconexión ───
+// El proxy (Cloudflare) corta las conexiones ociosas, a veces sin avisar: queda
+// un socket "zombie" (onclose nunca se dispara) y el combate se congela. Por eso
+// mandamos un ping cada 25 s y, si no llega nada de vuelta en 70 s, lo cerramos
+// a mano para forzar la reconexión.
+var WS=null, WS_HB=null, WS_ALIVE=0;
+var WS_PING_MS=25000, WS_DEAD_MS=70000;
+function wsStop(){
+  if(WS_HB){clearInterval(WS_HB);WS_HB=null;}
+}
 function connect(){
+  // un solo socket a la vez
+  if(WS&&(WS.readyState===0||WS.readyState===1))return;
+  wsStop();
   var proto=location.protocol==='https:'?'wss':'ws';
   var ws=new WebSocket(proto+'://'+location.host+'/ws/'+CID);
-  ws.onopen=function(){document.getElementById('liveDot').classList.add('on');};
+  WS=ws;
+  ws.onopen=function(){
+    document.getElementById('liveDot').classList.add('on');
+    WS_ALIVE=Date.now();
+    WS_HB=setInterval(function(){
+      if(ws.readyState!==1)return;
+      if(Date.now()-WS_ALIVE>WS_DEAD_MS){ try{ws.close();}catch(e){} return; }
+      try{ ws.send('{"type":"ping"}'); }catch(e){}
+    },WS_PING_MS);
+  };
   ws.onmessage=function(ev){
+    WS_ALIVE=Date.now();
     var msg=JSON.parse(ev.data);
     if(msg.type==='combat') render(msg.data);
   };
+  ws.onerror=function(){ try{ws.close();}catch(e){} };
   ws.onclose=function(){
+    wsStop();
+    if(WS===ws)WS=null;
     document.getElementById('liveDot').classList.remove('on');
     setTimeout(connect,2000);
   };
@@ -1082,6 +1108,14 @@ async function init(){
   connect();
   await loadRoster();               // fija SYSTEM antes de decidir si hay tormentas
   if(SYSTEM!=='dnd') loadStorm();   // en D&D no hay altas tormentas
+  // Al volver a la pestaña: en segundo plano los timers se frenan y el socket
+  // puede haberse caído, así que reconectamos y resincronizamos en el acto.
+  document.addEventListener('visibilitychange',function(){
+    if(document.visibilityState!=='visible')return;
+    if(!WS||WS.readyState>1) connect();
+    loadRoster();
+    if(SYSTEM!=='dnd') loadStorm();
+  });
   // refresco periódico: la ficha del personaje / grupo y el tracker de tormentas
   // (esos cambios no viajan por WS)
   setInterval(function(){ if(SYSTEM!=='dnd') loadStorm(); loadRoster(); }, 5000);

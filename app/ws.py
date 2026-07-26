@@ -78,6 +78,10 @@ async def websocket_endpoint(ws: WebSocket, cid: int):
     await ws.send_json({"type": "combat", "data": combat if is_dm else player_view(combat)})
     try:
         while True:
-            await ws.receive_text()  # keep-alive
+            raw = await ws.receive_text()  # keep-alive / heartbeat del cliente
+            # El cliente manda pings periódicos para mantener viva la conexión a
+            # través del proxy (Cloudflare) y detectar cortes; le devolvemos pong.
+            if raw and '"ping"' in raw:
+                await ws.send_json({"type": "pong"})
     except WebSocketDisconnect:
         hub.disconnect(cid, ws)
