@@ -37,7 +37,7 @@ def _roll_initiative(stats: dict) -> int:
 def _mk_participant(kind, name, vida, focus, inv, acciones=None, notas="", faction_color="",
                     tipo="", stats=None, clase="rival", cur_vida=None, cur_focus=None,
                     cur_inv=None, statuses=None, char_id=None, user_id=None, pet_id=None,
-                    owner_name="", has_pdf=False, system="cosmere"):
+                    owner_name="", has_pdf=False, system="cosmere", injuries=None):
     # Enemigos y mascotas toman turno al azar; los jugadores lo eligen.
     turn = _roll_enemy_turn(clase) if kind in ("enemy", "pet") else "slow"
     # D&D: los enemigos y mascotas tiran iniciativa solos (d20 + mod de DEX);
@@ -63,6 +63,7 @@ def _mk_participant(kind, name, vida, focus, inv, acciones=None, notas="", facti
         "focus": cur_focus, "focus_max": focus,
         "inv": cur_inv, "inv_max": inv,
         "statuses": statuses or [],
+        "injuries": injuries or [],   # heridas activas (jugadores): se ven en combate
         "turn": turn,
         "initiative": initiative,
         "acted": False,
@@ -125,6 +126,7 @@ def _build_participants(conn, cid: int, encounter_id: int, system: str = "cosmer
             "player", ch["name"], ch["vida_max"], ch["focus_max"], ch["inv_max"],
             cur_vida=ch["vida"], cur_focus=ch["focus"], cur_inv=ch["inv"],
             statuses=json.loads(ch["statuses"] or "[]"),
+            injuries=json.loads(ch["injuries"] or "[]"),
             stats=json.loads(ch["sheet"] or "{}"),
             char_id=ch["id"], user_id=ch["user_id"], has_pdf=bool(ch["has_pdf"]),
             system=system,

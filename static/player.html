@@ -294,21 +294,37 @@ function statCtl(p,stat,label,color){
     +'</div></div>';
 }
 function statusPanel(p){
+  // Los estados que impone una herida se muestran fijados (🔒) igual que en la
+  // pestaña "Mi personaje": no se pueden sacar hasta curar la herida.
+  var locked=lockedCounts(p.injuries);
   var btns=POS.concat(NEG).map(function(s){
-    var cnt=(p.statuses||[]).filter(function(x){return x===s;}).length;
+    var manual=(p.statuses||[]).filter(function(x){return x===s;}).length;
+    var lk=locked[s]||0, cnt=manual+lk;
     var on=cnt>0,col=SC[s]||'#a09070';
     // Exhausted es apilable: cuando tiene cargas, muestra un botón "−" para quitar una (funciona con tap)
     if(s==='Exhausted'&&cnt>0){
       var lbl='Exhausted'+(cnt>1?' x'+cnt:'');
+      var minus=manual>0
+        ? '<button class="spill-minus" style="color:'+col+'" onclick="rmStatus(\''+p.uid+'\',\'Exhausted\')" title="Quitar una carga">−</button>'
+        : '<span class="spill-minus" style="color:'+col+';cursor:default" onclick="injLockMsg()" title="Fijado por una herida">🔒</span>';
       return '<span class="spill-group" style="border-color:'+col+'">'
         +'<button class="spill on" style="color:'+col+';background:'+col+'22" onclick="chStatus(\''+p.uid+'\',\'Exhausted\')" title="Sumar una carga">'+lbl+'</button>'
-        +'<button class="spill-minus" style="color:'+col+'" onclick="rmStatus(\''+p.uid+'\',\'Exhausted\')" title="Quitar una carga">−</button>'
-        +'</span>';
+        +minus+'</span>';
+    }
+    if(lk>0){
+      return '<button class="spill on" style="border-color:'+col+';color:'+col+';background:'+col+'22;cursor:default" onclick="injLockMsg()" title="Fijado por una herida">'+s+' 🔒</button>';
     }
     return '<button class="spill'+(on?' on':'')+'" style="'+(on?'border-color:'+col+';color:'+col+';background:'+col+'22':'')+'" '
       +'onclick="chStatus(\''+p.uid+'\',\''+s+'\')">'+s+'</button>';
   }).join('');
-  return '<div class="mstatuses">'+btns+'</div>';
+  return '<div class="mstatuses">'+btns+injuryChips(p.injuries)+'</div>';
+}
+// chips de heridas activas (informativo, dentro del combate)
+function injuryChips(inj){
+  if(!inj||!inj.length)return '';
+  return '<div class="stags" style="margin-top:6px">'+inj.map(function(i){
+    return '<span class="stag" style="border-color:#c87830;color:#c87830">🩹 '+esc(i.name)
+      +(i.permanent?'':' ('+i.days+'d)')+'</span>';}).join('')+'</div>';
 }
 function meControls(p){
   if(SYSTEM==='dnd') return statCtl(p,'vida','Vida','#e05050')+statusPanel(p);

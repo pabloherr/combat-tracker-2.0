@@ -1815,18 +1815,35 @@ function colorRow(p){
   return '<div class="color-row">'+sw+custom+'</div>';
 }
 
+// Heridas que imponen un estado mientras duran: [estado, cargas]. Mismo criterio
+// que en la ficha del jugador; el estado fijado no se saca hasta curar la herida.
+var INJURY_STATUS={'Exhausted [−1]':['Exhausted',1],'Exhausted [−2]':['Exhausted',2],
+  'Slowed':['Slowed',1],'Disoriented':['Disoriented',1],'Surprised':['Surprised',1]};
+function lockedCounts(injuries){
+  var m={};
+  (injuries||[]).forEach(function(it){var e=INJURY_STATUS[it.name];if(e)m[e[0]]=(m[e[0]]||0)+e[1];});
+  return m;
+}
 function participantCard(p){
   var statusBtns='';
+  var locked=lockedCounts(p.injuries);
   POS.concat(NEG).forEach(function(s){
-    var cnt=p.statuses.filter(function(x){return x===s;}).length;
+    var manual=p.statuses.filter(function(x){return x===s;}).length;
+    var lk=locked[s]||0, cnt=manual+lk;
     var on=cnt>0; var col=SC[s];
     // Exhausted apilable: botón "−" para quitar una carga (funciona con tap en el celu)
     if(s==='Exhausted'&&cnt>0){
       var lbl='Exhausted'+(cnt>1?' x'+cnt:'');
+      var minus=manual>0
+        ? '<button class="spill-minus" style="color:'+col+'" onclick="rmStatus(\''+p.uid+'\',\'Exhausted\')" title="Quitar una carga">−</button>'
+        : '<span class="spill-minus" style="color:'+col+';cursor:default" title="Fijado por una herida">🔒</span>';
       statusBtns+='<span class="spill-group" style="border-color:'+col+'">'
         +'<button class="spill on" style="background:'+col+'22;color:'+col+'" onclick="chStatus(\''+p.uid+'\',\'Exhausted\')" title="Sumar una carga">'+lbl+'</button>'
-        +'<button class="spill-minus" style="color:'+col+'" onclick="rmStatus(\''+p.uid+'\',\'Exhausted\')" title="Quitar una carga">−</button>'
-        +'</span>';
+        +minus+'</span>';
+      return;
+    }
+    if(lk>0){
+      statusBtns+='<button class="spill on" style="background:'+col+'22;color:'+col+';border-color:'+col+';cursor:default" title="Fijado por una herida (se quita al curarla)">'+s+' 🔒</button>';
       return;
     }
     statusBtns+='<button class="spill'+(on?' on':'')+'" style="'+(on?'background:'+col+'22;color:'+col+';border-color:'+col:'')+'" '
@@ -1888,10 +1905,19 @@ function participantCard(p){
     +(SYSTEM==='dnd'&&p.kind==='player'?'':statBlock(p,'focus','#6aaae8','+F','−F','heal','fu')
       +statBlock(p,'inv','#aa8aec','+I','−I','heal','iu'))
     +'<div class="spills">'+statusBtns+'</div>'
+    +injuryChips(p.injuries)
     +ficha
     +acciones
     +actedCtl
     +'</div>';
+}
+// Heridas activas del personaje: el DM las ve durante el combate.
+function injuryChips(inj){
+  if(!inj||!inj.length)return '';
+  return '<div class="spills" style="margin-top:-2px">'+inj.map(function(i){
+    return '<span class="spill on" style="border-color:#c87830;color:#c87830;background:#c8783022;cursor:default">🩹 '
+      +esc(i.name)+(i.permanent?' (permanente)':' ('+i.days+'d)')+'</span>';
+  }).join('')+'</div>';
 }
 
 function renderCombat(){

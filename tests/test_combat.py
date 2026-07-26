@@ -68,6 +68,81 @@ def test_player_view_hides_hidden_enemies(make_client):
     assert any(p["kind"] == "enemy" for p in dm.get(f"/api/campaigns/{cid}/combat").json()["participants"])
 
 
+def _me(cli, cid):
+    return _find(cli.get(f"/api/campaigns/{cid}/combat").json()["participants"], "player")
+
+
+def test_out_of_combat_change_reaches_combat(make_client):
+    """Lo que el jugador toca en 'Mi personaje' durante un combate tiene que verse
+    en el combate (y en la pantalla del DM), no quedar en dos estados distintos."""
+    dm, pl, cid, chid, _ = _combat(make_client, inv_max=10)
+    # vida desde la ficha (endpoint de personaje, no el de combate)
+    pl.post(f"/api/characters/{chid}/stat", json={"stat": "vida", "delta": -7})
+    assert _me(dm, cid)["vida"] == 13          # el DM lo ve en el combate
+    assert _me(pl, cid)["vida"] == 13
+    # focus e investidura
+    pl.post(f"/api/characters/{chid}/stat", json={"stat": "focus", "delta": -3})
+    assert _me(dm, cid)["focus"] == 7
+    # estados
+    pl.post(f"/api/characters/{chid}/status", json={"status": "Slowed"})
+    assert "Slowed" in _me(dm, cid)["statuses"]
+    pl.post(f"/api/characters/{chid}/status/remove_one", json={"status": "Slowed"})
+    assert "Slowed" not in _me(dm, cid)["statuses"]
+
+
+def test_injuries_reach_combat(make_client):
+    dm, pl, cid, chid, _ = _combat(make_client)
+    assert _me(dm, cid)["injuries"] == []
+    r = pl.post(f"/api/characters/{chid}/injuries",
+                json={"name": "Exhausted [-2]", "days": 3}).json()
+    iid = r["injuries"][0]["id"]
+    inj = _me(dm, cid)["injuries"]
+    assert len(inj) == 1 and inj[0]["name"] == "Exhausted [-2]" and inj[0]["days"] == 3
+    # cambiar los días y curar también se reflejan
+    pl.post(f"/api/characters/{chid}/injuries/{iid}/days", json={"delta": -1})
+    assert _me(dm, cid)["injuries"][0]["days"] == 2
+    pl.delete(f"/api/characters/{chid}/injuries/{iid}")
+    assert _me(dm, cid)["injuries"] == []
+
+
+def test_combat_does_not_overwrite_out_of_combat_change(make_client):
+    """El bug de fondo: sin sincronizar, el combate guardaba su copia vieja encima
+    de lo que el jugador había cambiado desde su ficha."""
+    dm, pl, cid, chid, _ = _combat(make_client)
+    pl.post(f"/api/characters/{chid}/stat", json={"stat": "vida", "delta": -10})  # 20 -> 10
+    # ahora un cambio hecho DENTRO del combate parte de 10, no de 20
+    uid = _me(pl, cid)["uid"]
+    pl.post(f"/api/campaigns/{cid}/combat/stat", json={"uid": uid, "stat": "vida", "delta": -1})
+    assert _me(dm, cid)["vida"] == 9
+    ch = next(m["character"] for m in pl.get(f"/api/campaigns/{cid}/roster").json()["members"])
+    assert ch["vida"] == 9      # la ficha y el combate coinciden
+
+
+def test_edit_sheet_syncs_maximums(make_client):
+    dm, pl, cid, chid, _ = _combat(make_client)
+    pl.put(f"/api/characters/{chid}", json={
+        "name": "Kal el Grande", "campaign_id": cid,
+        "vida_max": 40, "focus_max": 10, "inv_max": 0, "sheet": {}})
+    me = _me(dm, cid)
+    assert me["vida_max"] == 40 and me["name"] == "Kal el Grande"
+
+
+def test_pet_change_out_of_combat_reaches_combat(make_client):
+    from helpers import SAMPLE_STATBLOCK, get_enemies, import_enemy
+    dm, pl, cid, chid = party(make_client)
+    import_enemy(dm, cid, SAMPLE_STATBLOCK)
+    eid = get_enemies(dm, cid)[0]["id"]
+    dm.post(f"/api/campaigns/{cid}/pet-options/{eid}")
+    pid = pl.post(f"/api/characters/{chid}/pets/from-enemy",
+                  json={"enemy_id": eid}).json()["id"]
+    encid = dm.post(f"/api/campaigns/{cid}/encounters",
+                    json={"name": "E", "enemies": [{"enemy_id": eid, "cantidad": 1}]}).json()["id"]
+    dm.post(f"/api/campaigns/{cid}/combat/start/{encid}")
+    pl.post(f"/api/characters/{chid}/pets/{pid}/stat", json={"stat": "vida", "delta": -5})
+    pet = _find(dm.get(f"/api/campaigns/{cid}/combat").json()["participants"], "pet")
+    assert pet["vida"] == 13     # 18 - 5
+
+
 def test_guard_player_cannot_touch_enemy(make_client):
     dm, pl, cid, chid, combat = _combat(make_client)
     enemy = _find(combat["participants"], "enemy")

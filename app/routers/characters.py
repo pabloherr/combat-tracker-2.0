@@ -13,6 +13,8 @@ from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn
                       LiveStat, LiveStatus, MarcosChange, MarcosSet, PetFromEnemy,
                       SlotsConfigIn, SlotSpend)
 from ..pdf_import import extract_pdf_image, parse_character_pdf
+from ..state import combats
+from ..ws import push_state
 
 router = APIRouter(prefix="/api/characters", tags=["characters"])
 
@@ -107,6 +109,42 @@ def _apply_pdf_slots(conn, char_id: int, slots):
     conn.execute("UPDATE characters SET dnd_resources=? WHERE id=?", (json.dumps(d), char_id))
 
 
+# ── Sincronización con el combate en curso ────────────────
+
+def _campaign_of(conn, cid: int):
+    r = conn.execute("SELECT campaign_id FROM characters WHERE id=?", (cid,)).fetchone()
+    return r["campaign_id"] if r else None
+
+
+async def _sync_combat(campaign_id, fields: dict, *, char_id=None, pet_id=None):
+    """Refleja en el combate en curso un cambio hecho desde la ficha.
+
+    Durante un combate cada participante lleva su propia copia de vida/focus/
+    investidura/estados. Si el jugador toca su ficha fuera del combate hay que
+    actualizar también esa copia: si no, el combate (y la pantalla del DM) se
+    quedan con los valores viejos y el próximo cambio hecho en combate los pisa.
+    """
+    if not campaign_id:
+        return
+    combat = combats.get(campaign_id)
+    if not combat.get("active"):
+        return
+    touched = False
+    for p in combat.get("participants", []):
+        is_char = (char_id is not None and p.get("kind") == "player"
+                   and p.get("char_id") == char_id)
+        is_pet = (pet_id is not None and p.get("kind") == "pet"
+                  and p.get("pet_id") == pet_id)
+        if not (is_char or is_pet):
+            continue
+        p.update(fields)
+        if "vida" in fields:
+            p["defeated"] = p["vida"] == 0
+        touched = True
+    if touched:
+        await push_state(campaign_id)   # guarda y difunde por WebSocket
+
+
 def _store_extracted_image(conn, char_id: int, pdf_bytes: bytes):
     """Best-effort: si el PDF trae un retrato, lo guarda como imagen del PJ."""
     img = extract_pdf_image(pdf_bytes)
@@ -150,7 +188,8 @@ def create_character(c: CharacterIn, user=Depends(current_user)):
 
 
 @router.put("/{cid}")
-def update_character(cid: int, c: CharacterIn, user=Depends(current_user)):
+async def update_character(cid: int, c: CharacterIn, user=Depends(current_user)):
+    name = c.name.strip() or "Personaje"
     with db() as conn:
         row = _owned(conn, cid, user)
         # Valor actual: usa el que mandó el jugador (si vino), si no el guardado;
@@ -164,9 +203,16 @@ def update_character(cid: int, c: CharacterIn, user=Depends(current_user)):
         conn.execute(
             "UPDATE characters SET name=?, vida_max=?, focus_max=?, inv_max=?, "
             "vida=?, focus=?, inv=?, sheet=? WHERE id=?",
-            (c.name.strip() or "Personaje", c.vida_max, c.focus_max, c.inv_max,
+            (name, c.vida_max, c.focus_max, c.inv_max,
              vida, focus, inv, json.dumps(c.sheet), cid),
         )
+        campaign_id = row["campaign_id"]
+    await _sync_combat(campaign_id, {
+        "name": name,
+        "vida": vida, "vida_max": c.vida_max,
+        "focus": focus, "focus_max": c.focus_max,
+        "inv": inv, "inv_max": c.inv_max,
+    }, char_id=cid)
     return {"ok": True}
 
 
@@ -320,7 +366,7 @@ def _owned_pet(conn, cid: int, pid: int, user: dict):
 
 
 @router.post("/{cid}/stat")
-def character_stat(cid: int, s: LiveStat, user=Depends(current_user)):
+async def character_stat(cid: int, s: LiveStat, user=Depends(current_user)):
     if s.stat not in _STATS:
         raise HTTPException(400, "Stat inválido")
     with db() as conn:
@@ -335,64 +381,76 @@ def character_stat(cid: int, s: LiveStat, user=Depends(current_user)):
             if gained > 0 and light > 0:
                 light = max(0, light - gained)
                 conn.execute("UPDATE characters SET marcos_light=? WHERE id=?", (light, cid))
+        campaign_id = r["campaign_id"]
+    await _sync_combat(campaign_id, {s.stat: val}, char_id=cid)
     return {"ok": True, "value": val, "marcos_light": light}
 
 
 @router.post("/{cid}/status")
-def character_status(cid: int, s: LiveStatus, user=Depends(current_user)):
+async def character_status(cid: int, s: LiveStatus, user=Depends(current_user)):
     with db() as conn:
         r = _owned(conn, cid, user)
         st = _toggle_status(json.loads(r["statuses"] or "[]"), s.status)
         conn.execute("UPDATE characters SET statuses=? WHERE id=?", (json.dumps(st), cid))
+        campaign_id = r["campaign_id"]
+    await _sync_combat(campaign_id, {"statuses": st}, char_id=cid)
     return {"ok": True, "statuses": st}
 
 
 @router.post("/{cid}/status/remove_one")
-def character_status_remove(cid: int, s: LiveStatus, user=Depends(current_user)):
+async def character_status_remove(cid: int, s: LiveStatus, user=Depends(current_user)):
     with db() as conn:
         r = _owned(conn, cid, user)
         st = json.loads(r["statuses"] or "[]")
         if s.status in st:
             st.remove(s.status)
         conn.execute("UPDATE characters SET statuses=? WHERE id=?", (json.dumps(st), cid))
+        campaign_id = r["campaign_id"]
+    await _sync_combat(campaign_id, {"statuses": st}, char_id=cid)
     return {"ok": True, "statuses": st}
 
 
 @router.post("/{cid}/pets/{pid}/stat")
-def pet_stat(cid: int, pid: int, s: LiveStat, user=Depends(current_user)):
+async def pet_stat(cid: int, pid: int, s: LiveStat, user=Depends(current_user)):
     if s.stat not in _STATS:
         raise HTTPException(400, "Stat inválido")
     with db() as conn:
         r = _owned_pet(conn, cid, pid, user)
         val = _clamp_stat(r, s.stat, s.delta)
         conn.execute(f"UPDATE pets SET {s.stat}=? WHERE id=?", (val, pid))
+        campaign_id = _campaign_of(conn, cid)
+    await _sync_combat(campaign_id, {s.stat: val}, pet_id=pid)
     return {"ok": True, "value": val}
 
 
 @router.post("/{cid}/pets/{pid}/status")
-def pet_status(cid: int, pid: int, s: LiveStatus, user=Depends(current_user)):
+async def pet_status(cid: int, pid: int, s: LiveStatus, user=Depends(current_user)):
     with db() as conn:
         r = _owned_pet(conn, cid, pid, user)
         st = _toggle_status(json.loads(r["statuses"] or "[]"), s.status)
         conn.execute("UPDATE pets SET statuses=? WHERE id=?", (json.dumps(st), pid))
+        campaign_id = _campaign_of(conn, cid)
+    await _sync_combat(campaign_id, {"statuses": st}, pet_id=pid)
     return {"ok": True, "statuses": st}
 
 
 @router.post("/{cid}/pets/{pid}/status/remove_one")
-def pet_status_remove(cid: int, pid: int, s: LiveStatus, user=Depends(current_user)):
+async def pet_status_remove(cid: int, pid: int, s: LiveStatus, user=Depends(current_user)):
     with db() as conn:
         r = _owned_pet(conn, cid, pid, user)
         st = json.loads(r["statuses"] or "[]")
         if s.status in st:
             st.remove(s.status)
         conn.execute("UPDATE pets SET statuses=? WHERE id=?", (json.dumps(st), pid))
+        campaign_id = _campaign_of(conn, cid)
+    await _sync_combat(campaign_id, {"statuses": st}, pet_id=pid)
     return {"ok": True, "statuses": st}
 
 
 # ── Heridas (injuries) del personaje ──────────────────────
 
 @router.post("/{cid}/injuries")
-def add_injury(cid: int, inj: InjuryIn, user=Depends(current_user)):
+async def add_injury(cid: int, inj: InjuryIn, user=Depends(current_user)):
     name = inj.name.strip()
     if not name:
         raise HTTPException(400, "Poné el tipo de herida")
@@ -402,11 +460,13 @@ def add_injury(cid: int, inj: InjuryIn, user=Depends(current_user)):
         lst.append({"id": uuid.uuid4().hex[:8], "name": name,
                     "days": max(0, inj.days), "permanent": bool(inj.permanent)})
         conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(lst), cid))
+        campaign_id = r["campaign_id"]
+    await _sync_combat(campaign_id, {"injuries": lst}, char_id=cid)
     return {"ok": True, "injuries": lst}
 
 
 @router.post("/{cid}/injuries/{iid}/days")
-def injury_days(cid: int, iid: str, ch: DaysChange, user=Depends(current_user)):
+async def injury_days(cid: int, iid: str, ch: DaysChange, user=Depends(current_user)):
     with db() as conn:
         r = _owned(conn, cid, user)
         lst = json.loads(r["injuries"] or "[]")
@@ -414,15 +474,19 @@ def injury_days(cid: int, iid: str, ch: DaysChange, user=Depends(current_user)):
             if it["id"] == iid and not it.get("permanent"):
                 it["days"] = max(0, it.get("days", 0) + ch.delta)
         conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(lst), cid))
+        campaign_id = r["campaign_id"]
+    await _sync_combat(campaign_id, {"injuries": lst}, char_id=cid)
     return {"ok": True, "injuries": lst}
 
 
 @router.delete("/{cid}/injuries/{iid}")
-def delete_injury(cid: int, iid: str, user=Depends(current_user)):
+async def delete_injury(cid: int, iid: str, user=Depends(current_user)):
     with db() as conn:
         r = _owned(conn, cid, user)
         lst = [it for it in json.loads(r["injuries"] or "[]") if it["id"] != iid]
         conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(lst), cid))
+        campaign_id = r["campaign_id"]
+    await _sync_combat(campaign_id, {"injuries": lst}, char_id=cid)
     return {"ok": True, "injuries": lst}
 
 
@@ -575,7 +639,7 @@ def character_marcos_set(cid: int, s: MarcosSet, user=Depends(current_user)):
 
 
 @router.post("/{cid}/marcos/charge_inv")
-def character_charge_inv(cid: int, user=Depends(current_user)):
+async def character_charge_inv(cid: int, user=Depends(current_user)):
     """Cargar investidura: llena el medidor 1:1 apagando marcos cargados."""
     with db() as conn:
         r = _owned(conn, cid, user)
@@ -585,6 +649,8 @@ def character_charge_inv(cid: int, user=Depends(current_user)):
         new_inv = inv + amount
         new_light = light - amount
         conn.execute("UPDATE characters SET inv=?, marcos_light=? WHERE id=?", (new_inv, new_light, cid))
+        campaign_id = r["campaign_id"]
+    await _sync_combat(campaign_id, {"inv": new_inv}, char_id=cid)
     return {"ok": True, "inv": new_inv, "marcos_light": new_light, "charged": amount}
 
 
