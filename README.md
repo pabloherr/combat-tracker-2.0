@@ -157,6 +157,138 @@ campaña**: el mismo bestiario puede ofrecer mascotas distintas en cada campaña
 una, se guarda una **copia** de la ficha, así que si después editás el enemigo la mascota
 ya agregada no cambia.
 
+## Objetos, tiendas e inventario (solo Cosmere)
+
+### Catálogo de objetos (pestaña **Objetos**)
+
+El DM arma su catálogo igual que el bestiario: a mano, **importando desde código**
+(YAML), **en bulk** (varias fichas separadas por `---`, o un archivo) y con **exportar**
+para hacer backup o pasárselo a otro DM.
+
+> **Ya viene cargado:** el archivo [`static/catalogo_cosmere.yaml`](static/catalogo_cosmere.yaml)
+> tiene los **123 objetos del manual** (armas ligeras, pesadas y especiales, armaduras,
+> equipo, alojamiento, vehículos y fabriales). Importalo con
+> *Objetos → ⭳⭳ Importar en bulk → Cargar archivo*.
+
+Cada objeto es de un **tipo**, y cada tipo se lista con sus propios datos:
+
+| Tipo | Qué guarda |
+|---|---|
+| **Arma** | clase (ligera/pesada/especial), daño, alcance, habilidad, rasgos y rasgos de experto |
+| **Armadura** | deflect, rasgos y rasgos de experto |
+| **Equipo** | precio y descripción; se subdivide con categorías (medicina, herramientas, comida…) |
+| **Alojamiento** | precio por persona por noche |
+| **Vehículo** | tipo, velocidad, alquiler por día y precio de compra |
+| **Fabrial** | cargas |
+
+Y en común: precio en marcos, peso, **slots**, **+capacidad**, **dosis/cargas** y
+**capacidad de contenedor**.
+
+```yaml
+kind: arma
+weapon_class: light
+name: "Jabalina"
+damage: "1d6 keen"
+range: "Melee"
+traits: "Thrown [30/120]"
+expert_traits: "Indirect"
+weight: "2 lb."
+price: 20
+---
+kind: equipo
+name: "Raciones (5 días)"
+categories: [comida]
+price: 1
+uses: 5           # 5 usos que ocupan 1 solo slot
+---
+kind: equipo
+name: "Mochila"
+categories: [generales, contenedores]
+price: 8
+container: 2      # guarda aparte: 2 slots propios
+---
+kind: armadura
+name: "Placa completa"
+deflect: 4
+traits: "Cumbersome [5]"
+slots: 6
+price: 1600
+```
+
+El catálogo es **del DM** y se comparte entre sus campañas. Con el botón 🔒 marcás un
+objeto como **secreto**: existe para vos, pero no aparece en el catálogo de los jugadores
+ni sale sorteado en las tiendas (así están cargadas la Hoja Esquirlada, el Moldeador de
+almas, etc.).
+
+### Tiendas y asentamientos (pestaña **Comercio**)
+
+- **Asentamiento**: creás una **aldea**, **pueblo** o **ciudad** y se generan sus tiendas
+  típicas con stock (la aldea trae general y granja; la ciudad suma herrería, fabrial,
+  joyería, alquimista…). Después podés **agregarle tiendas** (por ejemplo, una herrería a
+  una aldea que no tenía) y **restockear el pueblo entero** de una.
+- **Tienda suelta**: también podés crear una sola, sin asentamiento.
+- **Rubro** (preset): general, herrería, fabrial, carpintería, granja, médica/herbalista,
+  sastrería, taberna, joyería, alquimista, librería. Define qué categorías vende.
+- **Tamaño**: pequeña, mediana o grande. Decide **cuántos objetos** tiene y **hasta qué
+  precio** llega, así una herrería chica no tiene una placa completa.
+- **Precios**: barata (×0.75), normal, cara (×1.5) o **variada** (cada objeto sale con su
+  propio precio al azar). El precio queda fijo en la tienda y podés tocarlo a mano.
+- **Trastienda**: parte del stock arranca **oculto**. Con 👁 decidís qué ven los jugadores.
+- **Restock**: rota el stock según los **días transcurridos** desde el último restock (los
+  días avanzan con el descanso largo o con "+1 día").
+- El DM puede **agregar o sacar** objetos de una tienda cuando quiera.
+
+### Comprar: el jugador pide, el DM confirma
+
+El jugador ve las tiendas con lo que el DM expuso y toca **Pedir**. El pedido le llega al
+DM en **Pedidos pendientes**, con el total y cuántos marcos tiene ese personaje. Al
+**Aprobar**, se cobran los marcos, baja el stock y el objeto entra al inventario. Se pagan
+**primero los marcos opacos** (uno se queda con la luz que pueda) y después los cargados;
+si no le alcanza, la aprobación se rechaza sola.
+
+### Dar objetos sin tienda
+
+En la pestaña **Jugadores**, con **🎁 Dar objeto** le das algo a un personaje (o a su
+mascota) eligiéndolo del catálogo o **creándolo en el momento**, con la opción de
+guardarlo también en el catálogo. Al lado, el toggle **✎ Crea objetos** le da permiso a
+ese jugador para cargarse objetos propios; sin ese permiso solo recibe o compra.
+
+### Inventario y capacidad de carga
+
+Regla opcional del Cosmere RPG, en la pestaña **Inventario** del jugador:
+
+```
+Capacidad = base por tamaño + Fuerza
+Pequeño 4 · Mediano 6 · Grande 10 · Enorme 15 · Gargantuesco 20
+```
+
+Cada objeto ocupa **1 slot**, salvo: el dinero y las cosas insignificantes **0**,
+`Cumbersome N` ocupa **1+N**, la Placa y la Hoja Radiante **0**, y los objetos grandes más
+de 1 (a criterio del DM, se carga en el objeto). El personaje y **cada mascota** tienen su
+propia barra; si te pasás, se marca **Sobrecargado** en rojo pero **no te bloquea** (la
+penalización la decide el DM).
+
+**Contenedores.** La mochila (y el saco, el cofre, la carreta del chull…) **guarda
+aparte**: tiene su propia barra de espacio, y lo que metés adentro ocupa **ese** espacio,
+no el tuyo. Con **⇩ Guardar** elegís en qué contenedor va y con **⇧ Sacar** vuelve a tus
+manos; podés cargar la **carreta del chull** con cosas que llevabas encima. Además cada
+cosa se puede **equipar o dejar** (🎒): lo que dejaste no cuenta para tu carga.
+
+**Dosis y cargas.** Los objetos con usos (raciones de 5 días, antisépticos de 5 dosis,
+venenos, fabriales con cargas) muestran un contador **3/5** y un botón **Usar**: ocupan
+**un solo slot** hasta que se agotan, y ahí desaparecen (si tenías más de una unidad,
+arranca la siguiente).
+
+Al **crear** el personaje desde el PDF se importan su equipo y sus armas como objetos, y
+sus esferas como marcos. Al **actualizar** el PDF (subir de nivel) el inventario y los
+marcos **no se tocan**.
+
+### Catálogo para los jugadores
+
+En la pestaña **Tiendas** los jugadores tienen además un **catálogo** de todo lo que
+existe en el mundo, con buscador, **sin precios** (los precios se ven en cada tienda) y
+sin los objetos que el DM marcó como secretos.
+
 ### Buscar enemigos
 
 Tanto en el **Bestiario** como en el **creador de encuentros** hay un buscador por

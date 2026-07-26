@@ -25,7 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from app import ws
 from app.database import STATIC, init_db
 from app.routers import (auth, campaigns, characters, combat, encounters,
-                         enemies, frontend)
+                         enemies, frontend, items, shops)
 
 init_db()
 
@@ -37,6 +37,8 @@ app.include_router(campaigns.router)
 app.include_router(characters.router)
 app.include_router(enemies.router)
 app.include_router(encounters.router)
+app.include_router(items.router)
+app.include_router(shops.router)
 app.include_router(combat.router)
 app.include_router(frontend.router)
 

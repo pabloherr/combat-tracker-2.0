@@ -131,6 +131,93 @@ class CounterValue(BaseModel):
     delta: int
 
 
+# ── Objetos, comercio e inventario ─────────────────────────
+
+class ItemIn(BaseModel):
+    name: str
+    kind: str = "equipo"         # arma | armadura | equipo | alojamiento | vehiculo | fabrial
+    descripcion: str = ""
+    categorias: list[str] = []   # subcategorías: medicina, herramientas, comida…
+    precio: int = 0
+    peso: str = ""               # peso del manual (informativo)
+    slots: int = 1
+    capacity_bonus: int = 0      # suma capacidad al que lo lleva
+    usos_max: int = 0            # dosis/cargas por unidad (5 raciones = 1 slot)
+    contenedor_capacidad: int = 0  # >0 => es contenedor (mochila, carreta…)
+    stats: dict = {}             # datos propios del tipo (daño, deflect, cargas…)
+    notas: str = ""
+    secreto: bool = False        # no aparece en el catálogo de los jugadores
+
+
+class ItemImportIn(BaseModel):
+    code: str                    # YAML de uno o varios objetos
+
+
+class InventoryIn(BaseModel):
+    """Alta de un objeto en el inventario.
+
+    El DM puede dar uno del catálogo (`item_id`) o crearlo al vuelo; el jugador
+    con permiso solo puede crearlo al vuelo."""
+    item_id: int | None = None
+    name: str = ""
+    kind: str = "equipo"
+    descripcion: str = ""
+    categorias: list[str] = []
+    peso: str = ""
+    slots: int = 1
+    capacity_bonus: int = 0
+    usos_max: int = 0
+    contenedor_capacidad: int = 0
+    stats: dict = {}
+    cantidad: int = 1
+    notas: str = ""
+    parent_id: int | None = None    # dentro de qué contenedor entra
+    save_to_catalog: bool = False   # además, guardarlo en el catálogo del DM
+
+
+class InventoryQty(BaseModel):
+    delta: int
+
+
+class InventoryMove(BaseModel):
+    parent_id: int | None = None    # null = sacarlo del contenedor
+
+
+class SizeIn(BaseModel):
+    size: str                    # Pequeño | Mediano | Grande | Enorme | Gargantuesco
+
+
+class ShopIn(BaseModel):
+    name: str
+    preset: str = "general"
+    size: str = "mediana"           # pequeña | mediana | grande
+    price_policy: str = "normal"    # barato | normal | caro | variado
+    descripcion: str = ""
+    settlement_id: int | None = None
+
+
+class SettlementIn(BaseModel):
+    name: str
+    size: str = "pueblo"            # aldea | pueblo | ciudad
+    descripcion: str = ""
+
+
+class ShopItemIn(BaseModel):
+    item_id: int
+    cantidad: int = 1
+    precio: int | None = None       # si no viene, se calcula con la política
+    visible: bool = True
+
+
+class PriceIn(BaseModel):
+    precio: int
+
+
+class PurchaseIn(BaseModel):
+    shop_item_id: int
+    cantidad: int = 1
+
+
 class AccionIn(BaseModel):
     nombre: str
     coste: str = ""          # ej: "1 acción", "2 focus"

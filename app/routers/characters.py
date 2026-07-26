@@ -10,8 +10,9 @@ from ..auth import current_user
 from ..database import db
 from ..dnd_pdf import parse_dnd_pdf
 from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
-                      LiveStat, LiveStatus, MarcosChange, MarcosSet, PetFromEnemy,
-                      SlotsConfigIn, SlotSpend)
+                      InventoryIn, InventoryMove, InventoryQty, LiveStat, LiveStatus,
+                      MarcosChange, MarcosSet, PetFromEnemy, SizeIn, SlotsConfigIn,
+                      SlotSpend)
 from ..pdf_import import extract_pdf_image, parse_character_pdf
 from ..state import combats
 from ..ws import push_state
@@ -280,9 +281,33 @@ async def import_pdf(campaign_id: int, file: UploadFile = File(...), user=Depend
         cid = cur.lastrowid
         conn.execute("INSERT INTO character_pdfs (character_id, pdf) VALUES (?,?)", (cid, data))
         _apply_pdf_slots(conn, cid, p["slots"])
+        _seed_from_pdf(conn, cid, p, system)
         _link_membership(conn, campaign_id, user, cid)
         _store_extracted_image(conn, cid, data)
     return {"id": cid, "name": p["name"]}
+
+
+def _seed_from_pdf(conn, char_id: int, p: dict, system: str):
+    """Semilla inicial desde la ficha: inventario (armas + equipo) y marcos.
+
+    Solo corre al **crear** el personaje. Al reimportar el PDF para subir de
+    nivel no se toca nada de esto, porque para entonces el jugador ya compró,
+    gastó y reacomodó sus cosas en la app."""
+    if system != "cosmere":
+        return
+    sheet = p.get("sheet") or {}
+    for linea in (sheet.get("weapons") or []) + (sheet.get("equipment") or []):
+        nombre = str(linea).strip()
+        if nombre:
+            conn.execute(
+                "INSERT INTO inventory (character_id, name, slots, cantidad) VALUES (?,?,1,1)",
+                (char_id, nombre[:120]),
+            )
+    marcos = max(0, int(p.get("spheres") or 0))
+    if marcos:
+        # Entran cargados; el jugador ajusta el reparto con el recuadro de marcos.
+        conn.execute("UPDATE characters SET marcos=?, marcos_light=? WHERE id=?",
+                     (marcos, marcos, char_id))
 
 
 # ── Mascotas (pets) de un personaje ────────────────────────
@@ -636,6 +661,307 @@ def character_marcos_set(cid: int, s: MarcosSet, user=Depends(current_user)):
         conn.execute("UPDATE characters SET marcos=?, marcos_light=? WHERE id=?",
                      (cargados + opacos, cargados, cid))
     return {"ok": True, "marcos": cargados + opacos, "marcos_light": cargados}
+
+
+# ── Inventario y capacidad de carga (regla opcional de Cosmere) ──
+#
+# Capacidad = base por tamaño + Fuerza (+ bonus de objetos como la mochila).
+# Cada objeto ocupa 1 slot salvo excepciones: el dinero y los insignificantes 0,
+# Cumbersome N ocupa 1+N, y los grandes más de 1 (queda a criterio del DM, que
+# carga el número de slots al crear el objeto).
+
+_SIZE_BASE = {"Pequeño": 4, "Mediano": 6, "Grande": 10, "Enorme": 15, "Gargantuesco": 20}
+# Los statblocks vienen en inglés; se mapean al tamaño del sistema.
+_SIZE_ALIASES = {"tiny": "Pequeño", "small": "Pequeño", "medium": "Mediano",
+                 "large": "Grande", "huge": "Enorme", "gargantuan": "Gargantuesco",
+                 "pequeño": "Pequeño", "mediano": "Mediano", "grande": "Grande",
+                 "enorme": "Enorme", "gargantuesco": "Gargantuesco"}
+
+
+def _norm_size(value) -> str:
+    return _SIZE_ALIASES.get(str(value or "").strip().lower(), "Mediano")
+
+
+def _inv_rows(conn, *, character_id=None, pet_id=None):
+    if character_id is not None:
+        return conn.execute(
+            "SELECT * FROM inventory WHERE character_id=? AND pet_id IS NULL ORDER BY name",
+            (character_id,)).fetchall()
+    return conn.execute("SELECT * FROM inventory WHERE pet_id=? ORDER BY name",
+                        (pet_id,)).fetchall()
+
+
+def _inv_serialize(r) -> dict:
+    d = dict(r)
+    d["categorias"] = json.loads(d.get("categorias") or "[]")
+    d["stats"] = json.loads(d.get("stats") or "{}")
+    d["contenedor"] = bool(d.get("contenedor"))
+    d["equipado"] = bool(d.get("equipado"))
+    return d
+
+
+def _slots_de(r) -> int:
+    """Slots que ocupa una entrada. Un paquete con usos (5 raciones) ocupa lo
+    mismo hasta que se agota, no un slot por unidad."""
+    return (r["slots"] or 0) * (r["cantidad"] or 1)
+
+
+def carrying_capacity(size: str, fuerza: int, rows) -> dict:
+    """Capacidad, uso y sobrecarga. No bloquea: solo informa.
+
+    Solo cuenta lo que la criatura lleva encima: lo **equipado** y que no esté
+    dentro de un contenedor (eso va contra la capacidad del contenedor)."""
+    base = _SIZE_BASE.get(_norm_size(size), 6)
+    encima = [r for r in rows if not r["parent_id"] and r["equipado"]]
+    bonus = sum((r["capacity_bonus"] or 0) * (r["cantidad"] or 1) for r in encima)
+    usado = sum(_slots_de(r) for r in encima)
+    capacidad = base + int(fuerza or 0) + bonus
+    return {"capacidad": capacidad, "usado": usado, "base": base,
+            "fuerza": int(fuerza or 0), "bonus": bonus,
+            "sobrecargado": usado > capacidad}
+
+
+def _nest(rows) -> list:
+    """Arma el árbol: los contenedores traen adentro lo que guardan, con su
+    propio uso de espacio."""
+    ser = {r["id"]: _inv_serialize(r) for r in rows}
+    for d in ser.values():
+        d["children"] = []
+    top = []
+    for r in rows:
+        d = ser[r["id"]]
+        padre = ser.get(r["parent_id"]) if r["parent_id"] else None
+        (padre["children"] if padre else top).append(d)
+    for d in ser.values():
+        if d["contenedor"]:
+            d["cont_usado"] = sum((c["slots"] or 0) * (c["cantidad"] or 1)
+                                  for c in d["children"])
+            d["cont_lleno"] = d["cont_usado"] > (d["contenedor_capacidad"] or 0)
+    return top
+
+
+def _char_capacity(conn, ch, rows) -> dict:
+    sheet = json.loads(ch["sheet"] or "{}")
+    fuerza = (sheet.get("attributes") or {}).get("STR") or 0
+    size = ch["size"] if "size" in ch.keys() else "Mediano"
+    return carrying_capacity(size, fuerza, rows)
+
+
+def _pet_capacity(conn, pet, rows) -> dict:
+    stats = json.loads(pet["stats"] or "{}")
+    fuerza = (stats.get("physical") or {}).get("str") or 0
+    return carrying_capacity(stats.get("size"), fuerza, rows)
+
+
+def _can_create_items(conn, ch, user) -> bool:
+    """Permiso que el DM le da a un jugador para crear objetos propios."""
+    m = conn.execute(
+        "SELECT can_create_items FROM campaign_members WHERE campaign_id=? AND user_id=?",
+        (ch["campaign_id"], user["id"]),
+    ).fetchone()
+    return bool(m and m["can_create_items"])
+
+
+def _add_inventory(conn, payload, *, character_id=None, pet_id=None, owner_id=None,
+                   is_dm=False, can_create=False):
+    """Alta de un objeto. Del catálogo (item_id) solo puede el DM: dejar que un
+    jugador se sirva del catálogo sería sacar cosas gratis."""
+    if payload.item_id:
+        if not is_dm:
+            raise HTTPException(403, "Solo el DM puede entregar objetos del catálogo")
+        it = conn.execute("SELECT * FROM items WHERE id=?", (payload.item_id,)).fetchone()
+        if not it:
+            raise HTTPException(404, "Objeto no encontrado en el catálogo")
+        d = {"name": it["name"], "kind": it["kind"] or "equipo", "desc": it["descripcion"],
+             "cats": it["categorias"], "peso": it["peso"] or "", "slots": it["slots"],
+             "cap_bonus": it["capacity_bonus"] or 0, "usos_max": it["usos_max"] or 0,
+             "cont_cap": it["contenedor_capacidad"] or 0, "stats": it["stats"] or "{}",
+             "item_id": it["id"]}
+    else:
+        if not (is_dm or can_create):
+            raise HTTPException(403, "El DM no te habilitó a crear objetos")
+        name = (payload.name or "").strip()
+        if not name:
+            raise HTTPException(400, "Poné un nombre al objeto")
+        d = {"name": name, "kind": payload.kind or "equipo", "desc": payload.descripcion,
+             "cats": json.dumps([c.strip().lower() for c in payload.categorias if c.strip()]),
+             "peso": payload.peso, "slots": max(0, payload.slots),
+             "cap_bonus": max(0, payload.capacity_bonus),
+             "usos_max": max(0, payload.usos_max),
+             "cont_cap": max(0, payload.contenedor_capacidad),
+             "stats": json.dumps(payload.stats or {}), "item_id": None}
+        if payload.save_to_catalog and is_dm and owner_id:
+            d["item_id"] = conn.execute(
+                "INSERT INTO items (owner_id, name, kind, descripcion, categorias, precio, "
+                "peso, slots, capacity_bonus, usos_max, contenedor, contenedor_capacidad, "
+                "stats) VALUES (?,?,?,?,?,0,?,?,?,?,?,?,?)",
+                (owner_id, d["name"], d["kind"], d["desc"], d["cats"], d["peso"],
+                 d["slots"], d["cap_bonus"], d["usos_max"],
+                 1 if d["cont_cap"] else 0, d["cont_cap"], d["stats"]),
+            ).lastrowid
+    cur = conn.execute(
+        "INSERT INTO inventory (character_id, pet_id, item_id, name, kind, descripcion, "
+        "categorias, peso, slots, capacity_bonus, usos, usos_max, contenedor, "
+        "contenedor_capacidad, stats, cantidad, notas, parent_id, equipado) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)",
+        (character_id, pet_id, d["item_id"], d["name"], d["kind"], d["desc"], d["cats"],
+         d["peso"], d["slots"], d["cap_bonus"], d["usos_max"], d["usos_max"],
+         1 if d["cont_cap"] else 0, d["cont_cap"], d["stats"],
+         max(1, payload.cantidad), payload.notas, payload.parent_id),
+    )
+    return cur.lastrowid
+
+
+@router.get("/{cid}/inventory")
+def get_inventory(cid: int, user=Depends(current_user)):
+    """Inventario del personaje y de cada mascota, con su capacidad de carga."""
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        rows = _inv_rows(conn, character_id=cid)
+        out = {"character": {"id": cid, "name": ch["name"],
+                             "size": ch["size"] if "size" in ch.keys() else "Mediano",
+                             "items": _nest(rows),
+                             "capacity": _char_capacity(conn, ch, rows)},
+               "pets": []}
+        for pet in conn.execute("SELECT * FROM pets WHERE character_id=? ORDER BY name", (cid,)):
+            prows = _inv_rows(conn, pet_id=pet["id"])
+            out["pets"].append({"id": pet["id"], "name": pet["name"],
+                                "items": _nest(prows),
+                                "capacity": _pet_capacity(conn, pet, prows)})
+        return out
+
+
+@router.post("/{cid}/inventory")
+def add_inventory(cid: int, payload: InventoryIn, user=Depends(current_user)):
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        is_dm = ch["dm_id"] == user["id"]
+        _add_inventory(conn, payload, character_id=cid, owner_id=ch["dm_id"],
+                       is_dm=is_dm, can_create=_can_create_items(conn, ch, user))
+    return {"ok": True}
+
+
+@router.post("/{cid}/pets/{pid}/inventory")
+def add_pet_inventory(cid: int, pid: int, payload: InventoryIn, user=Depends(current_user)):
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        pet = conn.execute("SELECT * FROM pets WHERE id=? AND character_id=?",
+                           (pid, cid)).fetchone()
+        if not pet:
+            raise HTTPException(404, "Mascota no encontrada")
+        is_dm = ch["dm_id"] == user["id"]
+        _add_inventory(conn, payload, pet_id=pid, owner_id=ch["dm_id"],
+                       is_dm=is_dm, can_create=_can_create_items(conn, ch, user))
+    return {"ok": True}
+
+
+@router.post("/{cid}/inventory/{eid}/qty")
+def inventory_qty(cid: int, eid: int, ch: InventoryQty, user=Depends(current_user)):
+    """Ajusta la cantidad; al llegar a 0 se saca del inventario."""
+    with db() as conn:
+        _owned_or_dm(conn, cid, user)
+        r = conn.execute(
+            "SELECT inv.* FROM inventory inv LEFT JOIN pets p ON p.id=inv.pet_id "
+            "WHERE inv.id=? AND (inv.character_id=? OR p.character_id=?)",
+            (eid, cid, cid)).fetchone()
+        if not r:
+            raise HTTPException(404, "Objeto no encontrado en el inventario")
+        val = (r["cantidad"] or 1) + ch.delta
+        if val <= 0:
+            conn.execute("DELETE FROM inventory WHERE id=?", (eid,))
+        else:
+            conn.execute("UPDATE inventory SET cantidad=? WHERE id=?", (val, eid))
+    return {"ok": True}
+
+
+def _inv_entry(conn, cid: int, eid: int):
+    r = conn.execute(
+        "SELECT inv.* FROM inventory inv LEFT JOIN pets p ON p.id=inv.pet_id "
+        "WHERE inv.id=? AND (inv.character_id=? OR p.character_id=?)",
+        (eid, cid, cid)).fetchone()
+    if not r:
+        raise HTTPException(404, "Objeto no encontrado en el inventario")
+    return r
+
+
+@router.post("/{cid}/inventory/{eid}/equip")
+def toggle_equipado(cid: int, eid: int, user=Depends(current_user)):
+    """Equipar/desequipar. Lo desequipado (y lo que lleve adentro, si es un
+    contenedor) deja de contar para la capacidad: quedó en el suelo o en la carreta."""
+    with db() as conn:
+        _owned_or_dm(conn, cid, user)
+        r = _inv_entry(conn, cid, eid)
+        val = 0 if r["equipado"] else 1
+        conn.execute("UPDATE inventory SET equipado=? WHERE id=?", (val, eid))
+    return {"ok": True, "equipado": bool(val)}
+
+
+@router.post("/{cid}/inventory/{eid}/move")
+def move_inventory(cid: int, eid: int, m: InventoryMove, user=Depends(current_user)):
+    """Mete o saca un objeto de un contenedor (mochila, carreta del chull…)."""
+    with db() as conn:
+        _owned_or_dm(conn, cid, user)
+        r = _inv_entry(conn, cid, eid)
+        if m.parent_id:
+            if m.parent_id == eid:
+                raise HTTPException(400, "Un contenedor no puede guardarse a sí mismo")
+            parent = _inv_entry(conn, cid, m.parent_id)
+            if not parent["contenedor"]:
+                raise HTTPException(400, "Ese objeto no es un contenedor")
+            if r["contenedor"]:
+                raise HTTPException(400, "No se puede meter un contenedor dentro de otro")
+            # El objeto pasa a estar donde está el contenedor: así se carga la
+            # carreta del chull con cosas que llevaba el personaje.
+            conn.execute(
+                "UPDATE inventory SET parent_id=?, character_id=?, pet_id=? WHERE id=?",
+                (m.parent_id, parent["character_id"], parent["pet_id"], eid))
+        else:
+            # sacarlo lo devuelve a las manos del personaje
+            conn.execute(
+                "UPDATE inventory SET parent_id=NULL, character_id=?, pet_id=NULL WHERE id=?",
+                (cid, eid))
+    return {"ok": True}
+
+
+@router.post("/{cid}/inventory/{eid}/use")
+def use_inventory(cid: int, eid: int, ch: InventoryQty, user=Depends(current_user)):
+    """Gasta (o repone) una dosis/carga. Al agotarse, el objeto se va."""
+    with db() as conn:
+        _owned_or_dm(conn, cid, user)
+        r = _inv_entry(conn, cid, eid)
+        if not (r["usos_max"] or 0):
+            raise HTTPException(400, "Ese objeto no tiene dosis ni cargas")
+        val = max(0, min(r["usos_max"], (r["usos"] or 0) + ch.delta))
+        if val <= 0:
+            # se acabaron: si había más de una unidad, arranca otra
+            resto = (r["cantidad"] or 1) - 1
+            if resto > 0:
+                conn.execute("UPDATE inventory SET cantidad=?, usos=? WHERE id=?",
+                             (resto, r["usos_max"], eid))
+            else:
+                conn.execute("DELETE FROM inventory WHERE id=?", (eid,))
+            return {"ok": True, "usos": 0, "agotado": True}
+        conn.execute("UPDATE inventory SET usos=? WHERE id=?", (val, eid))
+    return {"ok": True, "usos": val, "agotado": False}
+
+
+@router.delete("/{cid}/inventory/{eid}")
+def delete_inventory(cid: int, eid: int, user=Depends(current_user)):
+    with db() as conn:
+        _owned_or_dm(conn, cid, user)
+        conn.execute(
+            "DELETE FROM inventory WHERE id=? AND (character_id=? OR pet_id IN "
+            "(SELECT id FROM pets WHERE character_id=?))", (eid, cid, cid))
+    return {"ok": True}
+
+
+@router.put("/{cid}/size")
+def set_size(cid: int, s: SizeIn, user=Depends(current_user)):
+    size = _norm_size(s.size)
+    with db() as conn:
+        _owned_or_dm(conn, cid, user)
+        conn.execute("UPDATE characters SET size=? WHERE id=?", (size, cid))
+    return {"ok": True, "size": size}
 
 
 @router.post("/{cid}/marcos/charge_inv")

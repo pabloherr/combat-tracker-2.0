@@ -1,0 +1,976 @@
+# ═══════════════════════════════════════════════════════════
+# Catálogo base de Cosmere RPG
+# Importar con: Objetos → ⭳⭳ Importar en bulk → Cargar archivo
+#
+# Notas:
+#  · Los slots siguen la regla de carga (armaduras pesadas ocupan más de 1).
+#  · Lo marcado `secret: true` no aparece en el catálogo de los jugadores ni
+#    sale por sorteo en las tiendas (Esquirlada, Soulcaster, etc.).
+#  · Los precios con rango en el manual (1–300 mk) se cargan con el mínimo y el
+#    rango queda anotado en la descripción.
+# ═══════════════════════════════════════════════════════════
+
+# ─────────────── ARMAS LIGERAS ───────────────
+kind: arma
+weapon_class: light
+name: "Jabalina"
+skill: "Light Weaponry"
+damage: "1d6 keen"
+range: "Melee"
+traits: "Thrown [30/120]"
+expert_traits: "Indirect"
+weight: "2 lb."
+price: 20
+---
+kind: arma
+weapon_class: light
+name: "Cuchillo"
+skill: "Light Weaponry"
+damage: "1d4 keen"
+range: "Melee"
+traits: "Discreet"
+expert_traits: "Offhand, Thrown [20/60]"
+weight: "1 lb."
+price: 8
+---
+kind: arma
+weapon_class: light
+name: "Maza"
+skill: "Light Weaponry"
+damage: "1d6 impact"
+range: "Melee"
+expert_traits: "Momentum"
+weight: "3 lb."
+price: 20
+---
+kind: arma
+weapon_class: light
+name: "Estoque"
+skill: "Light Weaponry"
+damage: "1d6 keen"
+range: "Melee"
+traits: "Quickdraw"
+expert_traits: "Defensive"
+weight: "2 lb."
+price: 100
+---
+kind: arma
+weapon_class: light
+name: "Lanza corta"
+skill: "Light Weaponry"
+damage: "1d8 keen"
+range: "Melee"
+traits: "Two-Handed"
+expert_traits: "Unique: pierde el rasgo Two-Handed"
+weight: "3 lb."
+price: 10
+---
+kind: arma
+weapon_class: light
+name: "Espada lateral"
+skill: "Light Weaponry"
+damage: "1d6 keen"
+range: "Melee"
+traits: "Quickdraw"
+expert_traits: "Offhand"
+weight: "2 lb."
+price: 40
+---
+kind: arma
+weapon_class: light
+name: "Bastón"
+skill: "Light Weaponry"
+damage: "1d6 impact"
+range: "Melee"
+traits: "Discreet, Two-Handed"
+expert_traits: "Defensive"
+weight: "4 lb."
+price: 1
+---
+kind: arma
+weapon_class: light
+name: "Arco corto"
+skill: "Light Weaponry"
+damage: "1d6 keen"
+range: "Ranged [80/320]"
+traits: "Two-Handed"
+expert_traits: "Quickdraw"
+weight: "2 lb."
+price: 80
+---
+kind: arma
+weapon_class: light
+name: "Honda"
+skill: "Light Weaponry"
+damage: "1d4 impact"
+range: "Ranged [30/120]"
+traits: "Discreet"
+expert_traits: "Indirect"
+weight: "1 lb."
+price: 2
+
+# ─────────────── ARMAS PESADAS ───────────────
+---
+kind: arma
+weapon_class: heavy
+name: "Hacha"
+skill: "Heavy Weaponry"
+damage: "1d6 keen"
+range: "Melee"
+traits: "Thrown [20/60]"
+expert_traits: "Offhand"
+weight: "2 lb."
+price: 20
+---
+kind: arma
+weapon_class: heavy
+name: "Mandoble"
+skill: "Heavy Weaponry"
+damage: "1d10 keen"
+range: "Melee"
+traits: "Two-Handed"
+expert_traits: "Deadly"
+weight: "7 lb."
+price: 200
+---
+kind: arma
+weapon_class: heavy
+name: "Martillo"
+skill: "Heavy Weaponry"
+damage: "1d10 impact"
+range: "Melee"
+traits: "Two-Handed"
+expert_traits: "Momentum"
+weight: "8 lb."
+price: 40
+---
+kind: arma
+weapon_class: heavy
+name: "Lanza larga"
+skill: "Heavy Weaponry"
+damage: "1d8 keen"
+range: "Melee [+5]"
+traits: "Two-Handed"
+expert_traits: "Defensive"
+weight: "9 lb."
+price: 15
+---
+kind: arma
+weapon_class: heavy
+name: "Espada larga"
+skill: "Heavy Weaponry"
+damage: "1d8 keen"
+range: "Melee"
+traits: "Quickdraw, Two-Handed"
+expert_traits: "Unique: pierde el rasgo Two-Handed"
+weight: "3 lb."
+price: 60
+---
+kind: arma
+weapon_class: heavy
+name: "Hacha de asta"
+skill: "Heavy Weaponry"
+damage: "1d10 keen"
+range: "Melee"
+traits: "Two-Handed"
+expert_traits: "Unique: Melee [+5]"
+weight: "5 lb."
+price: 40
+---
+kind: arma
+weapon_class: heavy
+name: "Escudo"
+skill: "Heavy Weaponry"
+damage: "1d4 impact"
+range: "Melee"
+traits: "Defensive"
+expert_traits: "Offhand"
+weight: "2 lb."
+price: 10
+---
+kind: arma
+weapon_class: heavy
+name: "Ballesta"
+skill: "Heavy Weaponry"
+damage: "1d8 keen"
+range: "Ranged [100/400]"
+traits: "Loaded [1], Two-Handed"
+expert_traits: "Deadly"
+weight: "7 lb."
+price: 200
+---
+kind: arma
+weapon_class: heavy
+name: "Arco largo"
+skill: "Heavy Weaponry"
+damage: "1d6 keen"
+range: "Ranged [150/600]"
+traits: "Two-Handed"
+expert_traits: "Indirect"
+weight: "3 lb."
+price: 100
+
+# ─────────────── ARMAS ESPECIALES ───────────────
+---
+kind: arma
+weapon_class: special
+name: "Arma improvisada"
+skill: "Igual que el arma similar"
+damage: "Igual que el arma similar"
+range: "Melee"
+traits: "Fragile"
+expert_traits: "Unique"
+slots: 1
+price: 0
+description: "Lo que tengas a mano. Sin precio ni peso fijos."
+---
+kind: arma
+weapon_class: special
+name: "Ataque desarmado"
+skill: "Athletics"
+damage: "Unique"
+range: "Melee"
+traits: "Unique"
+expert_traits: "Momentum, Offhand"
+weight: "Sin peso"
+slots: 0
+price: 0
+---
+kind: arma
+weapon_class: special
+name: "Media Esquirla"
+skill: "Heavy Weaponry"
+damage: "2d4 impact"
+range: "Melee"
+traits: "Defensive, Two-Handed, Unique"
+expert_traits: "Momentum"
+weight: "10 lb."
+slots: 2
+price: 2000
+---
+kind: arma
+weapon_class: special
+name: "Hoja Esquirlada"
+skill: "Heavy Weaponry"
+damage: "2d8 spirit"
+range: "Melee"
+traits: "Dangerous, Deadly, Unique"
+expert_traits: "Unique: pierde el rasgo Dangerous"
+weight: "4 lb."
+slots: 0
+price: 0
+secret: true
+notes: "Solo como recompensa. No ocupa espacio (regla de carga)."
+---
+kind: arma
+weapon_class: special
+name: "Hoja Esquirlada (Radiante)"
+damage: "2d* spirit"
+range: "Melee"
+traits: "Deadly, Unique"
+weight: "Sin peso"
+slots: 0
+price: 0
+secret: true
+notes: "Solo por talento. Ver 'Shardblades and Radiant Shardblades'."
+---
+kind: arma
+weapon_class: special
+name: "Martillo de guerra"
+skill: "Heavy Weaponry"
+damage: "2d10 impact"
+range: "Melee"
+traits: "Cumbersome [5], Two-Handed"
+expert_traits: "Unique"
+weight: "150 lb."
+cumbersome: 5
+price: 400
+---
+kind: arma
+weapon_class: special
+name: "Gran arco"
+skill: "Heavy Weaponry"
+damage: "2d6 keen"
+range: "Ranged [200/800]"
+traits: "Cumbersome [5], Two-Handed"
+expert_traits: "Pierce"
+weight: "20 lb."
+cumbersome: 5
+price: 1000
+
+# ─────────────── ARMADURAS ───────────────
+# Los slots salen de la tabla de carga, no del peso.
+---
+kind: armadura
+name: "Uniforme"
+deflect: 0
+traits: "Presentable"
+weight: "5 lb."
+slots: 1
+price: 40
+---
+kind: armadura
+name: "Cuero"
+deflect: 1
+expert_traits: "Presentable"
+weight: "10 lb."
+slots: 1
+price: 60
+---
+kind: armadura
+name: "Cota de malla"
+deflect: 2
+traits: "Cumbersome [3]"
+expert_traits: "Unique: pierde el rasgo Cumbersome"
+weight: "25 lb."
+slots: 4
+price: 80
+---
+kind: armadura
+name: "Peto"
+deflect: 2
+traits: "Cumbersome [3]"
+expert_traits: "Presentable"
+weight: "30 lb."
+slots: 4
+price: 120
+---
+kind: armadura
+name: "Media placa"
+deflect: 3
+traits: "Cumbersome [4]"
+expert_traits: "Unique: Cumbersome [3] en vez de Cumbersome [4]"
+weight: "40 lb."
+slots: 5
+price: 400
+---
+kind: armadura
+name: "Placa completa"
+deflect: 4
+traits: "Cumbersome [5]"
+weight: "55 lb."
+slots: 6
+price: 1600
+---
+kind: armadura
+name: "Armadura Esquirlada"
+deflect: 5
+traits: "Dangerous, Unique"
+expert_traits: "Unique: pierde el rasgo Dangerous"
+weight: "1400 lb."
+slots: 7
+price: 0
+secret: true
+notes: "Solo como recompensa. Cargada ocupa 1 slot; sin carga, 7."
+---
+kind: armadura
+name: "Armadura Esquirlada (Radiante)"
+deflect: 5
+traits: "Unique"
+weight: "Sin peso"
+slots: 0
+price: 0
+secret: true
+notes: "Solo por talento."
+
+# ─────────────── EQUIPO ───────────────
+---
+kind: equipo
+name: "Alcohol (1 trago)"
+categories: [comida]
+weight: "0.2 lb."
+price: 1
+description: "Entre 0.5 y 50 mk según la calidad."
+---
+kind: equipo
+name: "Alcohol (botella)"
+categories: [comida]
+weight: "2-4 lb."
+price: 1
+description: "Entre 1 y 300 mk según la calidad."
+---
+kind: equipo
+name: "Anestésico (5 dosis)"
+categories: [medicina]
+weight: "1.5 lb."
+price: 75
+uses: 5
+---
+kind: equipo
+name: "Antiséptico potente (5 dosis)"
+categories: [medicina]
+weight: "1 lb."
+price: 50
+uses: 5
+---
+kind: equipo
+name: "Antiséptico débil (5 dosis)"
+categories: [medicina]
+weight: "1 lb."
+price: 25
+uses: 5
+---
+kind: equipo
+name: "Mochila"
+categories: [generales, contenedores]
+weight: "5 lb."
+price: 8
+container: 2
+description: "Guarda aparte: 2 slots propios."
+---
+kind: equipo
+name: "Barril"
+categories: [generales, contenedores]
+weight: "70 lb."
+price: 15
+slots: 4
+container: 6
+---
+kind: equipo
+name: "Manta"
+categories: [generales]
+weight: "2 lb."
+price: 2
+---
+kind: equipo
+name: "Libro (de consulta)"
+categories: [libros]
+weight: "1-5 lb."
+price: 10
+description: "Entre 10 y 500 mk según el tema."
+---
+kind: equipo
+name: "Botella (crem)"
+categories: [generales]
+weight: "3 lb."
+price: 1
+---
+kind: equipo
+name: "Botella (vidrio)"
+categories: [generales]
+weight: "2 lb."
+price: 1
+---
+kind: equipo
+name: "Balde"
+categories: [generales]
+weight: "2 lb."
+price: 1
+---
+kind: equipo
+name: "Vela"
+categories: [generales, iluminacion]
+weight: "0.2 lb."
+price: 1
+slots: 0
+description: "Insignificante: no ocupa espacio."
+---
+kind: equipo
+name: "Estuche (cuero)"
+categories: [generales, contenedores]
+weight: "1 lb."
+price: 4
+container: 1
+---
+kind: equipo
+name: "Cadena gruesa (3 m)"
+categories: [materiales]
+weight: "10 lb."
+price: 20
+slots: 2
+---
+kind: equipo
+name: "Cadena fina (30 cm)"
+categories: [materiales]
+weight: "0.5 lb."
+price: 20
+---
+kind: equipo
+name: "Cofre"
+categories: [generales, contenedores]
+weight: "25 lb."
+price: 30
+slots: 4
+container: 8
+---
+kind: equipo
+name: "Ropa común"
+categories: [ropa]
+weight: "3 lb."
+price: 2
+---
+kind: equipo
+name: "Ropa fina"
+categories: [ropa, lujo]
+weight: "6 lb."
+price: 50
+description: "Entre 50 y 200 mk."
+---
+kind: equipo
+name: "Ropa harapienta"
+categories: [ropa]
+weight: "1.5 lb."
+price: 1
+---
+kind: equipo
+name: "Palanca"
+categories: [herramientas]
+weight: "3 lb."
+price: 10
+---
+kind: equipo
+name: "Trompetilla"
+categories: [generales]
+weight: "1 lb."
+price: 50
+---
+kind: equipo
+name: "Petaca o jarro"
+categories: [generales]
+weight: "1 lb."
+price: 1
+---
+kind: equipo
+name: "Pedernal y acero"
+categories: [herramientas]
+weight: "1.5 lb."
+price: 4
+---
+kind: equipo
+name: "Raciones (5 días)"
+categories: [comida]
+weight: "2.5 lb."
+price: 1
+uses: 5
+description: "Se compran de a 5. Ocupan 1 slot hasta que se acaban."
+---
+kind: equipo
+name: "Comida callejera (1 día)"
+categories: [comida]
+weight: "1.5 lb."
+price: 3
+---
+kind: equipo
+name: "Comida fina (1 día)"
+categories: [comida, lujo]
+weight: "0.5 lb."
+price: 25
+---
+kind: equipo
+name: "Garfio"
+categories: [herramientas]
+weight: "4 lb."
+price: 10
+---
+kind: equipo
+name: "Martillo de mano"
+categories: [herramientas]
+weight: "3 lb."
+price: 4
+---
+kind: equipo
+name: "Tinta (frasco)"
+categories: [generales]
+weight: "0.2 lb."
+price: 40
+---
+kind: equipo
+name: "Pluma"
+categories: [generales]
+weight: "0.1 lb."
+price: 1
+slots: 0
+---
+kind: equipo
+name: "Jarra o cántaro"
+categories: [generales]
+weight: "4 lb."
+price: 2
+---
+kind: equipo
+name: "Escalera (3 m)"
+categories: [herramientas]
+weight: "20 lb."
+price: 5
+slots: 3
+---
+kind: equipo
+name: "Lámpara de aceite"
+categories: [generales, iluminacion]
+weight: "2 lb."
+price: 20
+---
+kind: equipo
+name: "Lámpara de esferas"
+categories: [generales, iluminacion]
+weight: "2 lb."
+price: 20
+---
+kind: equipo
+name: "Candado y llave"
+categories: [herramientas]
+weight: "1 lb."
+price: 50
+---
+kind: equipo
+name: "Ganzúa"
+categories: [herramientas]
+weight: "0.5 lb."
+price: 5
+---
+kind: equipo
+name: "Lente de aumento"
+categories: [herramientas, lujo]
+weight: "0.2 lb."
+price: 400
+---
+kind: equipo
+name: "Grilletes"
+categories: [herramientas]
+weight: "6 lb."
+price: 10
+---
+kind: equipo
+name: "Espejo de mano"
+categories: [generales]
+weight: "2 lb."
+price: 25
+---
+kind: equipo
+name: "Instrumento musical"
+categories: [generales, lujo]
+weight: "0.5-20 lb."
+price: 1
+description: "Entre 1 y 50 mk según el instrumento."
+---
+kind: equipo
+name: "Red de caza"
+categories: [herramientas]
+weight: "5 lb."
+price: 4
+---
+kind: equipo
+name: "Red de pesca"
+categories: [herramientas]
+weight: "15 lb."
+price: 10
+slots: 2
+---
+kind: equipo
+name: "Aceite (1 frasco)"
+categories: [generales]
+weight: "1 lb."
+price: 1
+---
+kind: equipo
+name: "Papel o pergamino (1 hoja)"
+categories: [generales]
+weight: "0.1 lb."
+price: 1
+slots: 0
+---
+kind: equipo
+name: "Perfume (1 vial)"
+categories: [lujo]
+weight: "0.5 lb."
+price: 20
+---
+kind: equipo
+name: "Pico de minero"
+categories: [herramientas]
+weight: "10 lb."
+price: 10
+slots: 2
+---
+kind: equipo
+name: "Veneno débil (1 dosis)"
+categories: [venenos, alquimia]
+weight: "0.2 lb."
+price: 20
+uses: 1
+---
+kind: equipo
+name: "Veneno efectivo (1 dosis)"
+categories: [venenos, alquimia]
+weight: "0.2 lb."
+price: 50
+uses: 1
+---
+kind: equipo
+name: "Veneno potente (1 dosis)"
+categories: [venenos, alquimia]
+weight: "0.2 lb."
+price: 120
+uses: 1
+---
+kind: equipo
+name: "Olla de hierro"
+categories: [generales]
+weight: "10 lb."
+price: 8
+slots: 2
+---
+kind: equipo
+name: "Bolsa de mano"
+categories: [generales, contenedores]
+weight: "1 lb."
+price: 1
+container: 1
+---
+kind: equipo
+name: "Sistema de poleas"
+categories: [herramientas]
+weight: "12 lb."
+price: 100
+slots: 2
+---
+kind: equipo
+name: "Cuerda (15 m)"
+categories: [herramientas]
+weight: "5 lb."
+price: 30
+---
+kind: equipo
+name: "Saco"
+categories: [generales, contenedores]
+weight: "0.5 lb."
+price: 1
+container: 2
+---
+kind: equipo
+name: "Balanza"
+categories: [herramientas]
+weight: "3 lb."
+price: 20
+---
+kind: equipo
+name: "Pala"
+categories: [herramientas]
+weight: "5 lb."
+price: 8
+---
+kind: equipo
+name: "Jabón"
+categories: [generales]
+weight: "0.1 lb."
+price: 1
+slots: 0
+---
+kind: equipo
+name: "Catalejo"
+categories: [herramientas, lujo]
+weight: "1 lb."
+price: 500
+---
+kind: equipo
+name: "Instrumental quirúrgico"
+categories: [medicina]
+weight: "3 lb."
+price: 20
+---
+kind: equipo
+name: "Carpa (2 personas)"
+categories: [generales]
+weight: "20 lb."
+price: 10
+slots: 3
+---
+kind: equipo
+name: "Tratamiento médico (1 dosis)"
+categories: [medicina]
+weight: "0.2 lb."
+price: 10
+uses: 1
+---
+kind: equipo
+name: "Diapasón"
+categories: [herramientas]
+weight: "0.5 lb."
+price: 50
+---
+kind: equipo
+name: "Gema sin engarzar (infundida)"
+categories: [materiales]
+weight: "0.01 lb."
+price: 2
+slots: 0
+---
+kind: equipo
+name: "Vial de vidrio"
+categories: [generales]
+weight: "0.2 lb."
+price: 4
+slots: 0
+---
+kind: equipo
+name: "Odre"
+categories: [generales]
+weight: "1 lb. (vacío)"
+price: 1
+---
+kind: equipo
+name: "Cera (1 bloque)"
+categories: [materiales]
+weight: "0.5 lb."
+price: 2
+---
+kind: equipo
+name: "Piedra de afilar"
+categories: [herramientas]
+weight: "1 lb."
+price: 1
+
+# ─────────────── ALOJAMIENTO (por persona por noche) ───────────────
+---
+kind: alojamiento
+name: "Refugio de tormenta"
+price: 0
+slots: 0
+description: "Gratis para el público, si hay lugar."
+---
+kind: alojamiento
+name: "Alojamiento modesto"
+price: 2
+slots: 0
+---
+kind: alojamiento
+name: "Alojamiento confortable"
+price: 4
+slots: 0
+---
+kind: alojamiento
+name: "Alojamiento acomodado"
+price: 8
+slots: 0
+---
+kind: alojamiento
+name: "Alojamiento aristocrático"
+price: 20
+slots: 0
+
+# ─────────────── VEHÍCULOS ───────────────
+---
+kind: vehiculo
+name: "Carreta de chull"
+vehicle_type: "Tierra"
+speed: "2 mph"
+rental: 5
+price: 500
+slots: 0
+container: 20
+description: "Enganchada al chull, le agrega 20 slots de carga."
+---
+kind: vehiculo
+name: "Bote de remos"
+vehicle_type: "Agua"
+speed: "3 mph a favor, 1 mph en contra"
+rental: 3
+price: 250
+slots: 0
+container: 10
+---
+kind: vehiculo
+name: "Nave mercante"
+vehicle_type: "Agua"
+speed: "5 mph"
+rental: 50
+price: 10000
+slots: 0
+container: 100
+---
+kind: vehiculo
+name: "Navío de guerra"
+vehicle_type: "Agua"
+speed: "8 mph"
+rental: 250
+price: 100000
+slots: 0
+container: 150
+
+# ─────────────── FABRIALES ───────────────
+---
+kind: fabrial
+name: "Alertador"
+charges: 5
+weight: "0.5-10 lb."
+price: 500
+---
+kind: fabrial
+name: "Atractor"
+charges: 5
+weight: "8 lb."
+price: 750
+slots: 2
+---
+kind: fabrial
+name: "Fabrial reloj"
+charges: 3
+weight: "2 lb."
+price: 200
+---
+kind: fabrial
+name: "Drenador"
+charges: 2
+weight: "0.5 lb."
+price: 1000
+---
+kind: fabrial
+name: "Brazalete de emociones"
+charges: 3
+weight: "0.2 lb."
+price: 200
+---
+kind: fabrial
+name: "Silla libre"
+weight: "12 lb."
+price: 800
+slots: 2
+description: "Gratis o 800 mk según de dónde venga."
+---
+kind: fabrial
+name: "Calentador"
+charges: 5
+weight: "1-10 lb."
+price: 50
+description: "Entre 50 y 500 mk según el tamaño."
+---
+kind: fabrial
+name: "Dolorial (amplificador)"
+charges: 3
+weight: "1 lb."
+price: 750
+---
+kind: fabrial
+name: "Dolorial (adormecedor)"
+charges: 3
+weight: "1 lb."
+price: 750
+---
+kind: fabrial
+name: "Repulsor"
+charges: 5
+weight: "8 lb."
+price: 1500
+slots: 2
+---
+kind: fabrial
+name: "Moldeador de almas"
+charges: 5
+weight: "5 lb."
+price: 0
+secret: true
+notes: "Solo como recompensa."
+---
+kind: fabrial
+name: "Pluma unida (par)"
+charges: 3
+weight: "1 lb. cada una"
+price: 100
+---
+kind: fabrial
+name: "Supresor"
+charges: 2
+weight: "1 lb."
+price: 0
+secret: true
+notes: "Solo como recompensa."

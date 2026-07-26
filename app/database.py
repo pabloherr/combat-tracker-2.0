@@ -269,3 +269,131 @@ def init_db():
         ecols = {r["name"] for r in conn.execute("PRAGMA table_info(enemies)")}
         if "system" not in ecols:
             conn.execute("ALTER TABLE enemies ADD COLUMN system TEXT DEFAULT 'cosmere'")
+
+        # ── Objetos, comercio e inventario (solo campañas Cosmere) ─────────
+        conn.executescript("""
+        -- Catálogo de objetos del DM (se comparte entre sus campañas, como el bestiario).
+        CREATE TABLE IF NOT EXISTS items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            descripcion TEXT DEFAULT '',
+            categorias TEXT DEFAULT '[]',      -- JSON: ["armas", "generales", ...]
+            precio INTEGER NOT NULL DEFAULT 0, -- precio base, en marcos
+            slots INTEGER NOT NULL DEFAULT 1,  -- 0 = no ocupa; Cumbersome N => 1+N
+            capacity_bonus INTEGER DEFAULT 0,  -- mochila = 2
+            secreto INTEGER DEFAULT 0,         -- no aparece en el catálogo del jugador
+            notas TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- Asentamientos: agrupan tiendas (aldea | pueblo | ciudad).
+        CREATE TABLE IF NOT EXISTS settlements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            size TEXT NOT NULL DEFAULT 'pueblo',
+            descripcion TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- Tiendas: sueltas o dentro de un asentamiento.
+        CREATE TABLE IF NOT EXISTS shops (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+            settlement_id INTEGER REFERENCES settlements(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            preset TEXT DEFAULT 'general',
+            size TEXT DEFAULT 'mediana',
+            price_policy TEXT DEFAULT 'normal',  -- barato | normal | caro | variado
+            descripcion TEXT DEFAULT '',
+            last_restock_day INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- Stock de una tienda. El precio queda congelado al generarse.
+        CREATE TABLE IF NOT EXISTS shop_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            shop_id INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+            item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            cantidad INTEGER NOT NULL DEFAULT 1,
+            precio INTEGER NOT NULL DEFAULT 0,
+            price_tier TEXT DEFAULT 'normal',
+            visible INTEGER DEFAULT 1
+        );
+
+        -- Inventario de un personaje o de una mascota (copia del objeto).
+        CREATE TABLE IF NOT EXISTS inventory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+            pet_id INTEGER REFERENCES pets(id) ON DELETE CASCADE,
+            item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
+            name TEXT NOT NULL,
+            descripcion TEXT DEFAULT '',
+            categorias TEXT DEFAULT '[]',
+            slots INTEGER NOT NULL DEFAULT 1,
+            capacity_bonus INTEGER DEFAULT 0,
+            cantidad INTEGER NOT NULL DEFAULT 1,
+            notas TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- Pedidos de compra: el jugador pide, el DM confirma.
+        CREATE TABLE IF NOT EXISTS purchase_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            shop_id INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+            shop_item_id INTEGER NOT NULL REFERENCES shop_items(id) ON DELETE CASCADE,
+            character_id INTEGER NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+            cantidad INTEGER NOT NULL DEFAULT 1,
+            status TEXT NOT NULL DEFAULT 'pending',   -- pending | approved | rejected
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+        """)
+
+        # Tamaño del personaje (define la base de su capacidad de carga).
+        chcols = {r["name"] for r in conn.execute("PRAGMA table_info(characters)")}
+        if "size" not in chcols:
+            conn.execute("ALTER TABLE characters ADD COLUMN size TEXT DEFAULT 'Mediano'")
+
+        # Días absolutos transcurridos: storm_tracker.day se reinicia con cada
+        # tormenta, así que el restock necesita su propio contador.
+        cpcols = {r["name"] for r in conn.execute("PRAGMA table_info(campaigns)")}
+        if "day_count" not in cpcols:
+            conn.execute("ALTER TABLE campaigns ADD COLUMN day_count INTEGER DEFAULT 0")
+
+        # Permiso por jugador: crear objetos en su propio inventario.
+        mcols = {r["name"] for r in conn.execute("PRAGMA table_info(campaign_members)")}
+        if "can_create_items" not in mcols:
+            conn.execute("ALTER TABLE campaign_members ADD COLUMN can_create_items INTEGER DEFAULT 0")
+
+        # Migración: cada objeto es de un tipo (arma, armadura, equipo, alojamiento,
+        # vehículo, fabrial) y guarda en `stats` los datos propios de ese tipo
+        # (daño y rasgos de un arma, deflect de una armadura, cargas de un fabrial…).
+        icols = {r["name"] for r in conn.execute("PRAGMA table_info(items)")}
+        for col, ddl in (
+            ("kind", "TEXT DEFAULT 'equipo'"),
+            ("stats", "TEXT DEFAULT '{}'"),
+            ("peso", "TEXT DEFAULT ''"),            # peso del manual, informativo
+            ("usos_max", "INTEGER DEFAULT 0"),      # dosis/cargas por unidad (0 = no aplica)
+            ("contenedor", "INTEGER DEFAULT 0"),    # mochila, carreta, alforja…
+            ("contenedor_capacidad", "INTEGER DEFAULT 0"),
+        ):
+            if col not in icols:
+                conn.execute(f"ALTER TABLE items ADD COLUMN {col} {ddl}")
+
+        # Migración: el inventario refleja lo mismo, más el estado de cada unidad
+        # (usos que le quedan, si está equipada y dentro de qué contenedor).
+        vcols = {r["name"] for r in conn.execute("PRAGMA table_info(inventory)")}
+        for col, ddl in (
+            ("kind", "TEXT DEFAULT 'equipo'"),
+            ("stats", "TEXT DEFAULT '{}'"),
+            ("peso", "TEXT DEFAULT ''"),
+            ("usos", "INTEGER DEFAULT 0"),
+            ("usos_max", "INTEGER DEFAULT 0"),
+            ("contenedor", "INTEGER DEFAULT 0"),
+            ("contenedor_capacidad", "INTEGER DEFAULT 0"),
+            ("equipado", "INTEGER DEFAULT 1"),
+            ("parent_id", "INTEGER REFERENCES inventory(id) ON DELETE CASCADE"),
+        ):
+            if col not in vcols:
+                conn.execute(f"ALTER TABLE inventory ADD COLUMN {col} {ddl}")

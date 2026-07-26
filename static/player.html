@@ -94,6 +94,11 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .pet-tag{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:20px;border:1px solid #7ac88c;color:#7ac88c;margin-left:8px;vertical-align:middle;}
 .me-sheet-row{display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
 .btn-sheet{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:8px 14px;border-radius:var(--r);cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--gold2);text-decoration:none;display:inline-block;}
+.btn-sheet.off{color:var(--text3);border-color:var(--border);}
+/* contenedor: la mochila o la carreta con lo que guarda adentro */
+.cont-box{border:1px solid var(--border2);border-radius:var(--rl,10px);margin-bottom:8px;background:rgba(255,255,255,.015);}
+.cont-box .inv-row{margin-bottom:0;border:none;background:transparent;}
+.cont-box .cont-box{margin:0;}
 .btn-sheet:hover{background:rgba(224,189,124,.12);border-color:var(--gold);}
 /* modal ficha */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow:auto;z-index:50;}
@@ -197,6 +202,8 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
     <button class="tab" id="tab-pj" onclick="setTab('pj')">Mi personaje</button>
     <button class="tab" id="tab-grupo" onclick="setTab('grupo')">Grupo</button>
     <button class="tab" id="tab-combate" onclick="setTab('combate')">Combate<span class="tab-badge" id="combBadge" style="display:none">●</span></button>
+    <button class="tab cosmere-only" id="tab-inv" onclick="setTab('inv')">Inventario</button>
+    <button class="tab cosmere-only" id="tab-tiendas" onclick="setTab('tiendas')">Tiendas</button>
   </div>
 
   <div id="tabPJ" class="tabpanel">
@@ -227,6 +234,18 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
       <div class="section-lbl" id="enemiesLbl">Enemigos</div>
       <div class="grid" id="enemiesGrid"></div>
     </div>
+  </div>
+
+  <div id="tabInv" class="tabpanel" style="display:none">
+    <div id="invPanel"></div>
+  </div>
+
+  <div id="tabTiendas" class="tabpanel" style="display:none">
+    <div id="shopsPanel"></div>
+    <div class="section-lbl">📖 Catálogo</div>
+    <div class="sh-meta" style="margin-bottom:8px">Todo lo que existe en el mundo. Los precios los ves en cada tienda.</div>
+    <input class="oc-fi" type="search" id="catQ" placeholder="Buscar objeto…" oninput="renderCatalog()" style="width:100%;margin-bottom:8px"/>
+    <div id="catalogPanel"></div>
   </div>
 </div>
 
@@ -539,7 +558,7 @@ function card(p,enemyView){
 }
 
 var PREV_ACTIVE=null;   // para autocambiar a Combate cuando arranca
-var PANELS={pj:'tabPJ',grupo:'tabGrupo',combate:'tabCombate'};
+var PANELS={pj:'tabPJ',grupo:'tabGrupo',combate:'tabCombate',inv:'tabInv',tiendas:'tabTiendas'};
 function setTab(t){
   TAB=t;
   Object.keys(PANELS).forEach(function(x){
@@ -547,6 +566,8 @@ function setTab(t){
     document.getElementById('tab-'+x).classList.toggle('on',x===t);
   });
   if(t==='pj'||t==='grupo') loadRoster();
+  if(t==='inv') loadInventory();
+  if(t==='tiendas') loadShops();
 }
 
 function render(combat){
@@ -614,6 +635,10 @@ async function loadRoster(){
   if(MY_UID==null)return;
   try{ ROSTER=await api(API+'/roster'); }catch(e){ return; }
   SYSTEM=ROSTER.system||'cosmere';
+  // objetos, tiendas e inventario son reglas de Cosmere
+  document.querySelectorAll('.cosmere-only').forEach(function(el){
+    el.style.display=(SYSTEM==='dnd')?'none':'';
+  });
   renderRoster();
   if(COMBAT&&COMBAT.active) renderMe(COMBAT);   // refresca el recuadro de marcos del combate
 }
@@ -1079,6 +1104,277 @@ async function delPet(petId){
 }
 
 // ─── WebSocket con heartbeat y reconexión ───
+// ═══════════ INVENTARIO (capacidad de carga) ═══════════
+var INV=null, CAN_CREATE=false, INV_CONTENEDORES=[];
+function canCreateItems(){
+  var m=ROSTER&&ROSTER.members.find(function(x){return x.user_id===MY_UID;});
+  return !!(m&&m.can_create_items);
+}
+async function loadInventory(){
+  if(!MYCHAR) await loadRoster();
+  if(!MYCHAR){ document.getElementById('invPanel').innerHTML='<div class="empty-msg">Todavía no tenés personaje.</div>'; return; }
+  CAN_CREATE=canCreateItems();
+  try{ INV=await api('/api/characters/'+MYCHAR+'/inventory'); }catch(e){ return; }
+  renderInventory();
+}
+function capBar(c){
+  var pct=c.capacidad>0?Math.min(100,Math.round(c.usado/c.capacidad*100)):0;
+  var col=c.sobrecargado?'#e05050':'#7ac88c';
+  return '<div class="mstat" style="margin-bottom:8px">'
+    +'<div class="mstat-head"><span class="mstat-l">Carga</span>'
+      +'<span class="mstat-v" style="color:'+col+'">'+c.usado+' <span style="font-size:12px;color:var(--text3)">/ '+c.capacidad+'</span>'
+      +(c.sobrecargado?' <span style="font-size:11px">⚠ Sobrecargado</span>':'')+'</span></div>'
+    +'<div class="mbar"><div class="mbar-fill" style="width:'+pct+'%;background:'+col+'"></div></div>'
+    +'<div style="font-size:11px;color:var(--text3);margin-top:3px">base '+c.base+' + fuerza '+c.fuerza
+      +(c.bonus?' + '+c.bonus+' de mochila':'')+'</div></div>';
+}
+// Ficha corta por tipo (un arma muestra daño y rasgos; una posada, el precio).
+function invStatsHTML(it){
+  var s=it.stats||{};
+  if(it.kind==='arma'){
+    var t=(s.traits||[]).concat(s.expert_traits||[]);
+    return '<div style="font-size:12px;color:var(--text3)">'
+      +[s.damage,s.range].filter(Boolean).map(esc).join(' · ')
+      +(t.length?' · '+t.map(esc).join(', '):'')+'</div>';
+  }
+  if(it.kind==='armadura')
+    return '<div style="font-size:12px;color:var(--text3)">Deflect '+(s.deflect||0)
+      +((s.traits||[]).length?' · '+(s.traits||[]).map(esc).join(', '):'')+'</div>';
+  if(it.kind==='vehiculo')
+    return '<div style="font-size:12px;color:var(--text3)">'
+      +[s.vehicle_type,s.speed].filter(Boolean).map(esc).join(' · ')+'</div>';
+  return '';
+}
+function invItemRow(it,dentro){
+  var usos=it.usos_max
+    ? '<span class="stag" style="border-color:#e8c840;color:#e8c840" title="Dosis o cargas">'+it.usos+'/'+it.usos_max+'</span>'
+    : '';
+  var btnUso=it.usos_max
+    ? '<button class="btn-sheet" onclick="invUse('+it.id+',-1)" title="Usar una dosis">Usar</button>'
+    : '';
+  // mover: adentro de un contenedor o afuera
+  var mover='';
+  if(!it.contenedor){
+    if(dentro) mover='<button class="btn-sheet" onclick="invMove('+it.id+',null)" title="Sacarlo del contenedor">⇧ sacar</button>';
+    else if(INV_CONTENEDORES.length)
+      mover='<button class="btn-sheet" onclick="openMove('+it.id+')" title="Guardar en un contenedor">⇩ guardar</button>';
+  }
+  var eq=it.contenedor
+    ? '<button class="btn-sheet'+(it.equipado?'':' off')+'" onclick="invEquip('+it.id+')" title="'+(it.equipado?'Lo llevás encima: tocá para dejarlo':'Lo dejaste: no cuenta para tu carga')+'">'+(it.equipado?'🎒 llevando':'🎒 dejado')+'</button>'
+    : '<button class="btn-sheet'+(it.equipado?'':' off')+'" onclick="invEquip('+it.id+')" title="'+(it.equipado?'Equipado':'Guardado: no cuenta')+'">'+(it.equipado?'✓':'○')+'</button>';
+  var head='<div class="inv-row"'+(it.equipado?'':' style="opacity:.55"')+'>'
+    +'<span style="flex:1"><b style="color:var(--gold2)">'+esc(it.name)+'</b>'
+      +(it.cantidad>1?' <span style="color:var(--text3)">x'+it.cantidad+'</span>':'')
+      +' <span style="color:var(--text3);font-size:12px">'+it.slots+' slot'+(it.slots===1?'':'s')
+      +(it.capacity_bonus?' · +'+it.capacity_bonus+' cap':'')+'</span> '+usos
+      +invStatsHTML(it)
+      +(it.descripcion?'<div style="font-size:12px;color:var(--text3);font-style:italic">'+esc(it.descripcion)+'</div>':'')
+    +'</span>'
+    +btnUso+mover+eq
+    +'<button class="btn-sheet" onclick="invQty('+it.id+',1)">+</button>'
+    +'<button class="btn-sheet" onclick="invQty('+it.id+',-1)">−</button>'
+    +'<button class="btn-sheet" style="color:#e05050;border-color:#e05050" onclick="invDel('+it.id+')">✕</button></div>';
+  if(!it.contenedor) return head;
+  // contenedor: su propia barra y lo que guarda adentro
+  var cap=it.contenedor_capacidad||0, usado=it.cont_usado||0;
+  var pct=cap>0?Math.min(100,Math.round(usado/cap*100)):0;
+  var col=it.cont_lleno?'#e05050':'#6aaae8';
+  return '<div class="cont-box">'+head
+    +'<div style="padding:0 10px 8px">'
+      +'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3)">'
+        +'<span>Guarda</span><span style="color:'+col+'">'+usado+' / '+cap+(it.cont_lleno?' ⚠ lleno':'')+'</span></div>'
+      +'<div class="mbar"><div class="mbar-fill" style="width:'+pct+'%;background:'+col+'"></div></div>'
+      +((it.children||[]).length
+        ? '<div style="margin-top:6px">'+it.children.map(function(c){return invItemRow(c,true);}).join('')+'</div>'
+        : '<div style="font-size:12px;color:var(--text3);font-style:italic;margin-top:6px">Vacío.</div>')
+    +'</div></div>';
+}
+function renderInventory(){
+  if(!INV)return;
+  var panel=document.getElementById('invPanel'), ae=document.activeElement;
+  if(ae&&panel.contains(ae)&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName))return;
+  // contenedores disponibles (los del personaje y los de sus mascotas)
+  INV_CONTENEDORES=[];
+  (INV.character.items||[]).forEach(function(i){
+    if(i.contenedor) INV_CONTENEDORES.push(Object.assign({owner:INV.character.name},i));});
+  (INV.pets||[]).forEach(function(p){
+    (p.items||[]).forEach(function(i){
+      if(i.contenedor) INV_CONTENEDORES.push(Object.assign({owner:p.name},i));});});
+  var c=INV.character;
+  var sizes=['Pequeño','Mediano','Grande','Enorme','Gargantuesco'];
+  var html='<div class="me-card"><div class="me-head"><span class="me-name">'+esc(c.name)+'</span>'
+    +'<span style="flex:1"></span>'
+    +(CAN_CREATE?'<button class="btn-sheet" onclick="openCreateItem(\'c\')">+ Crear objeto</button>':'')
+    +'</div>'
+    +'<div class="me-sheet-row" style="border:none;padding:0;margin:0 0 8px;gap:6px">'
+      +'<span style="font-size:12px;color:var(--text3)">Tamaño</span>'
+      +'<select class="oc-fi" onchange="setSize(this.value)">'
+      +sizes.map(function(s){return '<option'+(s===c.size?' selected':'')+'>'+s+'</option>';}).join('')
+      +'</select></div>'
+    +capBar(c.capacity)
+    +(c.items.length?c.items.map(invItemRow).join('')
+      :'<div style="color:var(--text3);font-style:italic;font-size:13px">Sin objetos.</div>')
+    +'</div>';
+  (INV.pets||[]).forEach(function(p){
+    html+='<div class="me-card"><div class="me-head"><span class="me-name">'+esc(p.name)+' <span class="pet-tag">Mascota</span></span>'
+      +'<span style="flex:1"></span>'
+      +(CAN_CREATE?'<button class="btn-sheet" onclick="openCreateItem(\'p'+p.id+'\')">+ Crear objeto</button>':'')
+      +'</div>'+capBar(p.capacity)
+      +(p.items.length?p.items.map(invItemRow).join('')
+        :'<div style="color:var(--text3);font-style:italic;font-size:13px">Sin objetos.</div>')
+      +'</div>';
+  });
+  panel.innerHTML=html;
+}
+async function invQty(eid,delta){
+  await api('/api/characters/'+MYCHAR+'/inventory/'+eid+'/qty','POST',{delta:delta});
+  loadInventory();
+}
+async function invEquip(eid){
+  await api('/api/characters/'+MYCHAR+'/inventory/'+eid+'/equip','POST');
+  loadInventory();
+}
+async function invUse(eid,delta){
+  var r=await fetch('/api/characters/'+MYCHAR+'/inventory/'+eid+'/use',
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({delta:delta})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'Error');return;}
+  loadInventory();
+}
+async function invMove(eid,parentId){
+  var r=await fetch('/api/characters/'+MYCHAR+'/inventory/'+eid+'/move',
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parent_id:parentId})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo mover');return;}
+  closeModal(); loadInventory();
+}
+// Elegir en qué contenedor guardar (mochila del personaje, carreta del chull…)
+function openMove(eid){
+  if(!INV_CONTENEDORES.length){alert('No tenés contenedores.');return;}
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">Guardar en…</div>'
+    +'<div class="sh-meta" style="margin-bottom:10px">Lo que va adentro ocupa el espacio del contenedor, no el tuyo.</div>'
+    +INV_CONTENEDORES.map(function(c){
+      var libre=(c.contenedor_capacidad||0)-(c.cont_usado||0);
+      return '<div class="inv-row"><span style="flex:1"><b style="color:var(--gold2)">'+esc(c.name)+'</b>'
+        +' <span style="color:var(--text3);font-size:12px">'+(c.owner||'')+' · libre '+libre+'/'+(c.contenedor_capacidad||0)+'</span></span>'
+        +'<button class="btn-sheet" onclick="invMove('+eid+','+c.id+')">Guardar</button></div>';
+    }).join('');
+  document.getElementById('overlay').classList.add('on');
+}
+async function invDel(eid){
+  if(!confirm('¿Sacar este objeto del inventario?'))return;
+  await api('/api/characters/'+MYCHAR+'/inventory/'+eid,'DELETE');
+  loadInventory();
+}
+async function setSize(size){
+  await api('/api/characters/'+MYCHAR+'/size','PUT',{size:size});
+  loadInventory();
+}
+function openCreateItem(target){
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">Crear objeto</div>'
+    +'<div class="sh-meta" style="margin-bottom:10px">El DM te habilitó a cargar objetos propios.</div>'
+    +'<div style="display:flex;flex-direction:column;gap:9px">'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nombre</span>'
+        +'<input class="oc-fi" id="ciName" style="flex:1;max-width:280px"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Descripción</span>'
+        +'<input class="oc-fi" id="ciDesc" style="flex:1;max-width:280px"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Slots</span>'
+        +'<input class="oc-fi" type="number" min="0" id="ciSlots" value="1" style="width:90px"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>+ Capacidad</span>'
+        +'<input class="oc-fi" type="number" min="0" id="ciCap" value="0" style="width:90px"/></label>'
+    +'</div>'
+    +'<div class="me-sheet-row" style="justify-content:flex-end;border:none;margin-top:12px">'
+      +'<button class="btn-sheet" style="background:var(--gold);color:#1c1915;border-color:var(--gold)" onclick="saveCreateItem(\''+target+'\')">Crear</button></div>';
+  document.getElementById('overlay').classList.add('on');
+}
+async function saveCreateItem(target){
+  var name=document.getElementById('ciName').value.trim();
+  if(!name){alert('Poné un nombre.');return;}
+  var url=target==='c' ? '/api/characters/'+MYCHAR+'/inventory'
+                       : '/api/characters/'+MYCHAR+'/pets/'+target.slice(1)+'/inventory';
+  var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name,descripcion:document.getElementById('ciDesc').value.trim(),
+      slots:parseInt(document.getElementById('ciSlots').value)||0,
+      capacity_bonus:parseInt(document.getElementById('ciCap').value)||0})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo crear');return;}
+  closeModal(); loadInventory();
+}
+
+// ═══════════ TIENDAS y CATÁLOGO ═══════════
+var SHOPS=[], SETTLEMENTS=[], MYREQS=[], CATALOG=[];
+async function loadShops(){
+  try{
+    SETTLEMENTS=await api(API+'/settlements');
+    SHOPS=await api(API+'/shops');
+    MYREQS=await api(API+'/requests');
+    CATALOG=await api(API+'/catalog');
+  }catch(e){ return; }
+  renderShops(); renderCatalog();
+}
+function reqStateFor(shopItemId){
+  var r=MYREQS.filter(function(x){return x.shop_item_id===shopItemId;})[0];
+  if(!r)return '';
+  var col={pending:'#e8c840',approved:'#7ac88c',rejected:'#e05050'}[r.status]||'#a09070';
+  var lbl={pending:'pedido',approved:'comprado',rejected:'rechazado'}[r.status]||r.status;
+  return '<span class="stag" style="border-color:'+col+';color:'+col+'">'+lbl+'</span>';
+}
+function shopItemRow(sh,i){
+  var st=reqStateFor(i.id);
+  return '<div class="inv-row">'
+    +'<span style="flex:1"><b style="color:var(--gold2)">'+esc(i.name)+'</b>'
+      +' <span style="color:var(--text3);font-size:12px">x'+i.cantidad+' · '+i.slots+' slot'+(i.slots===1?'':'s')+'</span>'
+      +(i.descripcion?'<div style="font-size:12px;color:var(--text3);font-style:italic">'+esc(i.descripcion)+'</div>':'')+'</span>'
+    +'<span style="font-family:\'Cinzel\',serif;color:var(--gold2)">💠 '+i.precio+'</span>'
+    +st+(st?'':'<button class="btn-sheet" onclick="pedir('+sh.id+','+i.id+')">Pedir</button>')
+    +'</div>';
+}
+function shopCard(sh){
+  return '<div class="me-card"><div class="me-head"><span class="me-name">'+esc(sh.name)+'</span>'
+    +'<span class="pet-tag">'+esc(sh.preset_label||sh.preset)+'</span></div>'
+    +((sh.items||[]).length?sh.items.map(function(i){return shopItemRow(sh,i);}).join('')
+      :'<div style="color:var(--text3);font-style:italic;font-size:13px">No hay nada a la venta.</div>')
+    +'</div>';
+}
+function renderShops(){
+  var html='';
+  SETTLEMENTS.forEach(function(st){
+    html+='<div class="section-lbl">🏘 '+esc(st.name)+' <span style="color:var(--text3)">· '+esc(st.size_label||st.size)+'</span></div>'
+      +(st.shops.length?st.shops.map(shopCard).join(''):'<div class="empty-msg">Sin tiendas abiertas.</div>');
+  });
+  var sueltas=SHOPS.filter(function(s){return !s.settlement_id;});
+  if(sueltas.length) html+='<div class="section-lbl">Tiendas</div>'+sueltas.map(shopCard).join('');
+  document.getElementById('shopsPanel').innerHTML=html||'<div class="empty-msg">El DM todavía no abrió ninguna tienda.</div>';
+}
+async function pedir(sid,siid){
+  var r=await fetch(API+'/shops/'+sid+'/request',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({shop_item_id:siid,cantidad:1})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo pedir');return;}
+  var j=await r.json();
+  alert('Pedido enviado al DM por 💠'+j.total+'. Cuando lo confirme se te descuentan los marcos.');
+  loadShops();
+}
+function renderCatalog(){
+  var qEl=document.getElementById('catQ'), q=qEl?qEl.value:'';
+  var list=CATALOG;
+  if(q.trim()){
+    var words=q.trim().toLowerCase().split(/\s+/);
+    list=list.filter(function(it){
+      var hay=[it.name,it.descripcion,(it.categorias||[]).join(' ')].filter(Boolean).join(' ').toLowerCase();
+      for(var i=0;i<words.length;i++){ if(hay.indexOf(words[i])<0) return false; }
+      return true;
+    });
+  }
+  document.getElementById('catalogPanel').innerHTML=list.length
+    ? list.map(function(it){
+        var cats=(it.categorias||[]).map(function(c){return '<span class="stag">'+esc(c)+'</span>';}).join('');
+        return '<div class="inv-row"><span style="flex:1"><b style="color:var(--gold2)">'+esc(it.name)+'</b>'
+          +' <span style="color:var(--text3);font-size:12px">'+it.slots+' slot'+(it.slots===1?'':'s')+'</span>'
+          +(it.descripcion?'<div style="font-size:12px;color:var(--text3);font-style:italic">'+esc(it.descripcion)+'</div>':'')
+          +'</span>'+cats+'</div>';
+      }).join('')
+    : '<div class="empty-msg">Nada por acá.</div>';
+}
+
 // El proxy (Cloudflare) corta las conexiones ociosas, a veces sin avisar: queda
 // un socket "zombie" (onclose nunca se dispara) y el combate se congela. Por eso
 // mandamos un ping cada 25 s y, si no llega nada de vuelta en 70 s, lo cerramos

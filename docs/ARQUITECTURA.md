@@ -84,6 +84,8 @@ routers/*.py        ← endpoints por dominio (validan, orquestan)
 | `campaigns` | `/api/campaigns` | campañas, miembros, invitaciones, config, tormenta, marcos del DM, opciones de mascota |
 | `characters` | `/api/characters` | personajes, PDF, imagen, mascotas, stats en vivo, heridas, marcos, recursos D&D |
 | `enemies` | `/api/campaigns/{cid}/enemies` | bestiario (por DM + sistema): import, bulk, export |
+| `items` | `/api/campaigns/{cid}/items` | catálogo de objetos (por DM) + `/catalog` sin precios para jugadores |
+| `shops` | `/api/campaigns/{cid}` | tiendas, asentamientos, stock, restock y pedidos de compra |
 | `encounters` | `/api/campaigns/{cid}/encounters` | encuentros y overrides por-encuentro |
 | `combat` | `/api/campaigns/{cid}/combat` | combate en vivo (stats, turnos, vida máx, ocultar) |
 | `frontend` | `/` | sirve las páginas HTML y hace el gating por rol |
@@ -205,6 +207,7 @@ erDiagram
 | `dm_id` | INTEGER FK→users | dueño/DM |
 | `system` | TEXT | `cosmere` \| `dnd` |
 | `config` | TEXT (JSON) | parámetros: rango de tormenta, curva de descarga de marcos |
+| `day_count` | INTEGER | días **absolutos** transcurridos (para el restock: `storm_tracker.day` se reinicia con cada tormenta) |
 | `created_at` | TEXT | |
 
 #### `campaign_members` — quién está en qué campaña
@@ -287,6 +290,51 @@ Qué enemigos del bestiario puede elegir un jugador como mascota, **por campaña
 #### `combats` — estado del combate (1 por campaña)
 `campaign_id` PK/FK. `data` es un TEXT con el JSON del combate entero (participantes,
 ronda, fase, turnos, estados). Es el respaldo de la cache en memoria de `state.py`.
+
+#### `items` — catálogo de objetos (por DM, solo Cosmere)
+Igual que el bestiario: pertenece al **DM** y se comparte entre sus campañas.
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `owner_id` | INTEGER FK→users | el DM dueño del catálogo |
+| `name`, `descripcion`, `notas` | TEXT | |
+| `categorias` | TEXT (JSON) | `["armas", "lujo"]` |
+| `precio` | INTEGER | precio base, en marcos |
+| `slots` | INTEGER | 1 por defecto; 0 = no ocupa; `Cumbersome N` = 1+N |
+| `capacity_bonus` | INTEGER | mochila = 2 |
+| `secreto` | INTEGER | 1 = no aparece en el catálogo del jugador ni en el sorteo de las tiendas |
+
+#### `settlements` — asentamientos (por campaña)
+`id`, `campaign_id` (FK, cascade), `name`, `size` (`aldea`|`pueblo`|`ciudad`),
+`descripcion`. Agrupan tiendas; al crearse generan las suyas según el tamaño.
+
+#### `shops` — tiendas (por campaña)
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `campaign_id` | INTEGER FK→campaigns | cascade |
+| `settlement_id` | INTEGER FK→settlements | NULL = tienda suelta |
+| `name`, `descripcion` | TEXT | |
+| `preset` | TEXT | rubro: general, herreria, fabrial, granja, medica… |
+| `size` | TEXT | chica \| mediana \| grande (define cantidad y tope de precio) |
+| `price_policy` | TEXT | barato \| normal \| caro \| variado |
+| `last_restock_day` | INTEGER | contra `campaigns.day_count`, para el restock |
+
+#### `shop_items` — stock de una tienda
+`id`, `shop_id` (FK, cascade), `item_id` (FK), `cantidad`, `precio` (congelado al
+generarse), `price_tier`, `visible` (0 = trastienda). Al agotarse queda en `cantidad=0`
+(no se borra, para no perder el historial de pedidos por cascada).
+
+#### `inventory` — inventario de un personaje o de una mascota
+`id`, `character_id` (FK, cascade), `pet_id` (FK, cascade), `item_id` (origen, nullable),
+`name`, `descripcion`, `categorias`, `slots`, `capacity_bonus`, `cantidad`, `notas`.
+Guarda una **copia** del objeto: editar el catálogo no altera lo ya entregado.
+
+#### `purchase_requests` — pedidos de compra
+`id`, `shop_id`, `shop_item_id`, `character_id`, `cantidad`, `status`
+(`pending`|`approved`|`rejected`). El jugador pide; al aprobar el DM se cobran los marcos,
+baja el stock y se crea la entrada de inventario.
 
 #### `storm_tracker` — ciclo de altas tormentas (1 por campaña)
 | Columna | Tipo | Notas |
