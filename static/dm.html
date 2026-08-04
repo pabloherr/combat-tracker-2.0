@@ -380,8 +380,8 @@ select.fi{appearance:auto;}
     <button class="tab" data-tab="jugadores" onclick="showTab('jugadores')">Jugadores</button>
     <button class="tab" data-tab="bestiario" onclick="showTab('bestiario')">Bestiario</button>
     <button class="tab" data-tab="encuentros" onclick="showTab('encuentros')">Encuentros</button>
-    <button class="tab cosmere-only" data-tab="objetos" onclick="showTab('objetos')">Objetos</button>
-    <button class="tab cosmere-only" data-tab="comercio" onclick="showTab('comercio')">Inventarios</button>
+    <button class="tab cosmere-only" data-mod="catalogo" data-tab="objetos" onclick="showTab('objetos')">Objetos</button>
+    <button class="tab cosmere-only" data-mod="inventario" data-tab="comercio" onclick="showTab('comercio')">Inventarios</button>
   </div>
 
   <!-- ═══════════ COMBATE ═══════════ -->
@@ -941,7 +941,8 @@ var CFG=null;
 // Al cambiar de solapa se re-dibuja el modal, así que primero guardamos en CFG
 // lo que el DM haya tocado: nada se pierde por moverse entre solapas.
 var CFG_CAMPOS=[
-  ['cfg-mobj','modulo_objetos','bool'], ['cfg-mstorm','modulo_tormentas','bool'],
+  ['cfg-mcat','modulo_catalogo','bool'], ['cfg-minv','modulo_inventario','bool'],
+  ['cfg-mstorm','modulo_tormentas','bool'],
   ['cfg-ve-vida','ver_vida_enemigos','txt'], ['cfg-ve-focus','ver_focus_enemigos','txt'],
   ['cfg-ve-inv','ver_inv_enemigos','txt'], ['cfg-ve-est','ver_estados_enemigos','bool'],
   ['cfg-va-vida','ver_vida_aliados','txt'], ['cfg-va-focus','ver_focus_aliados','txt'],
@@ -974,8 +975,10 @@ function paintConfig(){
   if(CFG_TAB==='modulos'){
     cuerpo='<div class="cfg-sec">Qué se usa en esta campaña</div>'
       +'<div class="import-hint" style="margin-bottom:8px">Lo que apagues desaparece para todos: ni vos ni los jugadores lo ven.</div>'
-      +cfgSwitch('Objetos e inventario','cfg-mobj',cfg.modulo_objetos,
-                 'Catálogo, inventario, guardados y capacidad de carga')
+      +cfgSwitch('Catálogo de objetos','cfg-mcat',cfg.modulo_catalogo,
+                 'Tu catálogo y el que ven ellos para agarrar cosas')
+      +cfgSwitch('Inventario','cfg-minv',cfg.modulo_inventario,
+                 'Lo que lleva cada uno, los guardados y la capacidad de carga')
       +cfgSwitch('Tracker de altas tormentas','cfg-mstorm',cfg.modulo_tormentas,
                  'La barra del ciclo y la descarga de marcos por día');
   }else if(CFG_TAB==='ver'){
@@ -1051,17 +1054,22 @@ async function saveConfig(){
   aplicarModulos(CFG);
   loadStorm();
 }
-// Los módulos apagados desaparecen del panel del DM al toque.
+// Los módulos apagados desaparecen del panel del DM al toque. El catálogo y el
+// inventario se prenden y se apagan por separado.
 function aplicarModulos(cfg){
-  var objetos=(SYSTEM!=='dnd')&&cfg.modulo_objetos!==false;
+  var cosmere=SYSTEM!=='dnd';
+  var on={catalogo:cosmere&&cfg.modulo_catalogo!==false,
+          inventario:cosmere&&cfg.modulo_inventario!==false};
   document.querySelectorAll('.cosmere-only').forEach(function(el){
-    el.style.display=objetos?'':'none';
+    var m=el.dataset.mod;
+    el.style.display=(m?on[m]:cosmere)?'':'none';
   });
   var storm=document.getElementById('stormBar');
-  if(storm) storm.style.display=(SYSTEM!=='dnd'&&cfg.modulo_tormentas!==false)?'':'none';
+  if(storm) storm.style.display=(cosmere&&cfg.modulo_tormentas!==false)?'':'none';
   // si estabas parado en una pestaña que se apagó, volvés al combate
-  if(!objetos&&(document.getElementById('tab-objetos').style.display!=='none'
-              ||document.getElementById('tab-comercio').style.display!=='none')) showTab('combate');
+  if((!on.catalogo&&document.getElementById('tab-objetos').style.display!=='none')
+   ||(!on.inventario&&document.getElementById('tab-comercio').style.display!=='none'))
+    showTab('combate');
 }
 async function invitePlayer(){
   var u=document.getElementById('inviteUser').value.trim();

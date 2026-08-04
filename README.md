@@ -470,8 +470,18 @@ backend lo rechaza (no es solo esconder botones):
 
 | Módulo | Qué se lleva si lo apagás |
 |---|---|
-| **Objetos e inventario** | catálogo, inventario, guardados y capacidad de carga |
+| **Catálogo de objetos** | tu pestaña *Objetos* y la pestaña *Catálogo* de ellos |
+| **Inventario** | lo que lleva cada uno, los guardados, la capacidad de carga y tu pestaña *Inventarios* |
 | **Tracker de altas tormentas** | la barra del ciclo y la descarga de marcos por día |
+
+El catálogo y el inventario son **independientes**, así que las cuatro combinaciones
+sirven:
+
+- **Los dos** — el flujo completo: miran el catálogo, agarran y lo llevan.
+- **Solo inventario** — sin catálogo compartido: llevan sus cosas y vos se las das a mano.
+- **Solo catálogo** — queda como lista de consulta (qué existe y cuánto vale), sin
+  botón *Agarrar* y sin inventarios que llevar.
+- **Ninguno** — la campaña no usa objetos.
 
 **Qué ven los jugadores** — por separado para **enemigos** y para **otros jugadores**, y
 por cada stat (vida, focus, investidura):

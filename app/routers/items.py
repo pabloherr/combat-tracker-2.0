@@ -22,15 +22,16 @@ from .characters import _inv_rows, _nest, character_inventory
 router = APIRouter(prefix="/api/campaigns/{cid}", tags=["items"])
 
 
-def _require_cosmere(conn, cid: int):
+def _require_cosmere(conn, cid: int, modulo="modulo_catalogo"):
     """Los objetos son una regla de Cosmere, y además el DM puede apagar el
-    módulo entero desde los ajustes de la campaña."""
+    catálogo y el inventario por separado desde los ajustes de la campaña."""
     c = campaign_or_404(conn, cid)
     system = (c["system"] if "system" in c.keys() else None) or "cosmere"
     if system != "cosmere":
         raise HTTPException(400, "Los objetos son solo para campañas de Cosmere")
-    if not get_config(conn, cid)["modulo_objetos"]:
-        raise HTTPException(400, "El DM apagó los objetos en esta campaña")
+    if modulo and not get_config(conn, cid)[modulo]:
+        que = "el catálogo" if modulo == "modulo_catalogo" else "el inventario"
+        raise HTTPException(400, f"El DM apagó {que} en esta campaña")
     return c
 
 
@@ -215,7 +216,7 @@ def campaign_inventories(cid: int, user=Depends(current_user)):
     endpoints de `/api/characters/{id}/inventory…`."""
     with db() as conn:
         require_dm(conn, cid, user)
-        _require_cosmere(conn, cid)
+        _require_cosmere(conn, cid, "modulo_inventario")
         chars = conn.execute(
             "SELECT * FROM characters WHERE campaign_id=? ORDER BY name", (cid,)).fetchall()
         out = {"characters": [], "grupo": _nest(_inv_rows(conn, campaign_id=cid))}

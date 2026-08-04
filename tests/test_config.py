@@ -26,27 +26,68 @@ def _partes(cli, cid):
 
 # ── Módulos ────────────────────────────────────────────────
 
-def test_turning_off_items_closes_the_whole_module(make_client):
+def test_the_catalog_can_be_closed_without_touching_the_inventory(make_client):
     dm, pl, cid, chid = party(make_client)
-    assert pl.get(f"/api/characters/{chid}/inventory").status_code == 200
-    _cfg(dm, cid, modulo_objetos=False)
+    _cfg(dm, cid, modulo_catalogo=False)
 
-    assert pl.get(f"/api/characters/{chid}/inventory").status_code == 400
     assert pl.get(f"/api/campaigns/{cid}/catalog").status_code == 400
     assert dm.get(f"/api/campaigns/{cid}/items").status_code == 400
+    # el inventario sigue andando: el DM le da cosas a mano
+    assert pl.get(f"/api/characters/{chid}/inventory").status_code == 200
+    assert dm.post(f"/api/characters/{chid}/inventory",
+                   json={"name": "Cuerda"}).status_code == 200
+    assert dm.get(f"/api/campaigns/{cid}/inventories").status_code == 200
+
+
+def test_the_inventory_can_be_closed_without_touching_the_catalog(make_client):
+    dm, pl, cid, chid = party(make_client)
+    dm.post(f"/api/campaigns/{cid}/items", json={"name": "Cuerda", "precio": 3})
+    iid = dm.get(f"/api/campaigns/{cid}/items").json()[0]["id"]
+    _cfg(dm, cid, modulo_inventario=False)
+
+    assert pl.get(f"/api/characters/{chid}/inventory").status_code == 400
+    assert dm.get(f"/api/campaigns/{cid}/inventories").status_code == 400
     assert dm.post(f"/api/characters/{chid}/inventory",
                    json={"name": "Cuerda"}).status_code == 400
-    # y al volver a encenderlo sigue todo donde estaba
-    _cfg(dm, cid, modulo_objetos=True)
+    # el catálogo queda como lista de consulta, pero no se puede agarrar nada
+    assert pl.get(f"/api/campaigns/{cid}/catalog").status_code == 200
+    assert pl.post(f"/api/characters/{chid}/inventory/take",
+                   json={"item_id": iid, "precio": 0}).status_code == 400
+
+
+def test_turning_both_off_and_back_on(make_client):
+    dm, pl, cid, chid = party(make_client)
+    _cfg(dm, cid, modulo_catalogo=False, modulo_inventario=False)
+    assert pl.get(f"/api/characters/{chid}/inventory").status_code == 400
+    assert pl.get(f"/api/campaigns/{cid}/catalog").status_code == 400
+    _cfg(dm, cid, modulo_catalogo=True, modulo_inventario=True)
     assert pl.get(f"/api/characters/{chid}/inventory").status_code == 200
+    assert pl.get(f"/api/campaigns/{cid}/catalog").status_code == 200
 
 
 def test_players_are_told_which_modules_are_on(make_client):
     dm, pl, cid, chid = party(make_client)
     assert pl.get(f"/api/campaigns/{cid}/roster").json()["config"] == {
-        "modulo_objetos": True, "modulo_tormentas": True}
-    _cfg(dm, cid, modulo_objetos=False)
-    assert pl.get(f"/api/campaigns/{cid}/roster").json()["config"]["modulo_objetos"] is False
+        "modulo_catalogo": True, "modulo_inventario": True, "modulo_tormentas": True}
+    _cfg(dm, cid, modulo_catalogo=False)
+    cfg = pl.get(f"/api/campaigns/{cid}/roster").json()["config"]
+    assert cfg["modulo_catalogo"] is False and cfg["modulo_inventario"] is True
+
+
+def test_the_old_single_switch_still_applies_to_both(make_client):
+    """Las campañas que guardaron el interruptor viejo (`modulo_objetos`) siguen
+    con los objetos apagados: vale para el catálogo y para el inventario."""
+    import json
+
+    from app.database import db
+
+    dm, pl, cid, chid = party(make_client)
+    with db() as conn:
+        conn.execute("UPDATE campaigns SET config=? WHERE id=?",
+                     (json.dumps({"modulo_objetos": False}), cid))
+    cfg = dm.get(f"/api/campaigns/{cid}/config").json()
+    assert cfg["modulo_catalogo"] is False and cfg["modulo_inventario"] is False
+    assert pl.get(f"/api/characters/{chid}/inventory").status_code == 400
 
 
 def test_storm_tracker_can_be_turned_off(make_client):

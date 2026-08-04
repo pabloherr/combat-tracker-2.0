@@ -27,7 +27,8 @@ CONFIG_DEFAULTS = {
     "discharge_curve": 2.0,  # exponente: 1 = pareja; más alto = arranca más lento
 
     # ── Módulos que se pueden apagar en una campaña ──
-    "modulo_objetos": True,     # catálogo, inventario y guardados
+    "modulo_catalogo": True,    # el catálogo de objetos del DM y el que ven ellos
+    "modulo_inventario": True,  # inventario, guardados y capacidad de carga
     "modulo_tormentas": True,   # tracker de altas tormentas
 
     # ── Qué ven los jugadores de los demás en combate (ver VER_MODOS) ──
@@ -44,12 +45,12 @@ CONFIG_DEFAULTS = {
 
 INT_KEYS = {"storm_min", "storm_max", "discharge_start", "discharge_full"}
 FLOAT_KEYS = {"discharge_curve"}
-BOOL_KEYS = {"modulo_objetos", "modulo_tormentas",
+BOOL_KEYS = {"modulo_catalogo", "modulo_inventario", "modulo_tormentas",
              "ver_estados_enemigos", "ver_estados_aliados"}
 MODO_KEYS = {k for k in CONFIG_DEFAULTS if k.startswith("ver_") and k not in BOOL_KEYS}
 
 # Claves que los jugadores necesitan saber (el resto es cosa del DM).
-PLAYER_KEYS = ("modulo_objetos", "modulo_tormentas")
+PLAYER_KEYS = ("modulo_catalogo", "modulo_inventario", "modulo_tormentas")
 
 
 def coerce(key: str, value):
@@ -88,6 +89,11 @@ def get_config(conn, cid: int) -> dict:
         except (ValueError, TypeError):
             saved = {}
         if isinstance(saved, dict):
+            # Antes había un solo interruptor para catálogo e inventario: si una
+            # campaña lo tiene guardado, vale para los dos.
+            if "modulo_objetos" in saved:
+                viejo = coerce("modulo_catalogo", saved["modulo_objetos"])
+                cfg["modulo_catalogo"] = cfg["modulo_inventario"] = viejo
             for k, v in saved.items():
                 if k in CONFIG_DEFAULTS:
                     cfg[k] = coerce(k, v)
