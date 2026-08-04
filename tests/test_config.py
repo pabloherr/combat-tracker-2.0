@@ -90,6 +90,45 @@ def test_the_old_single_switch_still_applies_to_both(make_client):
     assert pl.get(f"/api/characters/{chid}/inventory").status_code == 400
 
 
+# ── Capacidad de carga por tamaño ──────────────────────────
+
+def _capacidad(cli, chid):
+    return cli.get(f"/api/characters/{chid}/inventory").json()["character"]["capacity"]
+
+
+def test_the_carrying_base_follows_the_manual_by_default(make_client):
+    dm, pl, cid, chid = party(make_client)
+    cap = _capacidad(pl, chid)
+    assert cap["base"] == 6 and cap["capacidad"] == 6      # Mediano, sin Fuerza
+    assert dm.get(f"/api/campaigns/{cid}/config").json()["carga_mediano"] == 6
+
+
+def test_the_dm_sets_the_base_of_each_size(make_client):
+    dm, pl, cid, chid = party(make_client)
+    _cfg(dm, cid, carga_mediano=9, carga_grande=20)
+    assert _capacidad(pl, chid)["capacidad"] == 9
+    pl.put(f"/api/characters/{chid}/size", json={"size": "Grande"})
+    cap = _capacidad(pl, chid)
+    assert cap["base"] == 20 and cap["capacidad"] == 20
+
+
+def test_the_base_also_applies_to_pets(make_client):
+    dm, pl, cid, chid = party(make_client)
+    import_enemy(dm, cid, SAMPLE_STATBLOCK)       # Axehound: Medium, fuerza 3
+    eid = get_enemies(dm, cid)[0]["id"]
+    dm.post(f"/api/campaigns/{cid}/pet-options/{eid}")
+    pl.post(f"/api/characters/{chid}/pets/from-enemy", json={"enemy_id": eid})
+    _cfg(dm, cid, carga_mediano=2)
+    pet = pl.get(f"/api/characters/{chid}/inventory").json()["pets"][0]
+    assert pet["capacity"]["base"] == 2 and pet["capacity"]["capacidad"] == 5
+
+
+def test_a_silly_base_gets_clamped(make_client):
+    dm, pl, cid, chid = party(make_client)
+    cfg = _cfg(dm, cid, carga_pequeno=-5, carga_gargantuesco=9999)
+    assert cfg["carga_pequeno"] == 0 and cfg["carga_gargantuesco"] == 99
+
+
 def test_storm_tracker_can_be_turned_off(make_client):
     dm, pl, cid, chid = party(make_client)
     assert pl.get(f"/api/campaigns/{cid}/storm").json()["enabled"] is True

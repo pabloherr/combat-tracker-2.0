@@ -31,6 +31,13 @@ CONFIG_DEFAULTS = {
     "modulo_inventario": True,  # inventario, guardados y capacidad de carga
     "modulo_tormentas": True,   # tracker de altas tormentas
 
+    # ── Capacidad de carga: base por tamaño (la fuerza se suma aparte) ──
+    "carga_pequeno": 4,
+    "carga_mediano": 6,
+    "carga_grande": 10,
+    "carga_enorme": 15,
+    "carga_gargantuesco": 20,
+
     # ── Qué ven los jugadores de los demás en combate (ver VER_MODOS) ──
     # Lo propio siempre se ve exacto: es tu personaje.
     "ver_vida_enemigos": "color",
@@ -43,7 +50,14 @@ CONFIG_DEFAULTS = {
     "ver_estados_aliados": True,
 }
 
-INT_KEYS = {"storm_min", "storm_max", "discharge_start", "discharge_full"}
+# Tamaño de la criatura → clave con su base de carga. La capacidad final es
+# `base + Fuerza (+ lo que sumen mochilas y demás)`.
+CARGA_BASE = {"Pequeño": "carga_pequeno", "Mediano": "carga_mediano",
+              "Grande": "carga_grande", "Enorme": "carga_enorme",
+              "Gargantuesco": "carga_gargantuesco"}
+
+INT_KEYS = {"storm_min", "storm_max", "discharge_start", "discharge_full"} \
+    | set(CARGA_BASE.values())
 FLOAT_KEYS = {"discharge_curve"}
 BOOL_KEYS = {"modulo_catalogo", "modulo_inventario", "modulo_tormentas",
              "ver_estados_enemigos", "ver_estados_aliados"}
@@ -77,7 +91,14 @@ def sane(cfg: dict) -> dict:
     cfg["discharge_start"] = max(1, cfg["discharge_start"])
     cfg["discharge_full"] = max(cfg["discharge_start"] + 1, cfg["discharge_full"])
     cfg["discharge_curve"] = max(0.1, min(8.0, cfg["discharge_curve"]))
+    for k in CARGA_BASE.values():
+        cfg[k] = max(0, min(99, cfg[k]))
     return cfg
+
+
+def size_bases(cfg: dict) -> dict:
+    """Base de carga por tamaño, tal como la dejó el DM."""
+    return {size: cfg[k] for size, k in CARGA_BASE.items()}
 
 
 def get_config(conn, cid: int) -> dict:

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from ..auth import current_user
-from ..config import get_config
+from ..config import CONFIG_DEFAULTS, get_config, size_bases
 from ..database import db
 from ..dnd_pdf import parse_dnd_pdf
 from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
@@ -320,6 +320,7 @@ def _pet_serialize(r) -> dict:
     d["statuses"] = json.loads(d.get("statuses") or "[]")
     d["acciones"] = json.loads(d.get("acciones") or "[]")
     d["stats"] = json.loads(d.get("stats") or "{}")
+    d["compartida"] = bool(d.get("compartida"))
     return d
 
 
@@ -365,6 +366,26 @@ def delete_pet(cid: int, pid: int, user=Depends(current_user)):
     return {"ok": True}
 
 
+@router.post("/{cid}/pets/{pid}/shared")
+async def toggle_pet_shared(cid: int, pid: int, user=Depends(current_user)):
+    """Marca la mascota como **de todos**: pasa a ser del grupo y cualquiera de
+    la mesa le maneja la vida, los estados y el inventario.
+
+    La prende y la apaga quien la trajo (o el DM): es su bicho."""
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        r = conn.execute("SELECT * FROM pets WHERE id=? AND character_id=?",
+                         (pid, cid)).fetchone()
+        if not r:
+            raise HTTPException(404, "Mascota no encontrada")
+        val = 0 if r["compartida"] else 1
+        conn.execute("UPDATE pets SET compartida=? WHERE id=?", (val, pid))
+        campaign_id = ch["campaign_id"]
+    # en combate cambia quién la puede tocar y quién le ve los números
+    await _sync_combat(campaign_id, {"shared": bool(val)}, pet_id=pid)
+    return {"ok": True, "compartida": bool(val)}
+
+
 # ── Gestión en vivo (vida/focus/investidura/estados), dentro o fuera de combate ──
 
 _STATS = {"vida", "focus", "inv"}
@@ -386,8 +407,48 @@ def _toggle_status(st: list, status: str) -> list:
 
 
 def _owned_pet(conn, cid: int, pid: int, user: dict):
-    _owned(conn, cid, user)
+    """Mascota que este usuario puede manejar.
+
+    La propia siempre; una marcada como **de todos** la maneja cualquiera de la
+    mesa (y el DM), aunque la haya traído otro jugador."""
     r = conn.execute("SELECT * FROM pets WHERE id=? AND character_id=?", (pid, cid)).fetchone()
+    if not r:
+        # el pedido puede venir con el personaje de quien la maneja, no con el
+        # de quien la trajo: si es de todos, se busca igual
+        r = conn.execute(
+            "SELECT p.* FROM pets p JOIN characters ch ON ch.id=p.character_id "
+            "WHERE p.id=? AND p.compartida=1 AND ch.campaign_id="
+            "  (SELECT campaign_id FROM characters WHERE id=?)", (pid, cid)).fetchone()
+    if not r:
+        raise HTTPException(404, "Mascota no encontrada")
+    if not r["compartida"]:
+        _owned_or_dm(conn, r["character_id"], user)
+    else:
+        _en_la_campana(conn, r["character_id"], user)
+    return r
+
+
+def _en_la_campana(conn, char_id: int, user: dict):
+    """El usuario es el DM de esa campaña o un jugador aceptado en ella."""
+    ok = conn.execute(
+        "SELECT 1 FROM characters ch JOIN campaigns c ON c.id=ch.campaign_id "
+        "WHERE ch.id=? AND (c.dm_id=? OR EXISTS("
+        "  SELECT 1 FROM campaign_members m WHERE m.campaign_id=c.id AND m.user_id=?"
+        "  AND m.status='accepted'))",
+        (char_id, user["id"], user["id"])).fetchone()
+    if not ok:
+        raise HTTPException(404, "Mascota no encontrada")
+
+
+def _pet_al_alcance(conn, ch, pid: int):
+    """Mascota a la que este personaje le puede meter mano: una suya, o una de
+    todos de su misma campaña."""
+    r = conn.execute("SELECT * FROM pets WHERE id=? AND character_id=?", (pid, ch["id"])).fetchone()
+    if not r and ch["campaign_id"]:
+        r = conn.execute(
+            "SELECT p.* FROM pets p JOIN characters c2 ON c2.id=p.character_id "
+            "WHERE p.id=? AND p.compartida=1 AND c2.campaign_id=?",
+            (pid, ch["campaign_id"])).fetchone()
     if not r:
         raise HTTPException(404, "Mascota no encontrada")
     return r
@@ -673,7 +734,9 @@ def character_marcos_set(cid: int, s: MarcosSet, user=Depends(current_user)):
 # Cumbersome N ocupa 1+N, y los grandes más de 1 (queda a criterio del DM, que
 # carga el número de slots al crear el objeto).
 
-_SIZE_BASE = {"Pequeño": 4, "Mediano": 6, "Grande": 10, "Enorme": 15, "Gargantuesco": 20}
+# Las bases por tamaño las fija el DM en los ajustes de la campaña (ver
+# `app/config.py`); estos son los valores del manual, que valen de default.
+_SIZE_BASE = size_bases(CONFIG_DEFAULTS)
 # Los statblocks vienen en inglés; se mapean al tamaño del sistema.
 _SIZE_ALIASES = {"tiny": "Pequeño", "small": "Pequeño", "medium": "Mediano",
                  "large": "Grande", "huge": "Enorme", "gargantuan": "Gargantuesco",
@@ -729,12 +792,15 @@ def _slots_de(r) -> int:
     return (r["slots"] or 0) * (r["cantidad"] or 1)
 
 
-def carrying_capacity(size: str, fuerza: int, rows) -> dict:
+def carrying_capacity(size: str, fuerza: int, rows, bases=None) -> dict:
     """Capacidad, uso y sobrecarga. No bloquea: solo informa.
 
     Solo cuenta lo que la criatura lleva encima: lo **equipado** y que no esté
-    dentro de un contenedor (eso va contra la capacidad del contenedor)."""
-    base = _SIZE_BASE.get(_norm_size(size), 6)
+    dentro de un contenedor (eso va contra la capacidad del contenedor).
+
+    `bases` es la tabla de base por tamaño de la campaña; sin ella, la del manual."""
+    bases = bases or _SIZE_BASE
+    base = bases.get(_norm_size(size), bases.get("Mediano", 6))
     encima = [r for r in rows if not r["parent_id"] and r["equipado"]]
     bonus = sum((r["capacity_bonus"] or 0) * (r["cantidad"] or 1) for r in encima)
     usado = sum(_slots_de(r) for r in encima)
@@ -763,17 +829,25 @@ def _nest(rows) -> list:
     return top
 
 
-def _char_capacity(conn, ch, rows) -> dict:
+def _bases_de(conn, campaign_id) -> dict:
+    """Bases de carga por tamaño que configuró el DM de esa campaña."""
+    if not campaign_id:
+        return _SIZE_BASE
+    return size_bases(get_config(conn, campaign_id))
+
+
+def _char_capacity(conn, ch, rows, bases=None) -> dict:
     sheet = json.loads(ch["sheet"] or "{}")
     fuerza = (sheet.get("attributes") or {}).get("STR") or 0
     size = ch["size"] if "size" in ch.keys() else "Mediano"
-    return carrying_capacity(size, fuerza, rows)
+    return carrying_capacity(size, fuerza, rows,
+                             bases or _bases_de(conn, ch["campaign_id"]))
 
 
-def _pet_capacity(conn, pet, rows) -> dict:
+def _pet_capacity(conn, pet, rows, bases=None) -> dict:
     stats = json.loads(pet["stats"] or "{}")
     fuerza = (stats.get("physical") or {}).get("str") or 0
-    return carrying_capacity(stats.get("size"), fuerza, rows)
+    return carrying_capacity(stats.get("size"), fuerza, rows, bases)
 
 
 def _require_modulo(conn, ch, modulo="modulo_inventario"):
@@ -942,19 +1016,32 @@ def character_inventory(conn, ch) -> dict:
     """Todo lo que rodea a un personaje: lo que lleva encima (con sus
     contenedores), lo de sus mascotas, su guardado y el del grupo."""
     cid = ch["id"]
+    bases = _bases_de(conn, ch["campaign_id"])
     rows = _inv_rows(conn, character_id=cid)
     out = {"character": {"id": cid, "name": ch["name"],
                          "size": ch["size"] if "size" in ch.keys() else "Mediano",
                          "items": _nest(rows),
-                         "capacity": _char_capacity(conn, ch, rows),
+                         "capacity": _char_capacity(conn, ch, rows, bases),
                          "guardado": _nest(_inv_rows(conn, character_id=cid,
                                                      stash="personal"))},
            "pets": []}
-    for pet in conn.execute("SELECT * FROM pets WHERE character_id=? ORDER BY name", (cid,)):
+
+    def _pet_block(pet, dueno=""):
         prows = _inv_rows(conn, pet_id=pet["id"])
-        out["pets"].append({"id": pet["id"], "name": pet["name"],
-                            "items": _nest(prows),
-                            "capacity": _pet_capacity(conn, pet, prows)})
+        return {"id": pet["id"], "name": pet["name"], "items": _nest(prows),
+                "compartida": bool(pet["compartida"]), "dueno": dueno,
+                "capacity": _pet_capacity(conn, pet, prows, bases)}
+
+    for pet in conn.execute("SELECT * FROM pets WHERE character_id=? ORDER BY name", (cid,)):
+        out["pets"].append(_pet_block(pet))
+    # Las mascotas de todos que trajo otro jugador: se manejan igual que las propias.
+    out["compartidas"] = [
+        _pet_block(p, p["dueno"])
+        for p in conn.execute(
+            "SELECT p.*, c2.name AS dueno FROM pets p JOIN characters c2 ON c2.id=p.character_id "
+            "WHERE p.compartida=1 AND c2.campaign_id=? AND c2.id<>? ORDER BY p.name",
+            (ch["campaign_id"], cid))
+    ] if ch["campaign_id"] else []
     out["grupo"] = _nest(_inv_rows(conn, campaign_id=ch["campaign_id"])) \
         if ch["campaign_id"] else []
     # Compañeros de campaña, para pasarles cosas.
@@ -993,10 +1080,7 @@ def add_pet_inventory(cid: int, pid: int, payload: InventoryIn, user=Depends(cur
     with db() as conn:
         ch = _owned_or_dm(conn, cid, user)
         _require_modulo(conn, ch)
-        pet = conn.execute("SELECT * FROM pets WHERE id=? AND character_id=?",
-                           (pid, cid)).fetchone()
-        if not pet:
-            raise HTTPException(404, "Mascota no encontrada")
+        _pet_al_alcance(conn, ch, pid)
         is_dm = ch["dm_id"] == user["id"]
         _add_inventory(conn, payload, pet_id=pid, campaign_id=ch["campaign_id"],
                        owner_id=ch["dm_id"], is_dm=is_dm,
@@ -1022,13 +1106,7 @@ def take_from_catalog(cid: int, t: TakeIn, user=Depends(current_user)):
         # Lo oculto no existe para el jugador: ni siquiera se entera de que está.
         if not it or (it["secreto"] and not is_dm):
             raise HTTPException(404, "Objeto no encontrado en el catálogo")
-        pet_id = None
-        if t.pet_id:
-            pet = conn.execute("SELECT id FROM pets WHERE id=? AND character_id=?",
-                               (t.pet_id, cid)).fetchone()
-            if not pet:
-                raise HTTPException(404, "Mascota no encontrada")
-            pet_id = pet["id"]
+        pet_id = _pet_al_alcance(conn, ch, t.pet_id)["id"] if t.pet_id else None
         cant = max(1, t.cantidad)
         precio = it["precio"] if t.precio is None else max(0, t.precio)
         total = precio * cant
@@ -1047,12 +1125,7 @@ def inventory_qty(cid: int, eid: int, ch: InventoryQty, user=Depends(current_use
     """Ajusta la cantidad; al llegar a 0 se saca del inventario."""
     with db() as conn:
         _owned_or_dm(conn, cid, user)
-        r = conn.execute(
-            "SELECT inv.* FROM inventory inv LEFT JOIN pets p ON p.id=inv.pet_id "
-            "WHERE inv.id=? AND (inv.character_id=? OR p.character_id=?)",
-            (eid, cid, cid)).fetchone()
-        if not r:
-            raise HTTPException(404, "Objeto no encontrado en el inventario")
+        r = _inv_entry(conn, cid, eid)
         val = (r["cantidad"] or 1) + ch.delta
         if val <= 0:
             conn.execute("DELETE FROM inventory WHERE id=?", (eid,))
@@ -1062,14 +1135,17 @@ def inventory_qty(cid: int, eid: int, ch: InventoryQty, user=Depends(current_use
 
 
 def _inv_entry(conn, cid: int, eid: int):
-    """Una entrada que este personaje puede tocar: propia, de una mascota suya o
-    del guardado del grupo (que es de todos)."""
+    """Una entrada que este personaje puede tocar: propia, de una mascota suya
+    (o de una mascota de todos), o del guardado del grupo."""
     r = conn.execute(
         "SELECT inv.* FROM inventory inv LEFT JOIN pets p ON p.id=inv.pet_id "
         "WHERE inv.id=? AND (inv.character_id=? OR p.character_id=? OR "
+        "  (p.compartida=1 AND p.character_id IN "
+        "   (SELECT id FROM characters WHERE campaign_id="
+        "    (SELECT campaign_id FROM characters WHERE id=?))) OR "
         "  (inv.character_id IS NULL AND inv.pet_id IS NULL AND inv.campaign_id="
         "   (SELECT campaign_id FROM characters WHERE id=?)))",
-        (eid, cid, cid, cid)).fetchone()
+        (eid, cid, cid, cid, cid)).fetchone()
     if not r:
         raise HTTPException(404, "Objeto no encontrado en el inventario")
     return r

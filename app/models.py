@@ -64,6 +64,12 @@ class ConfigIn(BaseModel):
     modulo_catalogo: bool | None = None     # el catálogo de objetos
     modulo_inventario: bool | None = None   # inventario, guardados y carga
     modulo_tormentas: bool | None = None    # tracker de altas tormentas
+    # Capacidad de carga: base por tamaño (después se le suma la Fuerza)
+    carga_pequeno: int | None = None
+    carga_mediano: int | None = None
+    carga_grande: int | None = None
+    carga_enorme: int | None = None
+    carga_gargantuesco: int | None = None
     # Qué ven los jugadores de los demás en combate: no | abstracto | exacto
     ver_vida_enemigos: str | None = None
     ver_focus_enemigos: str | None = None

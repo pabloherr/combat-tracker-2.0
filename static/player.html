@@ -96,6 +96,11 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .spill-group .spill{border:none;border-radius:0;}
 .spill-minus{border:none;border-left:.5px solid;background:rgba(0,0,0,.28);cursor:pointer;padding:0 12px;font-size:16px;font-family:'Cinzel',serif;line-height:1;}
 .pet-tag{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:20px;border:1px solid #7ac88c;color:#7ac88c;margin-left:8px;vertical-align:middle;}
+.pet-tag.all{border-color:#e8c840;color:#e8c840;}
+/* plegar el recuadro de una mascota: queda el nombre y un resumen de una línea */
+.pet-fold{background:none;border:none;color:var(--text3);font-size:13px;cursor:pointer;padding:0 8px 0 0;line-height:1;}
+.pet-fold:hover{color:var(--gold);}
+.pet-mini{display:flex;flex-wrap:wrap;gap:10px;font-size:13px;cursor:pointer;}
 .me-sheet-row{display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
 .btn-sheet{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:8px 14px;border-radius:var(--r);cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--gold2);text-decoration:none;display:inline-block;}
 .btn-sheet.off{color:var(--text3);border-color:var(--border);}
@@ -415,11 +420,16 @@ function controlCard(p,tagHTML,turnLabel,isPet,marcosHTML){
     +'<div class="me-turn-row"><span class="me-turn-lbl">'+(turnLabel||'Turno')+'</span>'+turnCtl+'</div>'
     +meControls(p)+sheetRow+'</div>';
 }
+// Lo que este jugador maneja: lo suyo y las mascotas de todos.
+function manejoYo(p,myUid){
+  if(p.kind==='pet'&&p.shared) return true;
+  return (p.kind==='player'||p.kind==='pet')&&p.user_id===myUid;
+}
 // mi personaje + mis mascotas. Devuelve mi user_id (o null si no tengo nada en combate).
 function renderMe(combat){
   var mp=document.getElementById('mePanel');
   var me=combat.participants.find(function(p){return p.kind==='player'&&p.user_id===MY_UID;});
-  var pets=combat.participants.filter(function(p){return p.kind==='pet'&&p.user_id===MY_UID;});
+  var pets=combat.participants.filter(function(p){return p.kind==='pet'&&manejoYo(p,MY_UID);});
   if(!me&&!pets.length){
     mp.innerHTML='<div class="me-select"><div class="me-q">Tu personaje todavía no está en el combate.</div></div>';
     return null;
@@ -429,7 +439,12 @@ function renderMe(combat){
   if(me) html+='<div class="section-lbl">Mi personaje</div>'+controlCard(me,'','Tu turno',false,(mc&&SYSTEM!=='dnd')?marcosWidget(mc):'');
   if(me&&mc&&SYSTEM==='dnd') html+='<div class="me-card" style="margin-top:10px">'+dndSlotsHTML(mc)+dndCountersHTML(mc)+'</div>';
   if(pets.length) html+='<div class="section-lbl">Mis mascotas</div>'
-    +pets.map(function(pt){return controlCard(pt,' <span class="pet-tag">Mascota</span>','Turno',true);}).join('');
+    +pets.map(function(pt){
+      var tag=pt.shared&&pt.user_id!==MY_UID
+        ? ' <span class="pet-tag">De todos'+(pt.owner_name?' · de '+esc(pt.owner_name):'')+'</span>'
+        : (pt.shared?' <span class="pet-tag">De todos</span>':' <span class="pet-tag">Mascota</span>');
+      return controlCard(pt,tag,'Turno',true);
+    }).join('');
   // no pisar el panel si el jugador está editando algún campo (marcos, cantidades)
   var ae=document.activeElement;
   if(!(ae && mp.contains(ae) && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName))) mp.innerHTML=html;
@@ -647,7 +662,7 @@ function render(combat){
     if(isDnd){
       // D&D: todos juntos, ordenados por iniciativa (mayor primero)
       var others=combat.participants.filter(function(p){
-        return !((p.kind==='player'||p.kind==='pet')&&p.user_id===myUid) && !(p.kind==='enemy'&&p.hidden);
+        return !manejoYo(p,myUid) && !(p.kind==='enemy'&&p.hidden);
       });
       others.sort(function(a,b){return initOf(b)-initOf(a);});
       document.getElementById('playersLbl').textContent='Orden de iniciativa';
@@ -656,7 +671,8 @@ function render(combat){
       document.getElementById('enemiesLbl').style.display='none';
       document.getElementById('enemiesGrid').innerHTML='';
     }else{
-      var pl=combat.participants.filter(function(p){return (p.kind==='player'||p.kind==='pet')&&p.user_id!==myUid;});
+      var pl=combat.participants.filter(function(p){
+        return (p.kind==='player'||p.kind==='pet')&&!manejoYo(p,myUid);});
       var en=combat.participants.filter(function(p){return p.kind==='enemy'&&!p.hidden;});
       // los personajes se ordenan por turno; los enemigos quedan en orden fijo
       // (no por turno) para no revelar quién es rápido o lento
@@ -726,7 +742,14 @@ function renderStorm(s){
   document.getElementById('stormBar').style.display=(s.enabled===false)?'none':'';
 }
 async function loadStorm(){ try{ renderStorm(await api(API+'/storm')); }catch(e){} }
-function ocUrl(target){ return target==='c' ? '/api/characters/'+MYCHAR : '/api/characters/'+MYCHAR+'/pets/'+target.slice(1); }
+// Las mascotas de todos cuelgan del personaje que las trajo, no del mío: para
+// manejarlas hay que pegarle a la URL de su dueño.
+var PET_CHAR={};
+function ocUrl(target){
+  if(target==='c') return '/api/characters/'+MYCHAR;
+  var pid=target.slice(1);
+  return '/api/characters/'+(PET_CHAR[pid]||MYCHAR)+'/pets/'+pid;
+}
 async function ocStat(target,stat,sign){
   var el=document.getElementById('oc-amt-'+target+'-'+stat);
   var val=Math.max(1,parseInt(el&&el.value)||1);
@@ -973,6 +996,64 @@ async function dndDelCounter(kid){
   closeModal(); loadRoster();
 }
 
+// ─── Mascotas: propias y las que son de todos ───
+// PETS_GRUPO son las que trajeron los demás pero se marcaron como de todos:
+// cualquiera de la mesa les maneja la vida, los estados y el inventario.
+var PETS_GRUPO=[];
+function indexarMascotas(){
+  PET_CHAR={}; PETS_GRUPO=[];
+  (ROSTER.members||[]).forEach(function(m){
+    (m.pets||[]).forEach(function(p){
+      PET_CHAR[p.id]=p.char_id||(m.character&&m.character.id);
+      if(p.compartida&&m.user_id!==MY_UID) PETS_GRUPO.push(Object.assign({dueno:m.character?m.character.name:''},p));
+    });
+  });
+}
+// Qué mascotas quedaron plegadas. Es una preferencia de quien mira, así que
+// vive en el navegador y no se le impone a nadie más.
+var PET_PLEGADAS={};
+try{ PET_PLEGADAS=JSON.parse(localStorage.getItem('petsPlegadas')||'{}')||{}; }catch(e){ PET_PLEGADAS={}; }
+function petAbierta(pid){ return !PET_PLEGADAS[pid]; }
+function togglePet(pid){
+  if(PET_PLEGADAS[pid]) delete PET_PLEGADAS[pid]; else PET_PLEGADAS[pid]=1;
+  try{ localStorage.setItem('petsPlegadas',JSON.stringify(PET_PLEGADAS)); }catch(e){}
+  renderRoster();
+}
+var PET_STATS=[['vida','Vida','#e05050'],['focus','Focus','#6aaae8'],['inv','Investidura','#aa8aec']];
+// Resumen de una línea para cuando el recuadro está plegado.
+function petMiniStats(p){
+  var parts=PET_STATS.filter(function(s){return p[s[0]+'_max'];}).map(function(s){
+    var mx=p[s[0]+'_max'], v=(p[s[0]]==null?mx:p[s[0]]);
+    return '<span style="color:'+s[2]+'">'+s[1]+' '+v+' <span style="color:var(--text3)">/ '+mx+'</span></span>';
+  });
+  return parts.length?parts.join(''):'<span style="color:var(--text3)">Sin stats.</span>';
+}
+function petCard(p,mia){
+  var t='p'+p.id, abierta=petAbierta(p.id);
+  var tag=p.compartida?'<span class="pet-tag all">De todos</span>':'<span class="pet-tag">Mascota</span>';
+  var dueno=(!mia&&p.dueno)?' <span style="font-size:12px;color:var(--text3)">de '+esc(p.dueno)+'</span>':'';
+  var acciones=mia
+    ? '<button class="me-change" onclick="togglePetShared('+p.id+')" title="'
+        +(p.compartida?'Volvés a ser el único que la maneja':'Cualquiera de la mesa va a poder manejarla')+'">'
+        +(p.compartida?'Hacerla mía' :'Hacerla de todos')+'</button>'
+      +' <button class="me-change" onclick="delPet('+p.id+')">Quitar</button>'
+    : '';
+  var cuerpo=abierta
+    ? '<div class="me-sheet-row" style="margin-top:0;padding-top:0;border:none"><button class="btn-sheet" onclick="openRosterSheet(\''+t+'\')">Ver ficha</button></div>'
+      +PET_STATS.map(function(s){return ocStatCtl(t,p,s[0],s[1],s[2]);}).join('')
+      +ocStatuses(t,p.statuses)
+    : '<div class="pet-mini" onclick="togglePet('+p.id+')" title="Tocá para desplegar">'+petMiniStats(p)+'</div>';
+  return '<div class="me-card" style="margin-top:8px"><div class="me-head">'
+    +'<button class="pet-fold" onclick="togglePet('+p.id+')" title="'+(abierta?'Plegar':'Desplegar')+'">'+(abierta?'▾':'▸')+'</button>'
+    +'<span class="me-name" style="flex:1">'+esc(p.name)+tag+dueno+'</span>'
+    +acciones+'</div>'+cuerpo+'</div>';
+}
+async function togglePetShared(pid){
+  var r=await fetch('/api/characters/'+(PET_CHAR[pid]||MYCHAR)+'/pets/'+pid+'/shared',{method:'POST'});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo cambiar');return;}
+  loadRoster();
+}
+
 function allyCard(m){
   var c=m.character;
   var t=mkTags(c.statuses);
@@ -996,6 +1077,7 @@ function renderRoster(){
   if(!ROSTER)return;
   var meM=ROSTER.members.find(function(m){return m.user_id===MY_UID;});
   MYCHAR=(meM&&meM.character)?meM.character.id:null;
+  indexarMascotas();
   var mp=document.getElementById('ocMe');
   var html='';
   if(meM&&meM.character){
@@ -1022,15 +1104,11 @@ function renderRoster(){
       +(SYSTEM==='dnd'?'':ocStatCtl('c',c,'focus','Focus','#6aaae8')+ocStatCtl('c',c,'inv','Investidura','#aa8aec'))
       +ocStatuses('c',c.statuses,c.injuries)+ocInjuriesHTML(c)
       +(SYSTEM==='dnd'?dndSlotsHTML(c)+dndCountersHTML(c):'')+'</div>';
-    if(meM.pets&&meM.pets.length){
-      html+='<div class="section-lbl">Mis mascotas</div>'+meM.pets.map(function(p){
-        return '<div class="me-card"><div class="me-head"><span class="me-name">'+esc(p.name)+' <span class="pet-tag">Mascota</span></span>'
-          +'<button class="me-change" onclick="delPet('+p.id+')">Quitar</button></div>'
-          +'<div class="me-sheet-row"><button class="btn-sheet" onclick="openRosterSheet(\'p'+p.id+'\')">Ver ficha</button></div>'
-          +ocStatCtl('p'+p.id,p,'vida','Vida','#e05050')+ocStatCtl('p'+p.id,p,'focus','Focus','#6aaae8')+ocStatCtl('p'+p.id,p,'inv','Investidura','#aa8aec')
-          +ocStatuses('p'+p.id,p.statuses)+'</div>';
-      }).join('');
-    }
+    var mias=meM.pets||[];
+    if(mias.length) html+='<div class="section-lbl">Mis mascotas</div>'
+      +mias.map(function(p){return petCard(p,true);}).join('');
+    if(PETS_GRUPO.length) html+='<div class="section-lbl">Mascotas del grupo</div>'
+      +PETS_GRUPO.map(function(p){return petCard(p,false);}).join('');
     // el inventario va después de las vidas: las del personaje y las de sus mascotas
     if(MODULO('inventario')) html+='<div id="invPanel"></div>';
     // ficha detallada del personaje
@@ -1066,7 +1144,7 @@ function openRosterSheet(target){
     var c=meM.character;
     html=charSheetHTML({name:c.name,stats:c.sheet,vida_max:c.vida_max,focus_max:c.focus_max,inv_max:c.inv_max});
   }else{
-    var p=(meM.pets||[]).find(function(x){return 'p'+x.id===target;});
+    var p=(meM.pets||[]).concat(PETS_GRUPO).find(function(x){return 'p'+x.id===target;});
     if(!p)return;
     html=petSheetHTML({name:p.name,stats:p.stats,acciones:p.acciones,vida_max:p.vida_max,focus_max:p.focus_max,inv_max:p.inv_max});
   }
@@ -1143,8 +1221,14 @@ async function loadPetsInto(){
   var el=document.getElementById('petsList'); if(!el)return;
   el.innerHTML='<div class="section-lbl" style="margin-bottom:6px">Tus mascotas</div>'
     +(pets.length?pets.map(function(p){
-    return '<div class="inv-row"><span><b style="color:var(--gold2)">'+esc(p.name)+'</b> <span style="color:var(--text3);font-size:12px">Vida '+p.vida_max+' · Focus '+p.focus_max+(p.inv_max?' · Inv '+p.inv_max:'')+'</span></span>'
-      +'<div style="flex:1"></div><button class="btn-sheet" style="color:#e05050;border-color:#e05050" onclick="delPet('+p.id+')">✕</button></div>';
+    return '<div class="inv-row"><span><b style="color:var(--gold2)">'+esc(p.name)+'</b>'
+      +(p.compartida?'<span class="pet-tag all">De todos</span>':'')
+      +' <span style="color:var(--text3);font-size:12px">Vida '+p.vida_max+' · Focus '+p.focus_max+(p.inv_max?' · Inv '+p.inv_max:'')+'</span></span>'
+      +'<div style="flex:1"></div>'
+      +'<button class="btn-sheet" onclick="togglePetShared('+p.id+').then(loadPetsInto)" title="'
+        +(p.compartida?'Volvés a ser el único que la maneja':'Cualquiera de la mesa va a poder manejarla')+'">'
+        +(p.compartida?'Hacerla mía':'Hacerla de todos')+'</button>'
+      +'<button class="btn-sheet" style="color:#e05050;border-color:#e05050" onclick="delPet('+p.id+')">✕</button></div>';
   }).join(''):'<div style="color:var(--text3);font-style:italic">Todavía no tiene mascotas.</div>');
 }
 async function loadPetOptions(){
@@ -1287,8 +1371,10 @@ function renderInventory(){
     +capBar(c.capacity)
     +zonaEncima(c.items||[],'','No llevás nada en la mano.')
     +'</div>';
-  (INV.pets||[]).forEach(function(p){
-    html+='<div class="me-card"><div class="me-head"><span class="me-name">'+esc(p.name)+' <span class="pet-tag">Mascota</span></span>'
+  mascotasInv().forEach(function(p){
+    var tag=p.compartida?'<span class="pet-tag all">De todos</span>':'<span class="pet-tag">Mascota</span>';
+    html+='<div class="me-card"><div class="me-head"><span class="me-name">'+esc(p.name)+tag
+      +(p.dueno?' <span style="font-size:12px;color:var(--text3)">de '+esc(p.dueno)+'</span>':'')+'</span>'
       +'<span style="flex:1"></span>'
       +(CAN_CREATE?'<button class="btn-sheet" onclick="openCreateItem(\'p'+p.id+'\')">+ Crear objeto</button>':'')
       +'</div>'+capBar(p.capacity)
@@ -1303,6 +1389,11 @@ function renderInventory(){
     INV.grupo||[],'grupo','El grupo no guardó nada todavía.');
   panel.innerHTML=html;
 }
+// Todas las mascotas cuyo inventario puedo tocar: las mías y las de todos.
+function mascotasInv(){
+  if(!INV)return [];
+  return (INV.pets||[]).concat(INV.compartidas||[]);
+}
 // Contenedores donde se puede guardar algo: los que lleva el personaje encima y
 // los de sus mascotas (la mochila, la carreta del chull).
 function contenedoresDe(inv){
@@ -1310,7 +1401,7 @@ function contenedoresDe(inv){
   if(!inv)return out;
   ((inv.character&&inv.character.items)||[]).forEach(function(i){
     if(i.contenedor) out.push(Object.assign({owner:inv.character.name},i));});
-  (inv.pets||[]).forEach(function(p){
+  (inv.pets||[]).concat(inv.compartidas||[]).forEach(function(p){
     (p.items||[]).forEach(function(i){
       if(i.contenedor) out.push(Object.assign({owner:p.name},i));});});
   return out;
@@ -1415,8 +1506,9 @@ async function invStash(eid,zona){
 function openTransfer(eid){
   var destinos=(INV.aliados||[]).map(function(a){
     return {lbl:esc(a.name),body:'{"character_id":'+a.id+'}'};});
-  (INV.pets||[]).forEach(function(p){
-    destinos.push({lbl:'🐾 '+esc(p.name)+' (tu mascota)',body:'{"pet_id":'+p.id+'}'});});
+  mascotasInv().forEach(function(p){
+    destinos.push({lbl:'🐾 '+esc(p.name)+(p.compartida?' (de todos)':' (tu mascota)'),
+                   body:'{"pet_id":'+p.id+'}'});});
   if(!destinos.length){alert('No hay nadie más en la campaña a quien pasárselo.');return;}
   document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
     +'<div class="sh-name">Pasarle el objeto a…</div>'
@@ -1623,7 +1715,7 @@ function takeDestOpts(){
   var o='<option value="c">🖐 Encima mío</option>';
   contenedoresDe(INV).forEach(function(k){
     o+='<option value="k'+k.id+'">🎒 '+esc(k.name)+' ('+esc(k.owner||'')+')</option>';});
-  ((INV&&INV.pets)||[]).forEach(function(p){
+  mascotasInv().forEach(function(p){
     o+='<option value="p'+p.id+'">🐾 Encima de '+esc(p.name)+'</option>';});
   return o+'<option value="s">🏠 Mi guardado</option><option value="g">👥 Guardado del grupo</option>';
 }

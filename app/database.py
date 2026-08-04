@@ -315,6 +315,13 @@ def init_db():
         if "day_count" not in cpcols:
             conn.execute("ALTER TABLE campaigns ADD COLUMN day_count INTEGER DEFAULT 0")
 
+        # Mascota "de todos": la maneja cualquiera de la mesa (vida, estados e
+        # inventario), no solo el jugador que la trajo. La carreta del grupo, el
+        # chull de carga, el axehound de la partida.
+        pcols = {r["name"] for r in conn.execute("PRAGMA table_info(pets)")}
+        if "compartida" not in pcols:
+            conn.execute("ALTER TABLE pets ADD COLUMN compartida INTEGER DEFAULT 0")
+
         # Permiso por jugador: crear objetos en su propio inventario.
         mcols = {r["name"] for r in conn.execute("PRAGMA table_info(campaign_members)")}
         if "can_create_items" not in mcols:

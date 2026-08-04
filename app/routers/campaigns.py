@@ -374,7 +374,8 @@ def campaign_roster(cid: int, user=Depends(current_user)):
         members = []
         for r in rows:
             pets = [
-                {"id": p["id"], "name": p["name"],
+                {"id": p["id"], "name": p["name"], "char_id": r["id"],
+                 "compartida": bool(p["compartida"]),
                  "vida": _actual(p["vida"], p["vida_max"]), "vida_max": p["vida_max"],
                  "focus": _actual(p["focus"], p["focus_max"]), "focus_max": p["focus_max"],
                  "inv": _actual(p["inv"], p["inv_max"]), "inv_max": p["inv_max"],
@@ -384,10 +385,12 @@ def campaign_roster(cid: int, user=Depends(current_user)):
                 for p in conn.execute("SELECT * FROM pets WHERE character_id=? ORDER BY name", (r["id"],))
             ]
             # De los demás jugadores se ve lo que el DM habilitó; lo propio y lo
-            # que ve el DM va entero.
+            # que ve el DM va entero. Las mascotas de todos también: si cualquiera
+            # las maneja, cualquiera les ve los números.
             ajeno = not is_dm and r["user_id"] != user["id"]
             if ajeno:
-                pets = [mask_stats(p, cfg, "aliados") for p in pets]
+                pets = [p if p["compartida"] else mask_stats(p, cfg, "aliados")
+                        for p in pets]
             char = {
                 "id": r["id"], "name": r["name"],
                 # NULL en la columna = está al máximo (nunca se le tocó el stat)

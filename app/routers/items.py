@@ -224,5 +224,7 @@ def campaign_inventories(cid: int, user=Depends(current_user)):
             inv = character_inventory(conn, ch)
             inv.pop("grupo", None)      # el del grupo va una sola vez, arriba
             inv.pop("aliados", None)
+            # cada mascota se muestra bajo quien la trajo, aunque sea de todos
+            inv.pop("compartidas", None)
             out["characters"].append(inv)
         return out

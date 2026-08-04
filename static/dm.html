@@ -926,6 +926,13 @@ function cfgSwitch(label,id,val,hint){
   return '<label class="cfg-lrow"><span>'+label+(hint?'<br><span class="cfg-hint">'+hint+'</span>':'')+'</span>'
     +'<input type="checkbox" id="'+id+'"'+(val?' checked':'')+' style="width:18px;height:18px;accent-color:var(--gold);cursor:pointer"/></label>';
 }
+// Base de carga de un tamaño, con la cuenta final a la vista mientras se edita.
+function cfgCarga(label,id,val){
+  return '<label class="cfg-lrow"><span>'+label+'<br><span class="cfg-hint">'
+    +'<b id="'+id+'-eco">'+val+'</b> + Fuerza</span></span>'
+    +'<input class="fi" type="number" min="0" max="99" id="'+id+'" value="'+val+'" style="width:90px" '
+    +'oninput="document.getElementById(\''+id+'-eco\').textContent=this.value||0"/></label>';
+}
 var VER_LBL={no:'No lo ven',
              color:'Solo el color',
              abstracto:'Barra que se vacía',
@@ -947,6 +954,9 @@ var CFG_CAMPOS=[
   ['cfg-ve-inv','ver_inv_enemigos','txt'], ['cfg-ve-est','ver_estados_enemigos','bool'],
   ['cfg-va-vida','ver_vida_aliados','txt'], ['cfg-va-focus','ver_focus_aliados','txt'],
   ['cfg-va-inv','ver_inv_aliados','txt'], ['cfg-va-est','ver_estados_aliados','bool'],
+  ['cfg-cpeq','carga_pequeno','int'], ['cfg-cmed','carga_mediano','int'],
+  ['cfg-cgra','carga_grande','int'], ['cfg-ceno','carga_enorme','int'],
+  ['cfg-cgar','carga_gargantuesco','int'],
   ['cfg-smin','storm_min','int'], ['cfg-smax','storm_max','int'],
   ['cfg-dstart','discharge_start','int'], ['cfg-dfull','discharge_full','int'],
   ['cfg-dcurve','discharge_curve','float'],
@@ -981,6 +991,20 @@ function paintConfig(){
                  'Lo que lleva cada uno, los guardados y la capacidad de carga')
       +cfgSwitch('Tracker de altas tormentas','cfg-mstorm',cfg.modulo_tormentas,
                  'La barra del ciclo y la descarga de marcos por día');
+  }else if(CFG_TAB==='carga'){
+    // Capacidad = base del tamaño + Fuerza. Acá se toca la base de cada tamaño.
+    cuerpo='<div class="cfg-sec">Capacidad de carga por tamaño</div>'
+      +'<div class="import-hint" style="margin-bottom:8px">'
+        +'Lo que puede cargar una criatura es <b>esta base + su Fuerza</b> (y lo que le '
+        +'sumen mochilas y alforjas). Vale igual para personajes y mascotas.</div>'
+      +cfgCarga('Pequeño','cfg-cpeq',cfg.carga_pequeno)
+      +cfgCarga('Mediano','cfg-cmed',cfg.carga_mediano)
+      +cfgCarga('Grande','cfg-cgra',cfg.carga_grande)
+      +cfgCarga('Enorme','cfg-ceno',cfg.carga_enorme)
+      +cfgCarga('Gargantuesco','cfg-cgar',cfg.carga_gargantuesco)
+      +'<div class="import-hint" style="margin-top:10px">Los valores del manual son '
+        +'4 · 6 · 10 · 15 · 20. Subilos si querés una mesa menos ajustada, o bajalos '
+        +'para que cada slot importe. La sobrecarga avisa, nunca bloquea.</div>';
   }else if(CFG_TAB==='ver'){
     cuerpo='<div class="cfg-sec">Qué ven los jugadores de los enemigos</div>'
       +cfgVer('Vida','cfg-ve-vida',cfg.ver_vida_enemigos)
@@ -1014,7 +1038,8 @@ function paintConfig(){
       +cfgRow('Cae el día','cfg-starget',cfg.storm_target)
       +'<label class="cfg-lrow"><span>Momento</span><select class="fi" id="cfg-smoment" style="min-width:150px">'+moments+'</select></label>';
   }
-  var tabs=[['modulos','Módulos'],['ver','Qué ven los jugadores'],['tormentas','Tormentas y marcos']];
+  var tabs=[['modulos','Módulos'],['carga','Capacidad de carga'],
+            ['ver','Qué ven los jugadores'],['tormentas','Tormentas y marcos']];
   document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
     +'<div class="cname" style="font-size:18px">⚙ Ajustes de la campaña</div>'
     +'<div class="cfg-tabs">'+tabs.map(function(t){
@@ -1053,6 +1078,8 @@ async function saveConfig(){
   closeModal();
   aplicarModulos(CFG);
   loadStorm();
+  // las bases de carga cambian todas las barras: si estás mirándolas, refrescá
+  if(document.getElementById('tab-comercio').style.display!=='none') loadInventories();
 }
 // Los módulos apagados desaparecen del panel del DM al toque. El catálogo y el
 // inventario se prenden y se apagan por separado.
@@ -2550,7 +2577,8 @@ function renderInventories(){
       +dmCapBar(c.capacity)
       +dmZona(c.id,c.items||[],'No lleva nada en la mano.');
     (e.pets||[]).forEach(function(p){
-      h+='<div class="section-label" style="margin:12px 0 2px">🐾 '+esc(p.name)+'</div>'
+      h+='<div class="section-label" style="margin:12px 0 2px">🐾 '+esc(p.name)
+        +(p.compartida?' <span class="meta-badge" style="border-color:#e8c840;color:#e8c840">de todos</span>':'')+'</div>'
         +dmCapBar(p.capacity)+dmZona(c.id,p.items||[],'No lleva nada encima.');
     });
     h+='<div class="ctype" style="margin-top:12px">🏠 Guardado de '+esc(c.name)+'</div>'

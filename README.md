@@ -157,6 +157,18 @@ campaña**: el mismo bestiario puede ofrecer mascotas distintas en cada campaña
 una, se guarda una **copia** de la ficha, así que si después editás el enemigo la mascota
 ya agregada no cambia.
 
+**Mascotas de todos.** Quien trajo la mascota (o el DM) puede marcarla como **de todos**
+con el botón *Hacerla de todos*. A partir de ahí deja de ser suya: aparece en la ficha de
+**cada** jugador bajo *Mascotas del grupo*, y cualquiera de la mesa le maneja la vida, el
+focus, la investidura, los estados y el **inventario**, dentro y fuera de combate. Es para
+el chull de carga, la carreta del grupo o el animal que compraron entre todos. Tampoco se
+le enmascaran los números: si la maneja cualquiera, la ve cualquiera. Con *Hacerla mía*
+vuelve a ser privada.
+
+**Recuadros plegables.** El recuadro de vida/focus/estados de cada mascota se pliega con
+la flechita **▾/▸** del encabezado; plegado deja una línea con los valores. Es una
+preferencia de cada jugador (se guarda en su navegador) y no afecta a nadie más.
+
 ## Objetos e inventario (solo Cosmere)
 
 ### Catálogo de objetos (pestaña **Objetos**)
@@ -281,6 +293,9 @@ de las vidas: las tuyas y las de tus mascotas.
 Capacidad = base por tamaño + Fuerza
 Pequeño 4 · Mediano 6 · Grande 10 · Enorme 15 · Gargantuesco 20
 ```
+
+Esas bases son las del manual, pero **las fija el DM** en *⚙ Ajustes → Capacidad de
+carga*: una por tamaño, y valen igual para personajes y mascotas.
 
 Cada objeto ocupa **1 slot**, salvo: el dinero y las cosas insignificantes **0**,
 `Cumbersome N` ocupa **1+N**, la Placa y la Hoja Radiante **0**, y los objetos grandes más
@@ -462,8 +477,8 @@ principio y todo llega a 0 en el día 15 si no hubo tormenta.
 ### Panel de ajustes del DM (⚙ Ajustes)
 
 En la vista del DM, el botón **⚙ Ajustes** (arriba a la derecha, al lado de *← Inicio*)
-abre el panel de configuración de la campaña, con tres solapas. Podés moverte entre ellas
-sin perder lo que tocaste; se guarda todo junto con **Guardar**.
+abre el panel de configuración de la campaña, con cuatro solapas. Podés moverte entre
+ellas sin perder lo que tocaste; se guarda todo junto con **Guardar**.
 
 **Módulos** — qué se usa en esta campaña. Lo que apagues desaparece para todos, y el
 backend lo rechaza (no es solo esconder botones):
@@ -483,6 +498,12 @@ sirven:
   botón *Agarrar* y sin inventarios que llevar.
 - **Ninguno** — la campaña no usa objetos.
 
+**Capacidad de carga** — la base de cada tamaño (Pequeño a Gargantuesco). Lo que carga
+una criatura es **esa base + su Fuerza**, más lo que sumen mochilas y alforjas; vale igual
+para personajes y mascotas, y el campo muestra la cuenta mientras lo editás. Los valores
+del manual son 4 · 6 · 10 · 15 · 20: subilos para una mesa menos ajustada, bajalos para
+que cada slot importe. La sobrecarga sigue avisando sin bloquear.
+
 **Qué ven los jugadores** — por separado para **enemigos** y para **otros jugadores**, y
 por cada stat (vida, focus, investidura):
 
@@ -494,7 +515,8 @@ por cada stat (vida, focus, investidura):
 | **Números exactos** | `23 / 30` |
 
 Más un interruptor para **estados y condiciones** de cada grupo. Su **propio** personaje y
-sus mascotas los ven siempre con los números exactos.
+sus mascotas los ven siempre con los números exactos, igual que las **mascotas de todos**
+(las maneja cualquiera, así que no tiene sentido ocultárselas).
 
 > Esto se aplica **en el servidor**: lo que no se ve tampoco se manda. En *solo el color*
 > viaja únicamente el tramo (0-5), y en *barra que se vacía* un porcentaje redondeado de a

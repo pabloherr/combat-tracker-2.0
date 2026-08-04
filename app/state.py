@@ -85,6 +85,8 @@ def player_view(combat: dict, cfg: dict = None, user_id: int = None) -> dict:
             parts.append(mask_stats(p, cfg, "enemigos"))
         elif user_id is not None and p.get("user_id") == user_id:
             parts.append(p)                      # tu personaje y tus mascotas, enteros
+        elif p.get("kind") == "pet" and p.get("shared"):
+            parts.append(p)                      # la mascota de todos, también
         else:
             parts.append(mask_stats(p, cfg, "aliados"))
     return {**combat, "participants": parts}

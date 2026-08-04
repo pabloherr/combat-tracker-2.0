@@ -64,7 +64,8 @@ routers/*.py        ← endpoints por dominio (validan, orquestan)
   (DM o miembro aceptado). Todos los routers de campaña los reusan para autorizar.
 - **`app/models.py`**: modelos Pydantic de los cuerpos de request (validación de entrada).
 - **`app/config.py`**: los ajustes de una campaña (`campaigns.config`, un JSON): qué
-  módulos están encendidos y cuánto ven los jugadores de cada stat ajeno. Vive aparte del
+  módulos están encendidos, cuánto ven los jugadores de cada stat ajeno y la base de
+  capacidad de carga de cada tamaño (`CARGA_BASE` / `size_bases`). Vive aparte del
   router de campañas porque lo consultan varios: el combate, los objetos y las tormentas.
   Todo tiene default, así que una campaña que nunca tocó los ajustes anda igual que antes.
 - **Parsers**:
@@ -267,7 +268,14 @@ combate como aliado que controla el jugador.
 | `character_id` | INTEGER FK→characters | cascade |
 | `name`, `vida_max`/`focus_max`/`inv_max`, `vida`/`focus`/`inv` | | como un personaje |
 | `statuses`, `acciones`, `stats` | TEXT (JSON) | |
+| `compartida` | INTEGER | 1 = **de todos**: la maneja cualquiera de la campaña |
 | `created_at` | TEXT | |
+
+Una mascota `compartida` sigue colgando del personaje que la trajo (ahí se borra y ahí se
+prende o apaga el interruptor), pero para todo lo demás es del grupo: cualquier miembro
+aceptado le toca stats, estados e inventario, y en combate ni el roster ni `player_view`
+le enmascaran los números. El helper `_owned_pet` la encuentra aunque el pedido venga con
+el personaje de **otro** jugador, así el frontend no necesita saber de quién es.
 
 #### `enemies` — bestiario
 El bestiario es **por DM y por sistema** (no por campaña): se comparte entre todas las
@@ -345,6 +353,10 @@ combinación de columnas:
 Solo lo que está en `stash=''`, sin `parent_id` y `equipado` pesa contra la capacidad de
 carga. Los guardados no tienen tope. Al mover o pasar una entrada, **sus hijos viajan con
 ella**: la mochila se guarda llena.
+
+`carrying_capacity(size, fuerza, rows, bases)` calcula la carga; `bases` sale de la config
+de la campaña (`size_bases`), así que el DM puede correr la escala sin tocar código. Se
+lee **una sola vez** por armado de inventario y se pasa a cada personaje y mascota.
 
 #### `storm_tracker` — ciclo de altas tormentas (1 por campaña)
 | Columna | Tipo | Notas |

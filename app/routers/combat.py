@@ -38,7 +38,8 @@ def _roll_initiative(stats: dict) -> int:
 def _mk_participant(kind, name, vida, focus, inv, acciones=None, notas="", faction_color="",
                     tipo="", stats=None, clase="rival", cur_vida=None, cur_focus=None,
                     cur_inv=None, statuses=None, char_id=None, user_id=None, pet_id=None,
-                    owner_name="", has_pdf=False, system="cosmere", injuries=None):
+                    owner_name="", has_pdf=False, system="cosmere", injuries=None,
+                    shared=False):
     # Enemigos y mascotas toman turno al azar; los jugadores lo eligen.
     turn = _roll_enemy_turn(clase) if kind in ("enemy", "pet") else "slow"
     # D&D: los enemigos y mascotas tiran iniciativa solos (d20 + mod de DEX);
@@ -55,6 +56,7 @@ def _mk_participant(kind, name, vida, focus, inv, acciones=None, notas="", facti
         "char_id": char_id,          # personaje (jugadores)
         "pet_id": pet_id,            # mascota
         "user_id": user_id,          # dueño (jugadores y mascotas)
+        "shared": shared,            # mascota de todos: la maneja cualquiera
         "owner_name": owner_name,    # nombre del PJ dueño de la mascota
         "has_pdf": has_pdf,          # el personaje tiene PDF cargado
         "clase": clase if kind == "enemy" else "",
@@ -102,10 +104,13 @@ def _find(cid: int, uid: str):
 
 
 def _guard_participant(is_dm: bool, p: dict, user: dict):
-    """El DM puede tocar a cualquiera; un jugador, solo su personaje o sus mascotas."""
+    """El DM puede tocar a cualquiera; un jugador, solo su personaje, sus
+    mascotas y las que son de todos."""
     if is_dm:
         return
     if p.get("kind") in ("player", "pet") and p.get("user_id") == user["id"]:
+        return
+    if p.get("kind") == "pet" and p.get("shared"):
         return
     raise HTTPException(403, "Solo podés modificar tu propio personaje o tus mascotas")
 
@@ -141,7 +146,7 @@ def _build_participants(conn, cid: int, encounter_id: int, system: str = "cosmer
                 statuses=json.loads(pet["statuses"] or "[]"),
                 stats=json.loads(pet["stats"] or "{}"),
                 user_id=ch["user_id"], pet_id=pet["id"], owner_name=ch["name"],
-                system=system,
+                shared=bool(pet["compartida"]), system=system,
             ))
 
     # Enemigos del encuentro. Los overrides ajustan al enemigo solo en este
