@@ -100,7 +100,16 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 /* plegar el recuadro de una mascota: queda el nombre y un resumen de una línea */
 .pet-fold{background:none;border:none;color:var(--text3);font-size:13px;cursor:pointer;padding:0 8px 0 0;line-height:1;}
 .pet-fold:hover{color:var(--gold);}
-.pet-mini{display:flex;flex-wrap:wrap;gap:10px;font-size:13px;cursor:pointer;}
+.pet-mini{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;cursor:pointer;}
+/* las acciones de la mascota, separadas entre sí (no vaya a ser que quieras
+   compartirla y le des a Quitar) */
+.pet-acciones{display:flex;align-items:center;gap:18px;flex:none;}
+/* el nombre se edita en el lugar: la mascota viene con el del bestiario */
+.pet-nombre{cursor:text;}
+.pet-nombre:hover{text-decoration:underline dotted var(--text3);}
+.pet-ren{background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;padding:0 2px;margin-left:6px;}
+.pet-ren:hover{color:var(--gold);}
+.pet-name-inp{font-family:'Cinzel',serif;font-size:17px;color:var(--gold2);background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:2px 8px;max-width:240px;}
 .me-sheet-row{display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
 .btn-sheet{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:8px 14px;border-radius:var(--r);cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--gold2);text-decoration:none;display:inline-block;}
 .btn-sheet.off{color:var(--text3);border-color:var(--border);}
@@ -415,10 +424,23 @@ function controlCard(p,tagHTML,turnLabel,isPet,marcosHTML){
     +'<button class="btn-sheet" onclick="openSheet(\''+p.uid+'\')">Ver ficha</button>'
     +(p.kind==='player'&&p.has_pdf?'<a class="btn-sheet" href="/api/characters/'+p.char_id+'/pdf" target="_blank">Ver PDF</a>':'')
     +'</div>';
+  // Las mascotas se pliegan también acá, con la misma preferencia que en la
+  // ficha. La fila del turno queda siempre: en D&D ahí va la iniciativa.
+  var fold='', nombreCss='', cuerpo=meControls(p)+sheetRow;
+  var nombre=esc(p.name)+(tagHTML||'');
+  if(isPet&&p.pet_id){
+    var abierta=petAbierta(p.pet_id);
+    nombreCss=' style="flex:1"';
+    nombre=petNombreHTML(p.pet_id,p.name,tagHTML);
+    fold='<button class="pet-fold" onclick="togglePet('+p.pet_id+')" title="'
+      +(abierta?'Plegar':'Desplegar')+'">'+(abierta?'▾':'▸')+'</button>';
+    if(!abierta) cuerpo='<div class="pet-mini" onclick="togglePet('+p.pet_id+')" '
+      +'title="Tocá para desplegar">'+petMiniStats(p)+'</div>';
+  }
   return '<div class="me-card">'
-    +'<div class="me-head"><span class="me-name">'+esc(p.name)+(tagHTML||'')+'</span>'+(marcosHTML||'')+'</div>'
+    +'<div class="me-head">'+fold+'<span class="me-name"'+nombreCss+'>'+nombre+'</span>'+(marcosHTML||'')+'</div>'
     +'<div class="me-turn-row"><span class="me-turn-lbl">'+(turnLabel||'Turno')+'</span>'+turnCtl+'</div>'
-    +meControls(p)+sheetRow+'</div>';
+    +cuerpo+'</div>';
 }
 // Lo que este jugador maneja: lo suyo y las mascotas de todos.
 function manejoYo(p,myUid){
@@ -1017,7 +1039,7 @@ function petAbierta(pid){ return !PET_PLEGADAS[pid]; }
 function togglePet(pid){
   if(PET_PLEGADAS[pid]) delete PET_PLEGADAS[pid]; else PET_PLEGADAS[pid]=1;
   try{ localStorage.setItem('petsPlegadas',JSON.stringify(PET_PLEGADAS)); }catch(e){}
-  renderRoster();
+  repaintMe();          // la ficha y, si hay combate, el panel de combate
 }
 var PET_STATS=[['vida','Vida','#e05050'],['focus','Focus','#6aaae8'],['inv','Investidura','#aa8aec']];
 // Resumen de una línea para cuando el recuadro está plegado.
@@ -1028,15 +1050,50 @@ function petMiniStats(p){
   });
   return parts.length?parts.join(''):'<span style="color:var(--text3)">Sin stats.</span>';
 }
+// Nombre editable: lo cambia quien la maneja (el ✎, o tocando el nombre).
+function petNombreHTML(pid,nombre,tagHTML){
+  return '<span class="pet-nombre" onclick="editPetName(this,'+pid+')" title="Tocá para cambiarle el nombre">'
+    +esc(nombre)+'</span>'+(tagHTML||'')
+    +'<button class="pet-ren" onclick="editPetName(this,'+pid+')" title="Cambiar el nombre">✎</button>';
+}
+function editPetName(el,pid){
+  var span=el.classList.contains('pet-nombre') ? el : el.parentNode.querySelector('.pet-nombre');
+  if(!span||span.querySelector('input'))return;
+  var actual=span.textContent.trim(), listo=false;
+  span.innerHTML='<input class="pet-name-inp" maxlength="80"/>';
+  var inp=span.firstChild;
+  inp.value=actual; inp.focus(); inp.select();
+  inp.onkeydown=function(e){ if(e.key==='Enter')inp.blur(); else if(e.key==='Escape'){listo=true;repaintPets();} };
+  inp.onblur=function(){
+    if(listo)return; listo=true;
+    var v=inp.value.trim();
+    if(!v||v===actual){ repaintPets(); return; }
+    savePetName(pid,v);
+  };
+}
+// Las mascotas se dibujan en tres lados: la ficha, el combate y el modal.
+function repaintPets(){
+  repaintMe();
+  if(document.getElementById('petsList')) loadPetsInto();
+}
+async function savePetName(pid,nombre){
+  var r=await fetch('/api/characters/'+(PET_CHAR[pid]||MYCHAR)+'/pets/'+pid,
+    {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:nombre})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo renombrar');}
+  loadRoster();
+  if(document.getElementById('petsList')) loadPetsInto();
+}
 function petCard(p,mia){
   var t='p'+p.id, abierta=petAbierta(p.id);
   var tag=p.compartida?'<span class="pet-tag all">De todos</span>':'<span class="pet-tag">Mascota</span>';
   var dueno=(!mia&&p.dueno)?' <span style="font-size:12px;color:var(--text3)">de '+esc(p.dueno)+'</span>':'';
   var acciones=mia
-    ? '<button class="me-change" onclick="togglePetShared('+p.id+')" title="'
+    ? '<span class="pet-acciones">'
+      +'<button class="me-change" onclick="togglePetShared('+p.id+')" title="'
         +(p.compartida?'Volvés a ser el único que la maneja':'Cualquiera de la mesa va a poder manejarla')+'">'
         +(p.compartida?'Hacerla mía' :'Hacerla de todos')+'</button>'
-      +' <button class="me-change" onclick="delPet('+p.id+')">Quitar</button>'
+      +'<button class="me-change" style="color:#c06a6a" onclick="delPet('+p.id+')">Quitar</button>'
+      +'</span>'
     : '';
   var cuerpo=abierta
     ? '<div class="me-sheet-row" style="margin-top:0;padding-top:0;border:none"><button class="btn-sheet" onclick="openRosterSheet(\''+t+'\')">Ver ficha</button></div>'
@@ -1045,7 +1102,7 @@ function petCard(p,mia){
     : '<div class="pet-mini" onclick="togglePet('+p.id+')" title="Tocá para desplegar">'+petMiniStats(p)+'</div>';
   return '<div class="me-card" style="margin-top:8px"><div class="me-head">'
     +'<button class="pet-fold" onclick="togglePet('+p.id+')" title="'+(abierta?'Plegar':'Desplegar')+'">'+(abierta?'▾':'▸')+'</button>'
-    +'<span class="me-name" style="flex:1">'+esc(p.name)+tag+dueno+'</span>'
+    +'<span class="me-name" style="flex:1">'+petNombreHTML(p.id,p.name,tag+dueno)+'</span>'
     +acciones+'</div>'+cuerpo+'</div>';
 }
 async function togglePetShared(pid){
@@ -1221,8 +1278,8 @@ async function loadPetsInto(){
   var el=document.getElementById('petsList'); if(!el)return;
   el.innerHTML='<div class="section-lbl" style="margin-bottom:6px">Tus mascotas</div>'
     +(pets.length?pets.map(function(p){
-    return '<div class="inv-row"><span><b style="color:var(--gold2)">'+esc(p.name)+'</b>'
-      +(p.compartida?'<span class="pet-tag all">De todos</span>':'')
+    return '<div class="inv-row"><span><b style="color:var(--gold2)">'
+      +petNombreHTML(p.id,p.name,p.compartida?'<span class="pet-tag all">De todos</span>':'')+'</b>'
       +' <span style="color:var(--text3);font-size:12px">Vida '+p.vida_max+' · Focus '+p.focus_max+(p.inv_max?' · Inv '+p.inv_max:'')+'</span></span>'
       +'<div style="flex:1"></div>'
       +'<button class="btn-sheet" onclick="togglePetShared('+p.id+').then(loadPetsInto)" title="'

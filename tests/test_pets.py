@@ -49,6 +49,41 @@ def test_validation_is_per_campaign(make_client):
                    json={"enemy_id": eid}).status_code == 404
 
 
+def test_rename_pet(make_client):
+    """La mascota viene con el nombre del bestiario, pero el jugador se lo cambia."""
+    dm, pl, cid, chid, eid = _setup(make_client)
+    dm.post(f"/api/campaigns/{cid}/pet-options/{eid}")
+    pid = pl.post(f"/api/characters/{chid}/pets/from-enemy",
+                  json={"enemy_id": eid}).json()["id"]
+    r = pl.put(f"/api/characters/{chid}/pets/{pid}", json={"name": "  Rocío  "})
+    assert r.status_code == 200 and r.json()["name"] == "Rocío"      # se recorta
+    assert pl.get(f"/api/characters/{chid}/pets").json()[0]["name"] == "Rocío"
+    # el enemigo del bestiario no se toca
+    assert get_enemies(dm, cid)[0]["name"] == "Axehound"
+
+
+def test_a_pet_needs_a_name(make_client):
+    dm, pl, cid, chid, eid = _setup(make_client)
+    dm.post(f"/api/campaigns/{cid}/pet-options/{eid}")
+    pid = pl.post(f"/api/characters/{chid}/pets/from-enemy",
+                  json={"enemy_id": eid}).json()["id"]
+    assert pl.put(f"/api/characters/{chid}/pets/{pid}",
+                  json={"name": "   "}).status_code == 400
+    assert pl.get(f"/api/characters/{chid}/pets").json()[0]["name"] == "Axehound"
+
+
+def test_only_who_manages_it_renames_it(make_client):
+    dm, pl, cid, chid, eid = _setup(make_client)
+    dm.post(f"/api/campaigns/{cid}/pet-options/{eid}")
+    pid = pl.post(f"/api/characters/{chid}/pets/from-enemy",
+                  json={"enemy_id": eid}).json()["id"]
+    otro = make_user(make_client, "pl2", "player")
+    assert otro.put(f"/api/characters/{chid}/pets/{pid}",
+                    json={"name": "Mío"}).status_code == 404
+    assert dm.put(f"/api/characters/{chid}/pets/{pid}",
+                  json={"name": "Chull de carga"}).status_code == 200
+
+
 def test_delete_pet(make_client):
     dm, pl, cid, chid, eid = _setup(make_client)
     dm.post(f"/api/campaigns/{cid}/pet-options/{eid}")

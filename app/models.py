@@ -101,6 +101,10 @@ class PetFromEnemy(BaseModel):
     enemy_id: int              # enemigo del bestiario habilitado como mascota por el DM
 
 
+class PetName(BaseModel):
+    name: str                  # la mascota es tuya: ponele el nombre que quieras
+
+
 class LiveStat(BaseModel):
     stat: str                  # vida | focus | inv
     delta: int

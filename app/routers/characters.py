@@ -13,7 +13,8 @@ from ..dnd_pdf import parse_dnd_pdf
 from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
                       InventoryIn, InventoryMove, InventoryQty, InventoryStash,
                       InventoryTransfer, LiveStat, LiveStatus, MarcosChange, MarcosSet,
-                      PetFromEnemy, SizeIn, SlotsConfigIn, SlotSpend, TakeIn)
+                      PetFromEnemy, PetName, SizeIn, SlotsConfigIn, SlotSpend,
+                      TakeIn)
 from ..pdf_import import extract_pdf_image, parse_character_pdf
 from ..state import combats
 from ..ws import push_state
@@ -364,6 +365,23 @@ def delete_pet(cid: int, pid: int, user=Depends(current_user)):
         _owned(conn, cid, user)
         conn.execute("DELETE FROM pets WHERE id=? AND character_id=?", (pid, cid))
     return {"ok": True}
+
+
+@router.put("/{cid}/pets/{pid}")
+async def rename_pet(cid: int, pid: int, p: PetName, user=Depends(current_user)):
+    """Le cambia el nombre a la mascota: viene con el del bestiario, pero el
+    axehound de la mesa se llama como ellos quieran.
+
+    Lo cambia quien la maneja: el dueño y el DM, o cualquiera si es de todos."""
+    name = p.name.strip()[:80]
+    if not name:
+        raise HTTPException(400, "Poné un nombre a la mascota")
+    with db() as conn:
+        r = _owned_pet(conn, cid, pid, user)
+        conn.execute("UPDATE pets SET name=? WHERE id=?", (name, r["id"]))
+        campaign_id = _campaign_of(conn, r["character_id"])
+    await _sync_combat(campaign_id, {"name": name}, pet_id=r["id"])
+    return {"ok": True, "name": name}
 
 
 @router.post("/{cid}/pets/{pid}/shared")

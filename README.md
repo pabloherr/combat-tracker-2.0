@@ -157,6 +157,10 @@ campaña**: el mismo bestiario puede ofrecer mascotas distintas en cada campaña
 una, se guarda una **copia** de la ficha, así que si después editás el enemigo la mascota
 ya agregada no cambia.
 
+**Ponerle nombre.** La mascota entra con el nombre del bestiario (*Axehound*), pero se le
+cambia tocando el nombre o el **✎** que tiene al lado, en la ficha, en combate o en el
+modal de 🐾 Mascotas. El enemigo del bestiario no se toca: solo cambia tu bicho.
+
 **Mascotas de todos.** Quien trajo la mascota (o el DM) puede marcarla como **de todos**
 con el botón *Hacerla de todos*. A partir de ahí deja de ser suya: aparece en la ficha de
 **cada** jugador bajo *Mascotas del grupo*, y cualquiera de la mesa le maneja la vida, el
@@ -166,8 +170,10 @@ le enmascaran los números: si la maneja cualquiera, la ve cualquiera. Con *Hace
 vuelve a ser privada.
 
 **Recuadros plegables.** El recuadro de vida/focus/estados de cada mascota se pliega con
-la flechita **▾/▸** del encabezado; plegado deja una línea con los valores. Es una
-preferencia de cada jugador (se guarda en su navegador) y no afecta a nadie más.
+la flechita **▾/▸** del encabezado; plegado deja una línea con los valores. Anda igual en
+la ficha y **en combate** (ahí la fila del turno queda siempre a la vista, porque en D&D
+es donde se anota la iniciativa), y es la misma preferencia en los dos lados: se guarda en
+el navegador de cada jugador y no afecta a nadie más.
 
 ## Objetos e inventario (solo Cosmere)
 

@@ -86,6 +86,16 @@ def test_only_the_owner_or_the_dm_flips_the_switch(make_client):
     assert dm.post(f"/api/characters/{chid}/pets/{pid}/shared").status_code == 200
 
 
+def test_anyone_can_rename_a_shared_pet(make_client):
+    dm, pl, otro, cid, chid, chid2, pid = _mesa(make_client)
+    assert otro.put(f"/api/characters/{chid2}/pets/{pid}",
+                    json={"name": "Carreta"}).status_code == 404
+    _compartir(pl, chid, pid)
+    r = otro.put(f"/api/characters/{chid2}/pets/{pid}", json={"name": "Carreta"})
+    assert r.status_code == 200, r.text
+    assert _vida(pl, cid, "Carreta") is not None
+
+
 def test_someone_outside_the_campaign_is_still_out(make_client):
     dm, pl, otro, cid, chid, chid2, pid = _mesa(make_client)
     _compartir(pl, chid, pid)
