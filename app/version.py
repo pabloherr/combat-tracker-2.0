@@ -5,4 +5,4 @@ Fuente única: se muestra en una esquina de todas las pantallas (vía
 versión nueva, cambiá solo este número.
 """
 
-VERSION = "26.1"
+VERSION = "26.2"
