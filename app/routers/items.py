@@ -16,6 +16,7 @@ from ..database import db
 from ..items_import import (CATEGORIAS, KIND_LABELS, KINDS, WEAPON_CLASSES,
                             export_items, parse_item, parse_items_bulk)
 from ..models import ItemImportIn, ItemIn
+from .characters import _inv_rows, _nest, character_inventory
 
 router = APIRouter(prefix="/api/campaigns/{cid}", tags=["items"])
 
@@ -29,14 +30,12 @@ def _require_cosmere(conn, cid: int):
     return c
 
 
-def _serialize(r, with_price=True) -> dict:
+def _serialize(r) -> dict:
     d = dict(r)
     d["categorias"] = json.loads(d.get("categorias") or "[]")
     d["stats"] = json.loads(d.get("stats") or "{}")
     d["secreto"] = bool(d.get("secreto"))
     d["contenedor"] = bool(d.get("contenedor"))
-    if not with_price:
-        d.pop("precio", None)
     return d
 
 
@@ -166,7 +165,7 @@ def item_kinds(cid: int, user=Depends(current_user)):
 
 @router.post("/items/{iid}/secret")
 def toggle_secret(cid: int, iid: int, user=Depends(current_user)):
-    """Un objeto secreto no aparece en el catálogo que ven los jugadores."""
+    """Un objeto oculto no aparece en el catálogo que ven los jugadores."""
     with db() as conn:
         require_dm(conn, cid, user)
         r = conn.execute("SELECT secreto FROM items WHERE id=? AND owner_id=?",
@@ -186,12 +185,14 @@ def delete_item(cid: int, iid: int, user=Depends(current_user)):
     return {"ok": True}
 
 
-# ── Compendio para los jugadores (sin precios) ─────────────
+# ── Catálogo que ven los jugadores ─────────────────────────
 
 @router.get("/catalog")
 def player_catalog(cid: int, user=Depends(current_user)):
-    """Catálogo del DM de la campaña. Los jugadores lo ven completo pero **sin
-    precios** y sin los objetos marcados como secretos."""
+    """Catálogo del DM de la campaña, con precios: de acá los jugadores agarran
+    lo que quieran (ver `POST /api/characters/{id}/inventory/take`).
+
+    Lo que el DM marcó como oculto no aparece."""
     with db() as conn:
         c, is_dm = require_access(conn, cid, user)
         _require_cosmere(conn, cid)
@@ -199,4 +200,24 @@ def player_catalog(cid: int, user=Depends(current_user)):
         if not is_dm:
             sql += " AND COALESCE(secreto,0)=0"
         rows = conn.execute(sql + " ORDER BY name", (c["dm_id"],)).fetchall()
-        return [_serialize(r, with_price=is_dm) for r in rows]
+        return [_serialize(r) for r in rows]
+
+
+# ── Los inventarios de la mesa, para el DM ─────────────────
+
+@router.get("/inventories")
+def campaign_inventories(cid: int, user=Depends(current_user)):
+    """Qué lleva cada uno. El DM edita cualquiera de estos inventarios con los
+    endpoints de `/api/characters/{id}/inventory…`."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+        _require_cosmere(conn, cid)
+        chars = conn.execute(
+            "SELECT * FROM characters WHERE campaign_id=? ORDER BY name", (cid,)).fetchall()
+        out = {"characters": [], "grupo": _nest(_inv_rows(conn, campaign_id=cid))}
+        for ch in chars:
+            inv = character_inventory(conn, ch)
+            inv.pop("grupo", None)      # el del grupo va una sola vez, arriba
+            inv.pop("aliados", None)
+            out["characters"].append(inv)
+        return out

@@ -287,41 +287,6 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now'))
         );
 
-        -- Asentamientos: agrupan tiendas (aldea | pueblo | ciudad).
-        CREATE TABLE IF NOT EXISTS settlements (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
-            name TEXT NOT NULL,
-            size TEXT NOT NULL DEFAULT 'pueblo',
-            descripcion TEXT DEFAULT '',
-            created_at TEXT DEFAULT (datetime('now'))
-        );
-
-        -- Tiendas: sueltas o dentro de un asentamiento.
-        CREATE TABLE IF NOT EXISTS shops (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
-            settlement_id INTEGER REFERENCES settlements(id) ON DELETE CASCADE,
-            name TEXT NOT NULL,
-            preset TEXT DEFAULT 'general',
-            size TEXT DEFAULT 'mediana',
-            price_policy TEXT DEFAULT 'normal',  -- barato | normal | caro | variado
-            descripcion TEXT DEFAULT '',
-            last_restock_day INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT (datetime('now'))
-        );
-
-        -- Stock de una tienda. El precio queda congelado al generarse.
-        CREATE TABLE IF NOT EXISTS shop_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            shop_id INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-            item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-            cantidad INTEGER NOT NULL DEFAULT 1,
-            precio INTEGER NOT NULL DEFAULT 0,
-            price_tier TEXT DEFAULT 'normal',
-            visible INTEGER DEFAULT 1
-        );
-
         -- Inventario de un personaje o de una mascota (copia del objeto).
         CREATE TABLE IF NOT EXISTS inventory (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -337,17 +302,6 @@ def init_db():
             notas TEXT DEFAULT '',
             created_at TEXT DEFAULT (datetime('now'))
         );
-
-        -- Pedidos de compra: el jugador pide, el DM confirma.
-        CREATE TABLE IF NOT EXISTS purchase_requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            shop_id INTEGER NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
-            shop_item_id INTEGER NOT NULL REFERENCES shop_items(id) ON DELETE CASCADE,
-            character_id INTEGER NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
-            cantidad INTEGER NOT NULL DEFAULT 1,
-            status TEXT NOT NULL DEFAULT 'pending',   -- pending | approved | rejected
-            created_at TEXT DEFAULT (datetime('now'))
-        );
         """)
 
         # Tamaño del personaje (define la base de su capacidad de carga).
@@ -355,8 +309,8 @@ def init_db():
         if "size" not in chcols:
             conn.execute("ALTER TABLE characters ADD COLUMN size TEXT DEFAULT 'Mediano'")
 
-        # Días absolutos transcurridos: storm_tracker.day se reinicia con cada
-        # tormenta, así que el restock necesita su propio contador.
+        # Días absolutos transcurridos (storm_tracker.day se reinicia con cada
+        # tormenta, así que el calendario necesita su propio contador).
         cpcols = {r["name"] for r in conn.execute("PRAGMA table_info(campaigns)")}
         if "day_count" not in cpcols:
             conn.execute("ALTER TABLE campaigns ADD COLUMN day_count INTEGER DEFAULT 0")
@@ -394,6 +348,28 @@ def init_db():
             ("contenedor_capacidad", "INTEGER DEFAULT 0"),
             ("equipado", "INTEGER DEFAULT 1"),
             ("parent_id", "INTEGER REFERENCES inventory(id) ON DELETE CASCADE"),
+            # Zona donde está el objeto. '' = encima (o dentro de un contenedor
+            # que se lleva encima); 'personal' = guardado del personaje, lo que
+            # tiene pero no carga; 'grupo' = guardado compartido de la campaña.
+            # Solo lo que está en '' cuenta para la capacidad de carga.
+            ("stash", "TEXT DEFAULT ''"),
+            # Necesario para el guardado del grupo, que no es de nadie en
+            # particular: ahí character_id y pet_id van en NULL.
+            ("campaign_id", "INTEGER REFERENCES campaigns(id) ON DELETE CASCADE"),
         ):
             if col not in vcols:
                 conn.execute(f"ALTER TABLE inventory ADD COLUMN {col} {ddl}")
+
+        # Backfill: las entradas viejas son de un personaje; les completamos la
+        # campaña para que las consultas por campaña las vean.
+        conn.execute(
+            "UPDATE inventory SET campaign_id = ("
+            "  SELECT ch.campaign_id FROM characters ch WHERE ch.id = inventory.character_id"
+            ") WHERE campaign_id IS NULL AND character_id IS NOT NULL"
+        )
+        conn.execute(
+            "UPDATE inventory SET campaign_id = ("
+            "  SELECT ch.campaign_id FROM pets p JOIN characters ch ON ch.id = p.character_id"
+            "  WHERE p.id = inventory.pet_id"
+            ") WHERE campaign_id IS NULL AND pet_id IS NOT NULL"
+        )

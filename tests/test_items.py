@@ -69,21 +69,22 @@ def test_export_roundtrip(make_client):
     assert back["Placa completa"]["slots"] == 6
 
 
-def test_player_catalog_hides_price_and_secrets(make_client):
+def test_player_catalog_shows_prices_but_hides_the_hidden(make_client):
+    """El jugador agarra del catálogo, así que ve los precios. Lo que el DM
+    marcó como oculto no aparece."""
     dm, pl, cid, chid = party(make_client)
     dm.post(f"/api/campaigns/{cid}/items", json={"name": "Cuerda", "precio": 3})
     dm.post(f"/api/campaigns/{cid}/items", json={"name": "Hoja Esquirlada", "precio": 99999})
     ids = {i["name"]: i["id"] for i in dm.get(f"/api/campaigns/{cid}/items").json()}
-    # el DM marca la hoja como secreta
     r = dm.post(f"/api/campaigns/{cid}/items/{ids['Hoja Esquirlada']}/secret").json()
     assert r["secreto"] is True
 
     cat = pl.get(f"/api/campaigns/{cid}/catalog").json()
-    assert [c["name"] for c in cat] == ["Cuerda"]      # el secreto no aparece
-    assert "precio" not in cat[0]                       # y sin precios
-    # el DM sí ve todo, con precio
+    assert [c["name"] for c in cat] == ["Cuerda"]      # lo oculto no aparece
+    assert cat[0]["precio"] == 3
+    # el DM ve todo, incluido lo oculto
     dcat = dm.get(f"/api/campaigns/{cid}/catalog").json()
-    assert len(dcat) == 2 and "precio" in dcat[0]
+    assert len(dcat) == 2
 
 
 def test_items_rejected_in_dnd_campaign(make_client):

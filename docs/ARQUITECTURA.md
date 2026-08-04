@@ -84,8 +84,7 @@ routers/*.py        ← endpoints por dominio (validan, orquestan)
 | `campaigns` | `/api/campaigns` | campañas, miembros, invitaciones, config, tormenta, marcos del DM, opciones de mascota |
 | `characters` | `/api/characters` | personajes, PDF, imagen, mascotas, stats en vivo, heridas, marcos, recursos D&D |
 | `enemies` | `/api/campaigns/{cid}/enemies` | bestiario (por DM + sistema): import, bulk, export |
-| `items` | `/api/campaigns/{cid}/items` | catálogo de objetos (por DM) + `/catalog` sin precios para jugadores |
-| `shops` | `/api/campaigns/{cid}` | tiendas, asentamientos, stock, restock y pedidos de compra |
+| `items` | `/api/campaigns/{cid}/items` | catálogo de objetos (por DM), `/catalog` para jugadores y `/inventories` (vista del DM) |
 | `encounters` | `/api/campaigns/{cid}/encounters` | encuentros y overrides por-encuentro |
 | `combat` | `/api/campaigns/{cid}/combat` | combate en vivo (stats, turnos, vida máx, ocultar) |
 | `frontend` | `/` | sirve las páginas HTML y hace el gating por rol |
@@ -166,6 +165,13 @@ erDiagram
     encounters ||--o{ encounter_enemies : "compone"
     enemies ||--o{ encounter_enemies : "aparece en"
     enemies ||--o{ campaign_pet_options : "ofrecido como mascota"
+
+    users ||--o{ items : "posee catálogo (owner_id)"
+    items ||--o{ inventory : "copiado a"
+    characters ||--o{ inventory : "lleva o guarda"
+    pets ||--o{ inventory : "lleva"
+    campaigns ||--o{ inventory : "guardado del grupo"
+    inventory ||--o{ inventory : "contenedor (parent_id)"
 ```
 
 ### Convenciones
@@ -178,7 +184,8 @@ erDiagram
   actualiza bases viejas sin perder datos y se puede correr siempre.
 - **Columnas JSON (TEXT)**: `statuses`, `sheet`, `dnd_resources`, `injuries` (personajes);
   `acciones`, `stats` (enemigos/mascotas); `config` (campaña); `overrides` (encounter);
-  `data` (combate). Se serializan con `json.dumps`/`json.loads`.
+  `categorias`, `stats` (objetos e inventario); `data` (combate). Se serializan con
+  `json.dumps`/`json.loads`.
 
 ### Tablas
 
@@ -207,7 +214,7 @@ erDiagram
 | `dm_id` | INTEGER FK→users | dueño/DM |
 | `system` | TEXT | `cosmere` \| `dnd` |
 | `config` | TEXT (JSON) | parámetros: rango de tormenta, curva de descarga de marcos |
-| `day_count` | INTEGER | días **absolutos** transcurridos (para el restock: `storm_tracker.day` se reinicia con cada tormenta) |
+| `day_count` | INTEGER | días **absolutos** transcurridos (`storm_tracker.day` se reinicia con cada tormenta) |
 | `created_at` | TEXT | |
 
 #### `campaign_members` — quién está en qué campaña
@@ -303,38 +310,35 @@ Igual que el bestiario: pertenece al **DM** y se comparte entre sus campañas.
 | `precio` | INTEGER | precio base, en marcos |
 | `slots` | INTEGER | 1 por defecto; 0 = no ocupa; `Cumbersome N` = 1+N |
 | `capacity_bonus` | INTEGER | mochila = 2 |
-| `secreto` | INTEGER | 1 = no aparece en el catálogo del jugador ni en el sorteo de las tiendas |
+| `secreto` | INTEGER | 1 = oculto: no aparece en el catálogo del jugador ni se puede agarrar |
 
-#### `settlements` — asentamientos (por campaña)
-`id`, `campaign_id` (FK, cascade), `name`, `size` (`aldea`|`pueblo`|`ciudad`),
-`descripcion`. Agrupan tiendas; al crearse generan las suyas según el tamaño.
+#### `inventory` — dónde está cada objeto
+Guarda una **copia** del objeto del catálogo: editar el catálogo no altera lo ya
+entregado. La misma tabla cubre las cuatro zonas, y **quién** es el dueño sale de la
+combinación de columnas:
 
-#### `shops` — tiendas (por campaña)
+| Zona | `character_id` | `pet_id` | `campaign_id` | `stash` |
+|---|---|---|---|---|
+| Encima del personaje | sí | NULL | sí | `''` |
+| Encima de una mascota | NULL | sí | sí | `''` |
+| Guardado del personaje | sí | NULL | sí | `'personal'` |
+| Guardado del grupo | NULL | NULL | sí | `'grupo'` |
+
 | Columna | Tipo | Notas |
 |---|---|---|
-| `id` | INTEGER PK | |
-| `campaign_id` | INTEGER FK→campaigns | cascade |
-| `settlement_id` | INTEGER FK→settlements | NULL = tienda suelta |
-| `name`, `descripcion` | TEXT | |
-| `preset` | TEXT | rubro: general, herreria, fabrial, granja, medica… |
-| `size` | TEXT | chica \| mediana \| grande (define cantidad y tope de precio) |
-| `price_policy` | TEXT | barato \| normal \| caro \| variado |
-| `last_restock_day` | INTEGER | contra `campaigns.day_count`, para el restock |
+| `item_id` | INTEGER FK→items | origen en el catálogo (nullable: puede no venir de ahí) |
+| `name`, `descripcion`, `categorias`, `kind`, `stats`, `peso` | | copia del objeto |
+| `slots`, `capacity_bonus`, `cantidad` | INTEGER | |
+| `usos`, `usos_max` | INTEGER | dosis/cargas de esta unidad |
+| `contenedor`, `contenedor_capacidad` | INTEGER | mochila, carreta… |
+| `parent_id` | INTEGER FK→inventory | dentro de qué contenedor está (cascade) |
+| `equipado` | INTEGER | 0 = lo dejó: no cuenta para la capacidad |
+| `stash` | TEXT | `''` \| `personal` \| `grupo` |
+| `campaign_id` | INTEGER FK→campaigns | cascade; imprescindible para el guardado del grupo |
 
-#### `shop_items` — stock de una tienda
-`id`, `shop_id` (FK, cascade), `item_id` (FK), `cantidad`, `precio` (congelado al
-generarse), `price_tier`, `visible` (0 = trastienda). Al agotarse queda en `cantidad=0`
-(no se borra, para no perder el historial de pedidos por cascada).
-
-#### `inventory` — inventario de un personaje o de una mascota
-`id`, `character_id` (FK, cascade), `pet_id` (FK, cascade), `item_id` (origen, nullable),
-`name`, `descripcion`, `categorias`, `slots`, `capacity_bonus`, `cantidad`, `notas`.
-Guarda una **copia** del objeto: editar el catálogo no altera lo ya entregado.
-
-#### `purchase_requests` — pedidos de compra
-`id`, `shop_id`, `shop_item_id`, `character_id`, `cantidad`, `status`
-(`pending`|`approved`|`rejected`). El jugador pide; al aprobar el DM se cobran los marcos,
-baja el stock y se crea la entrada de inventario.
+Solo lo que está en `stash=''`, sin `parent_id` y `equipado` pesa contra la capacidad de
+carga. Los guardados no tienen tope. Al mover o pasar una entrada, **sus hijos viajan con
+ella**: la mochila se guarda llena.
 
 #### `storm_tracker` — ciclo de altas tormentas (1 por campaña)
 | Columna | Tipo | Notas |
@@ -367,6 +371,16 @@ baja el stock y se crea la entrada de inventario.
 - **JSON en TEXT**: fichas, estados y listas se guardan como documentos JSON. Cómodo para
   leer/escribir entero, pero **no se puede consultar por SQL** el contenido (se filtra en
   Python).
+- **Sin tiendas: el catálogo es la tienda**. No hay stock, ni precios por local, ni
+  aprobación del DM. El jugador agarra del catálogo, **fija el precio** (descuento o
+  hallazgo) y **elige con qué esferas paga**. Es a confianza, a propósito: la mesa se
+  arregla en la mesa, y lo que el DM no quiere que exista lo marca como oculto
+  (`items.secreto`). La versión anterior tenía generador de tiendas, asentamientos y
+  pedidos de compra; se sacó entera (queda en el historial de git).
+- **Una sola tabla para las cuatro zonas del inventario**: encima, guardado propio y
+  guardado del grupo son la misma tabla con distinta combinación de
+  `character_id`/`pet_id`/`campaign_id`/`stash`. Alternativa descartada: una tabla por
+  zona, que duplicaría toda la lógica de contenedores, dosis y capacidad.
 
 ---
 

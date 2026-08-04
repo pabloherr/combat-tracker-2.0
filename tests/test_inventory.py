@@ -66,7 +66,9 @@ def test_player_needs_permission_to_create(make_client):
     assert _members(dm, cid)[0]["can_create_items"] is True
 
 
-def test_player_can_never_take_from_catalog(make_client):
+def test_player_cannot_get_catalog_items_for_free(make_client):
+    """Del catálogo se agarra pagando (`/inventory/take`). El alta directa con
+    `item_id` es del DM: sería sacar cosas gratis."""
     dm, pl, cid, chid = party(make_client)
     dm.post(f"/api/campaigns/{cid}/items", json={"name": "Hoja Esquirlada", "precio": 99999})
     iid = dm.get(f"/api/campaigns/{cid}/items").json()[0]["id"]
@@ -265,22 +267,16 @@ def test_use_rejected_on_plain_item(make_client):
                    json={"delta": -1}).status_code == 400
 
 
-def test_bought_item_keeps_uses_and_container(make_client):
-    """Lo comprado llega con sus dosis y su capacidad de contenedor."""
+def test_taken_item_keeps_uses_and_container(make_client):
+    """Lo que se agarra del catálogo llega con sus dosis y su capacidad."""
     dm, pl, cid, chid = party(make_client)
     dm.post(f"/api/campaigns/{cid}/items", json={
         "name": "Mochila", "kind": "equipo", "precio": 8, "slots": 1,
-        "contenedor_capacidad": 2})
+        "contenedor_capacidad": 2, "usos_max": 0})
     iid = dm.get(f"/api/campaigns/{cid}/items").json()[0]["id"]
-    sid = dm.post(f"/api/campaigns/{cid}/shops", json={
-        "name": "General", "preset": "general", "size": "grande",
-        "price_policy": "normal"}).json()["id"]
-    dm.post(f"/api/campaigns/{cid}/shops/{sid}/items", json={"item_id": iid, "cantidad": 1})
     pl.post(f"/api/characters/{chid}/marcos/set", json={"cargados": 50, "opacos": 0})
-    siid = dm.get(f"/api/campaigns/{cid}/shops").json()[0]["items"][0]["id"]
-    rid = pl.post(f"/api/campaigns/{cid}/shops/{sid}/request",
-                  json={"shop_item_id": siid}).json()["id"]
-    dm.post(f"/api/campaigns/{cid}/requests/{rid}/approve")
+    assert pl.post(f"/api/characters/{chid}/inventory/take",
+                   json={"item_id": iid}).status_code == 200
     it = _inv(pl, chid)["character"]["items"][0]
     assert it["contenedor"] is True and it["contenedor_capacidad"] == 2
 

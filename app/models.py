@@ -183,39 +183,36 @@ class InventoryMove(BaseModel):
     parent_id: int | None = None    # null = sacarlo del contenedor
 
 
-class SizeIn(BaseModel):
-    size: str                    # Pequeño | Mediano | Grande | Enorme | Gargantuesco
+class InventoryStash(BaseModel):
+    """Mover un objeto entre zonas: encima, el guardado propio o el del grupo."""
+    stash: str = ""                 # "" (encima) | personal | grupo
 
 
-class ShopIn(BaseModel):
-    name: str
-    preset: str = "general"
-    size: str = "mediana"           # pequeña | mediana | grande
-    price_policy: str = "normal"    # barato | normal | caro | variado
-    descripcion: str = ""
-    settlement_id: int | None = None
+class InventoryTransfer(BaseModel):
+    """Pasarle un objeto a otro personaje (o a una mascota) de la campaña."""
+    character_id: int | None = None
+    pet_id: int | None = None
+    stash: str = ""                 # zona en la que cae, en el destino
 
 
-class SettlementIn(BaseModel):
-    name: str
-    size: str = "pueblo"            # aldea | pueblo | ciudad
-    descripcion: str = ""
+class TakeIn(BaseModel):
+    """El jugador agarra un objeto del catálogo y lo paga como quiera.
 
-
-class ShopItemIn(BaseModel):
+    `precio` es editable: el DM puede hacerle un descuento, o el objeto puede
+    ser un hallazgo (precio 0). El reparto de esferas también lo elige él; si no
+    manda ninguno, se cobra con opacas primero."""
     item_id: int
     cantidad: int = 1
-    precio: int | None = None       # si no viene, se calcula con la política
-    visible: bool = True
+    precio: int | None = None       # por unidad; None = el del catálogo
+    pago_cargados: int | None = None
+    pago_opacos: int | None = None
+    pet_id: int | None = None       # destino: una mascota en vez del personaje
+    parent_id: int | None = None    # destino: dentro de un contenedor
+    stash: str = ""                 # destino: encima, guardado propio o del grupo
 
 
-class PriceIn(BaseModel):
-    precio: int
-
-
-class PurchaseIn(BaseModel):
-    shop_item_id: int
-    cantidad: int = 1
+class SizeIn(BaseModel):
+    size: str                    # Pequeño | Mediano | Grande | Enorme | Gargantuesco
 
 
 class AccionIn(BaseModel):
