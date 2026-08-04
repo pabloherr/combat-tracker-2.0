@@ -7,17 +7,66 @@ que se accede y se guarda en la tabla `combats`.
 
 import json
 
+from .config import CONFIG_DEFAULTS
 from .database import db
 
 EMPTY_COMBAT = {"active": False, "round": 1, "phase": "fast_players", "participants": []}
 
+_STATS = ("vida", "focus", "inv")
 
-def player_view(combat: dict) -> dict:
-    """Vista del combate para los jugadores.
+
+def _pct(valor, maximo) -> int:
+    if not maximo:
+        return 0
+    # se redondea a múltiplos de 5: la barra se ve igual y no se puede deducir
+    # el número exacto contando píxeles
+    return max(0, min(100, round(valor / maximo * 100 / 5) * 5))
+
+
+def _nivel(valor, maximo) -> int:
+    """Tramo en el que está el stat, de 5 (intacto) a 0 (vacío). Es lo único que
+    se manda en modo 'color': ni siquiera un porcentaje."""
+    if not maximo:
+        return 0
+    pct = (valor or 0) / maximo * 100
+    for corte, n in ((100, 5), (75, 4), (50, 3), (25, 2)):
+        if pct >= corte:
+            return n
+    return 1 if pct > 0 else 0
+
+
+def mask_stats(p: dict, cfg: dict, grupo: str) -> dict:
+    """Recorta un participante según lo que el DM deje ver de ese grupo.
+
+    Lo que no se ve no se manda: 'color' viaja como un tramo (0-5), 'abstracto'
+    como porcentaje redondeado, y en 'no' no viaja nada."""
+    d = dict(p)
+    for stat in _STATS:
+        modo = cfg.get(f"ver_{stat}_{grupo}", "color")
+        if modo == "exacto":
+            continue
+        maximo = d.get(f"{stat}_max") or 0
+        actual = d.get(stat)
+        d[stat] = None
+        d[f"{stat}_max"] = None
+        if maximo and modo == "abstracto":
+            d[f"{stat}_pct"] = _pct(actual or 0, maximo)
+        elif maximo and modo == "color":
+            d[f"{stat}_nivel"] = _nivel(actual, maximo)
+    if not cfg.get(f"ver_estados_{grupo}", True):
+        d["statuses"] = []
+        d["injuries"] = []
+    return d
+
+
+def player_view(combat: dict, cfg: dict = None, user_id: int = None) -> dict:
+    """Vista del combate para **un** jugador.
 
     - Mientras está en preparación (`staged`) o no hay combate activo, los
       jugadores no ven nada (pantalla de espera).
-    - Con el combate ya enviado, se quitan los enemigos marcados como ocultos.
+    - Se quitan los enemigos marcados como ocultos.
+    - De los demás se manda solo lo que el DM habilitó (ver `app/config.py`).
+      Lo propio siempre va completo: es tu personaje.
     """
     if not combat.get("active") or combat.get("staged"):
         return {
@@ -27,8 +76,17 @@ def player_view(combat: dict) -> dict:
             "encounter_name": "",
             "participants": [],
         }
-    parts = [p for p in combat.get("participants", [])
-             if not (p.get("kind") == "enemy" and p.get("hidden"))]
+    cfg = cfg or CONFIG_DEFAULTS
+    parts = []
+    for p in combat.get("participants", []):
+        if p.get("kind") == "enemy":
+            if p.get("hidden"):
+                continue
+            parts.append(mask_stats(p, cfg, "enemigos"))
+        elif user_id is not None and p.get("user_id") == user_id:
+            parts.append(p)                      # tu personaje y tus mascotas, enteros
+        else:
+            parts.append(mask_stats(p, cfg, "aliados"))
     return {**combat, "participants": parts}
 
 

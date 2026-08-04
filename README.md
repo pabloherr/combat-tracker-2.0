@@ -217,7 +217,13 @@ price: 1600
 
 El catálogo es **del DM** y se comparte entre sus campañas. Con el botón 🔒 lo marcás como
 **oculto**: existe para vos, pero los jugadores ni se enteran de que está (así vienen
-cargadas la Hoja Esquirlada, el Moldeador de almas, etc.).
+cargadas la Hoja Esquirlada, el Moldeador de almas, etc.). En la lista, lo oculto se ve
+atenuado y con su etiqueta.
+
+La pestaña **Objetos** se lee **igual que el catálogo de los jugadores** (mismas solapas
+por tipo, mismas tablas, mismo filtro por categoría y precio); la única diferencia es la
+última columna, que en vez de *Agarrar* trae **🔒 ocultar · editar · ✕**. Y vos ves
+también los objetos ocultos, claro.
 
 ### Agarrar del catálogo (pestaña **Catálogo** del jugador)
 
@@ -382,9 +388,13 @@ Así armás un "Archer veterano" con más vida y otro color reusando la misma fi
 - Sobre **su** personaje ve los números exactos y gestiona en vivo su **turno
   (rápido/lento), vida, focus, investidura y estados** (se sincroniza con el DM y el
   resto al instante). Solo puede tocar su propio personaje.
-- De los aliados ve el estado de salud descriptivo (sin números), su turno y estados.
-- De los **enemigos** ve solo el nombre, color, salud descriptiva y estados: **no** ve
-  su tier/tipo, ni si tomaron turno rápido o lento. Los ocultos por el DM no aparecen.
+- De los demás (aliados y enemigos) ve **vida, focus e investidura**, cada uno con su
+  barra. Cuánto ve de cada stat lo decide el DM en **⚙ Ajustes → Qué ven los jugadores**:
+  nada, solo el color, una barra que se vacía, o los números exactos. Por defecto, solo el
+  color: la barra queda llena y cambia de color con su etiqueta.
+- De los **enemigos** además **no** ve su tier/tipo ni si tomaron turno rápido o lento.
+  Los ocultos por el DM no aparecen.
+- Su propio personaje y sus mascotas nunca se recortan: esos siempre van con los números.
 
 ## Novedades: personajes, marcos, tormentas y heridas
 
@@ -451,20 +461,44 @@ principio y todo llega a 0 en el día 15 si no hubo tormenta.
 
 ### Panel de ajustes del DM (⚙ Ajustes)
 
-En la vista del DM, el botón **⚙ Ajustes** abre un panel para **tunear los parámetros**
-de la campaña sin tocar código (se guardan en la campaña):
+En la vista del DM, el botón **⚙ Ajustes** (arriba a la derecha, al lado de *← Inicio*)
+abre el panel de configuración de la campaña, con tres solapas. Podés moverte entre ellas
+sin perder lo que tocaste; se guarda todo junto con **Guardar**.
 
-- **Tormentas:** días mínimo/máximo entre tormentas.
-- **Descarga de marcos:** día de inicio, día de apagado total y **curva de descarga**.
-- **Estado actual de la tormenta:** día del ciclo, día objetivo y momento del día.
+**Módulos** — qué se usa en esta campaña. Lo que apagues desaparece para todos, y el
+backend lo rechaza (no es solo esconder botones):
 
-El panel incluye un **preview en vivo**: una mini gráfica de barras del **% de marcos con
-luz por día**, que se recalcula al instante al mover el día de inicio/apagado o la curva
-(es el valor esperado; la descarga real es al azar). Sirve para ver el ritmo y ajustarlo
-antes de guardar.
+| Módulo | Qué se lleva si lo apagás |
+|---|---|
+| **Objetos e inventario** | catálogo, inventario, guardados y capacidad de carga |
+| **Tracker de altas tormentas** | la barra del ciclo y la descarga de marcos por día |
 
-Los valores por defecto: tormenta cada **8–12** días, descarga del día **5** al **15**,
-curva **2.0**. Una campaña sin ajustes guardados toma estos valores.
+**Qué ven los jugadores** — por separado para **enemigos** y para **otros jugadores**, y
+por cada stat (vida, focus, investidura):
+
+| Modo | Qué ve el jugador |
+|---|---|
+| **No lo ven** | nada: ni barra |
+| **Solo el color** | la barra queda llena y cambia de color, con su etiqueta (*Malherido*, *A medias*) |
+| **Barra que se vacía** | además se acorta a medida que el stat baja |
+| **Números exactos** | `23 / 30` |
+
+Más un interruptor para **estados y condiciones** de cada grupo. Su **propio** personaje y
+sus mascotas los ven siempre con los números exactos.
+
+> Esto se aplica **en el servidor**: lo que no se ve tampoco se manda. En *solo el color*
+> viaja únicamente el tramo (0-5), y en *barra que se vacía* un porcentaje redondeado de a
+> 5, así que no hay forma de deducir el número exacto mirando la red.
+
+**Tormentas y marcos** — los parámetros de siempre: días mínimo/máximo entre tormentas,
+día de inicio y de apagado total de los marcos, **curva de descarga**, y el estado actual
+del ciclo (día, día objetivo y momento). Incluye un **preview en vivo**: una mini gráfica
+del **% de marcos con luz por día** que se recalcula al mover cualquier valor (es el
+esperado; la descarga real es al azar).
+
+Por defecto: tormenta cada **8–12** días, descarga del día **5** al **15**, curva **2.0**,
+todos los módulos encendidos y todo en **solo el color**. Una campaña sin ajustes
+guardados toma estos valores.
 
 ### Vista de jugadores del DM
 

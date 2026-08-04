@@ -11,6 +11,7 @@ from fastapi.responses import Response
 
 from ..access import campaign_or_404, require_access, require_dm
 from ..auth import current_user
+from ..config import get_config
 from ..cosmere_import import ImportError_
 from ..database import db
 from ..items_import import (CATEGORIAS, KIND_LABELS, KINDS, WEAPON_CLASSES,
@@ -22,11 +23,14 @@ router = APIRouter(prefix="/api/campaigns/{cid}", tags=["items"])
 
 
 def _require_cosmere(conn, cid: int):
-    """El comercio es una regla de Cosmere: en campañas de D&D no aplica."""
+    """Los objetos son una regla de Cosmere, y además el DM puede apagar el
+    módulo entero desde los ajustes de la campaña."""
     c = campaign_or_404(conn, cid)
     system = (c["system"] if "system" in c.keys() else None) or "cosmere"
     if system != "cosmere":
-        raise HTTPException(400, "Los objetos y tiendas son solo para campañas de Cosmere")
+        raise HTTPException(400, "Los objetos son solo para campañas de Cosmere")
+    if not get_config(conn, cid)["modulo_objetos"]:
+        raise HTTPException(400, "El DM apagó los objetos en esta campaña")
     return c
 
 

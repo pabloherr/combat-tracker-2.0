@@ -299,6 +299,30 @@ select.fi{appearance:auto;}
 .cfg-sec{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border);}
 .cfg-lrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;font-size:14px;color:var(--text2);}
 .cfg-hint{font-size:11px;color:var(--text3);font-style:italic;}
+.cfg-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px;}
+.cfg-tab{background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:20px;padding:5px 13px;font-family:'Cinzel',serif;font-size:11px;letter-spacing:.05em;cursor:pointer;}
+.cfg-tab:hover{border-color:var(--gold2);color:var(--text2);}
+.cfg-tab.on{background:var(--gold);border-color:var(--gold);color:#1c1915;}
+/* catálogo de objetos: mismas solapas y tablas que ve el jugador */
+.kind-bar{display:flex;flex-wrap:wrap;gap:6px;}
+.kind-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:20px;padding:5px 13px;font-family:'Cinzel',serif;font-size:11px;letter-spacing:.05em;cursor:pointer;}
+.kind-btn:hover{border-color:var(--gold2);color:var(--text2);}
+.kind-btn.on{background:var(--gold);border-color:var(--gold);color:#1c1915;}
+.cat-filters{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0;}
+.cat-f-lbl{font-size:11px;color:var(--text3);font-family:'Cinzel',serif;}
+.cat-f-num{width:76px;-moz-appearance:textfield;}
+.cat-f-num::-webkit-outer-spin-button,.cat-f-num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.cat-scroll{overflow-x:auto;margin-bottom:14px;}
+.cat-tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:560px;}
+.cat-tbl th{font-family:'Cinzel',serif;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);text-align:left;font-weight:400;padding:6px 8px;border-bottom:1px solid var(--border2);white-space:nowrap;}
+.cat-tbl td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top;}
+.cat-tbl tr:hover td{background:rgba(255,255,255,.02);}
+.cat-tbl tr.oculto td{opacity:.5;}
+.cat-tbl .n{color:var(--gold2);font-weight:600;}
+.cat-tbl .d{font-size:12px;color:var(--text3);font-style:italic;}
+.cat-tbl .num{text-align:right;font-family:'Cinzel',serif;color:var(--gold2);white-space:nowrap;}
+.cat-tbl .act{text-align:right;white-space:nowrap;}
+.sec-lbl{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin:14px 0 4px;}
 .dchart-lbl{font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--text3);margin:10px 0 6px;font-family:'Cinzel',serif;}
 .dchart{display:flex;align-items:flex-end;gap:3px;height:100px;padding:5px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;overflow-x:auto;}
 .dbar-col{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;min-width:15px;}
@@ -334,6 +358,9 @@ select.fi{appearance:auto;}
     <div class="app-title">Cosmere Combat Tracker<small id="campName">Panel del DM</small></div>
     <div class="row" style="margin:0;gap:12px">
       <span class="conn-status" id="connStatus">Conectando...</span>
+      <!-- Los ajustes viven acá y no en la barra de tormenta: si apagás el
+           tracker, seguís pudiendo entrar a la configuración. -->
+      <button class="btn sm" onclick="openConfig()" title="Configurar la campaña">⚙ Ajustes</button>
       <a class="btn sm" href="/">← Inicio</a>
     </div>
   </div>
@@ -345,7 +372,6 @@ select.fi{appearance:auto;}
     <span class="storm-ctrl">
       <button class="btn ghost sm" onclick="stormAdvance()" title="Pasar un día (sin descanso)">+1 día</button>
       <button class="btn ghost sm" onclick="stormReset()" title="Reiniciar el ciclo">⟳</button>
-      <button class="btn ghost sm" onclick="openConfig()" title="Ajustar parámetros (tormentas, marcos)">⚙ Ajustes</button>
     </span>
   </div>
 
@@ -516,8 +542,17 @@ select.fi{appearance:auto;}
         <button class="btn accent" onclick="importItem()">Importar</button>
       </div>
     </div>
-    <div class="filter-bar" id="itBar"></div>
-    <div class="grid" id="itemsGrid"></div>
+    <div class="kind-bar" id="itKinds"></div>
+    <div class="cat-filters">
+      <input class="fi" type="search" id="itQ" placeholder="Buscar objeto…" oninput="renderItemsGrid()" style="flex:1;min-width:150px"/>
+      <span class="cat-f-lbl">💠 desde</span>
+      <input class="fi cat-f-num" type="number" min="0" id="itMin" oninput="renderItemsGrid()"/>
+      <span class="cat-f-lbl">hasta</span>
+      <input class="fi cat-f-num" type="number" min="0" id="itMax" oninput="renderItemsGrid()"/>
+      <button class="btn ghost sm" onclick="clearItemFilters()">Limpiar</button>
+    </div>
+    <div class="kind-bar" id="itCats"></div>
+    <div id="itemsGrid"></div>
     <div class="empty" id="itemsEmpty">Todavía no cargaste objetos.</div>
   </div>
 
@@ -573,9 +608,10 @@ async function loadCampaign(){
       document.getElementById('importCode').placeholder='layout: D&D 5e\nname: "Goblin"\ntype: "Small Humanoid (Goblinoid), Neutral Evil"\nac: "15 (leather armor, shield)"\nhp: 7\nspeed: "30 ft."\ncr: "1/4 (50 XP)"\nstr: 8\ndex: 14\n...';
       document.getElementById('bulkCode').placeholder='layout: D&D 5e\nname: "Goblin"\nhp: 7\n---\nlayout: D&D 5e\nname: "Hobgoblin"\nhp: 11';
       document.getElementById('dndExampleBtn').style.display='';
-      // Objetos, tiendas e inventario son reglas de Cosmere.
-      document.querySelectorAll('.cosmere-only').forEach(function(el){el.style.display='none';});
     }
+    // Objetos e inventario son reglas de Cosmere, y además el DM puede haber
+    // apagado módulos desde los ajustes.
+    try{ aplicarModulos(await api(API+'/config')); }catch(e){}
   }catch(e){}
 }
 
@@ -865,7 +901,8 @@ function renderStorm(s){
   }
   document.getElementById('stormCells').innerHTML=cells;
   document.getElementById('stormInfo').textContent='Día '+s.day+' · cae el día '+s.target+' '+s.moment;
-  document.getElementById('stormBar').style.display='';
+  // el DM puede apagar el tracker desde los ajustes
+  document.getElementById('stormBar').style.display=(s.enabled===false)?'none':'';
 }
 async function loadStorm(){ try{ renderStorm(await api(API+'/storm')); }catch(e){} }
 async function stormAdvance(){
@@ -880,34 +917,110 @@ async function stormReset(){
   renderStorm(r.state);
 }
 
-// ─── Ajustes de la campaña (parámetros de tormenta/marcos) ───
+// ─── Ajustes de la campaña ───
 function cfgRow(label,id,val,hint,extra){
   return '<label class="cfg-lrow"><span>'+label+(hint?'<br><span class="cfg-hint">'+hint+'</span>':'')+'</span>'
     +'<input class="fi" type="number" id="'+id+'" value="'+val+'" style="width:90px" '+(extra||'')+'/></label>';
 }
+function cfgSwitch(label,id,val,hint){
+  return '<label class="cfg-lrow"><span>'+label+(hint?'<br><span class="cfg-hint">'+hint+'</span>':'')+'</span>'
+    +'<input type="checkbox" id="'+id+'"'+(val?' checked':'')+' style="width:18px;height:18px;accent-color:var(--gold);cursor:pointer"/></label>';
+}
+var VER_LBL={no:'No lo ven',
+             color:'Solo el color',
+             abstracto:'Barra que se vacía',
+             exacto:'Números exactos'};
+function cfgVer(label,id,val){
+  var opts=['no','color','abstracto','exacto'].map(function(m){
+    return '<option value="'+m+'"'+(m===val?' selected':'')+'>'+VER_LBL[m]+'</option>';}).join('');
+  return '<label class="cfg-lrow"><span>'+label+'</span>'
+    +'<select class="fi" id="'+id+'" style="min-width:170px">'+opts+'</select></label>';
+}
+var CFG_TAB='modulos';
+var CFG=null;
+// Al cambiar de solapa se re-dibuja el modal, así que primero guardamos en CFG
+// lo que el DM haya tocado: nada se pierde por moverse entre solapas.
+var CFG_CAMPOS=[
+  ['cfg-mobj','modulo_objetos','bool'], ['cfg-mstorm','modulo_tormentas','bool'],
+  ['cfg-ve-vida','ver_vida_enemigos','txt'], ['cfg-ve-focus','ver_focus_enemigos','txt'],
+  ['cfg-ve-inv','ver_inv_enemigos','txt'], ['cfg-ve-est','ver_estados_enemigos','bool'],
+  ['cfg-va-vida','ver_vida_aliados','txt'], ['cfg-va-focus','ver_focus_aliados','txt'],
+  ['cfg-va-inv','ver_inv_aliados','txt'], ['cfg-va-est','ver_estados_aliados','bool'],
+  ['cfg-smin','storm_min','int'], ['cfg-smax','storm_max','int'],
+  ['cfg-dstart','discharge_start','int'], ['cfg-dfull','discharge_full','int'],
+  ['cfg-dcurve','discharge_curve','float'],
+  ['cfg-sday','storm_day','int'], ['cfg-starget','storm_target','int'],
+  ['cfg-smoment','storm_moment','txt']
+];
+function harvestConfig(){
+  CFG_CAMPOS.forEach(function(f){
+    var el=document.getElementById(f[0]);
+    if(!el)return;                                   // esa solapa no está a la vista
+    if(f[2]==='bool') CFG[f[1]]=el.checked;
+    else if(f[2]==='int'){ var n=parseInt(el.value); if(!isNaN(n)) CFG[f[1]]=n; }
+    else if(f[2]==='float'){ var x=parseFloat(el.value); if(!isNaN(x)) CFG[f[1]]=x; }
+    else CFG[f[1]]=el.value;
+  });
+}
+function setCfgTab(t){ harvestConfig(); CFG_TAB=t; paintConfig(); }
 async function openConfig(){
-  var cfg=await api(API+'/config');
-  var moments=(cfg.moments||[]).map(function(m){return '<option value="'+esc(m)+'"'+(m===cfg.storm_moment?' selected':'')+'>'+esc(m)+'</option>';}).join('');
-  var dp='oninput="renderDischargePreview()"';
+  CFG=await api(API+'/config');
+  CFG_TAB='modulos';
+  paintConfig();
+  document.getElementById('overlay').classList.add('on');
+}
+function paintConfig(){
+  var cfg=CFG, cuerpo='';
+  if(CFG_TAB==='modulos'){
+    cuerpo='<div class="cfg-sec">Qué se usa en esta campaña</div>'
+      +'<div class="import-hint" style="margin-bottom:8px">Lo que apagues desaparece para todos: ni vos ni los jugadores lo ven.</div>'
+      +cfgSwitch('Objetos e inventario','cfg-mobj',cfg.modulo_objetos,
+                 'Catálogo, inventario, guardados y capacidad de carga')
+      +cfgSwitch('Tracker de altas tormentas','cfg-mstorm',cfg.modulo_tormentas,
+                 'La barra del ciclo y la descarga de marcos por día');
+  }else if(CFG_TAB==='ver'){
+    cuerpo='<div class="cfg-sec">Qué ven los jugadores de los enemigos</div>'
+      +cfgVer('Vida','cfg-ve-vida',cfg.ver_vida_enemigos)
+      +cfgVer('Focus','cfg-ve-focus',cfg.ver_focus_enemigos)
+      +cfgVer('Investidura','cfg-ve-inv',cfg.ver_inv_enemigos)
+      +cfgSwitch('Estados y condiciones','cfg-ve-est',cfg.ver_estados_enemigos)
+      +'<div class="cfg-sec">Qué ven de los otros jugadores</div>'
+      +cfgVer('Vida','cfg-va-vida',cfg.ver_vida_aliados)
+      +cfgVer('Focus','cfg-va-focus',cfg.ver_focus_aliados)
+      +cfgVer('Investidura','cfg-va-inv',cfg.ver_inv_aliados)
+      +cfgSwitch('Estados y condiciones','cfg-va-est',cfg.ver_estados_aliados)
+      +'<div class="import-hint" style="margin-top:10px">'
+        +'<b>Solo el color</b>: la barra queda llena y cambia de color con una etiqueta '
+        +'(<i>Malherido</i>). <b>Barra que se vacía</b>: además se acorta a medida que baja.<br>'
+        +'Su propio personaje y sus mascotas siempre los ven con los números exactos. '
+        +'Lo que acá no se ve <b>ni se les manda</b>: no hay forma de espiarlo.</div>';
+  }else{
+    var moments=(cfg.moments||[]).map(function(m){return '<option value="'+esc(m)+'"'+(m===cfg.storm_moment?' selected':'')+'>'+esc(m)+'</option>';}).join('');
+    var dp='oninput="renderDischargePreview()"';
+    cuerpo='<div class="cfg-sec">Ciclo de tormentas</div>'
+      +cfgRow('Mínimo de días entre tormentas','cfg-smin',cfg.storm_min)
+      +cfgRow('Máximo de días entre tormentas','cfg-smax',cfg.storm_max)
+      +'<div class="cfg-sec">Descarga de marcos</div>'
+      +cfgRow('Día en que empiezan a apagarse','cfg-dstart',cfg.discharge_start,'','min="1" '+dp)
+      +cfgRow('Día en que se apagan del todo','cfg-dfull',cfg.discharge_full,'','min="2" '+dp)
+      +cfgRow('Curva de descarga','cfg-dcurve',cfg.discharge_curve,'1 = pareja · más alto arranca más lento','step="0.5" min="0.5" '+dp)
+      +'<div class="dchart-lbl">Marcos con luz por día (promedio) — pasá el mouse por cada barra</div>'
+      +'<div class="dchart" id="dchart"></div>'
+      +'<div class="cfg-sec">Estado actual de la tormenta</div>'
+      +cfgRow('Día actual del ciclo','cfg-sday',cfg.storm_day)
+      +cfgRow('Cae el día','cfg-starget',cfg.storm_target)
+      +'<label class="cfg-lrow"><span>Momento</span><select class="fi" id="cfg-smoment" style="min-width:150px">'+moments+'</select></label>';
+  }
+  var tabs=[['modulos','Módulos'],['ver','Qué ven los jugadores'],['tormentas','Tormentas y marcos']];
   document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
     +'<div class="cname" style="font-size:18px">⚙ Ajustes de la campaña</div>'
-    +'<div style="font-size:12px;color:var(--text3);font-style:italic;margin:4px 0 12px">Jugá con los parámetros del ciclo de tormentas y la descarga de marcos.</div>'
-    +'<div class="cfg-sec">Ciclo de tormentas</div>'
-    +cfgRow('Mínimo de días entre tormentas','cfg-smin',cfg.storm_min)
-    +cfgRow('Máximo de días entre tormentas','cfg-smax',cfg.storm_max)
-    +'<div class="cfg-sec">Descarga de marcos</div>'
-    +cfgRow('Día en que empiezan a apagarse','cfg-dstart',cfg.discharge_start,'','min="1" '+dp)
-    +cfgRow('Día en que se apagan del todo','cfg-dfull',cfg.discharge_full,'','min="2" '+dp)
-    +cfgRow('Curva de descarga','cfg-dcurve',cfg.discharge_curve,'1 = pareja · más alto arranca más lento','step="0.5" min="0.5" '+dp)
-    +'<div class="dchart-lbl">Marcos con luz por día (promedio) — pasá el mouse por cada barra</div>'
-    +'<div class="dchart" id="dchart"></div>'
-    +'<div class="cfg-sec">Estado actual de la tormenta</div>'
-    +cfgRow('Día actual del ciclo','cfg-sday',cfg.storm_day)
-    +cfgRow('Cae el día','cfg-starget',cfg.storm_target)
-    +'<label class="cfg-lrow"><span>Momento</span><select class="fi" id="cfg-smoment" style="min-width:150px">'+moments+'</select></label>'
-    +'<div class="form-actions" style="margin-top:16px"><button class="btn ghost" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="saveConfig()">Guardar</button></div>';
-  document.getElementById('overlay').classList.add('on');
-  renderDischargePreview();
+    +'<div class="cfg-tabs">'+tabs.map(function(t){
+        return '<button class="cfg-tab'+(t[0]===CFG_TAB?' on':'')+'" onclick="setCfgTab(\''+t[0]+'\')">'+t[1]+'</button>';
+      }).join('')+'</div>'
+    +cuerpo
+    +'<div class="form-actions" style="margin-top:16px"><button class="btn ghost" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn accent" onclick="saveConfig()">Guardar</button></div>';
+  if(CFG_TAB==='tormentas') renderDischargePreview();
 }
 // Mini gráfica del % de marcos que queda con luz cada día (valor esperado),
 // con la misma fórmula que el backend: p(día) = (base) ** curva.
@@ -930,16 +1043,25 @@ function renderDischargePreview(){
   el.innerHTML=bars;
 }
 async function saveConfig(){
-  var v=function(id){var n=parseInt(document.getElementById(id).value);return isNaN(n)?null:n;};
-  var vf=function(id){var n=parseFloat(document.getElementById(id).value);return isNaN(n)?null:n;};
-  await api(API+'/config','PUT',{
-    storm_min:v('cfg-smin'), storm_max:v('cfg-smax'),
-    discharge_start:v('cfg-dstart'), discharge_full:v('cfg-dfull'), discharge_curve:vf('cfg-dcurve'),
-    storm_day:v('cfg-sday'), storm_target:v('cfg-starget'),
-    storm_moment:document.getElementById('cfg-smoment').value
-  });
+  harvestConfig();
+  var body={};
+  CFG_CAMPOS.forEach(function(f){ if(CFG[f[1]]!==undefined) body[f[1]]=CFG[f[1]]; });
+  await api(API+'/config','PUT',body);
   closeModal();
+  aplicarModulos(CFG);
   loadStorm();
+}
+// Los módulos apagados desaparecen del panel del DM al toque.
+function aplicarModulos(cfg){
+  var objetos=(SYSTEM!=='dnd')&&cfg.modulo_objetos!==false;
+  document.querySelectorAll('.cosmere-only').forEach(function(el){
+    el.style.display=objetos?'':'none';
+  });
+  var storm=document.getElementById('stormBar');
+  if(storm) storm.style.display=(SYSTEM!=='dnd'&&cfg.modulo_tormentas!==false)?'':'none';
+  // si estabas parado en una pestaña que se apagó, volvés al combate
+  if(!objetos&&(document.getElementById('tab-objetos').style.display!=='none'
+              ||document.getElementById('tab-comercio').style.display!=='none')) showTab('combate');
 }
 async function invitePlayer(){
   var u=document.getElementById('inviteUser').value.trim();
@@ -2051,35 +2173,64 @@ function toggleSection(gridId,toggleId){
 }
 
 // ═══════════ OBJETOS (catálogo) ═══════════
-var items=[], itemCats=[];
+var items=[];
 async function loadItems(){
   items=await api(API+'/items');
-  try{ itemCats=await api(API+'/items/categories'); }catch(e){ itemCats=[]; }
-  renderItemFilters();
-  renderItemsGrid();
+  renderItemsGrid();     // las solapas y las categorías salen del propio catálogo
 }
-function renderItemFilters(){
-  var opts='<option value="">Todas</option>'+itemCats.map(function(c){
-    return '<option value="'+esc(c)+'">'+esc(c)+'</option>';}).join('');
-  var kopts='<option value="">Todos</option>'+Object.keys(KIND_LABEL).map(function(k){
-    return '<option value="'+k+'">'+KIND_LABEL[k]+'</option>';}).join('');
-  document.getElementById('itBar').innerHTML=
-    '<div class="filter-f filter-q"><span class="fl">Buscar</span>'
-      +'<input class="fi" type="search" id="itQ" placeholder="nombre, descripción…" oninput="renderItemsGrid()"/></div>'
-    +'<div class="filter-f"><span class="fl">Tipo</span><select class="fi" id="itKindF" onchange="renderItemsGrid()">'+kopts+'</select></div>'
-    +'<div class="filter-f"><span class="fl">Categoría</span><select class="fi" id="itCat" onchange="renderItemsGrid()">'+opts+'</select></div>'
-    +'<button class="btn ghost sm filter-clear" onclick="clearItemFilters()">Limpiar</button>';
-}
+var KIND_LABEL={arma:'Arma',armadura:'Armadura',equipo:'Equipo',
+  alojamiento:'Alojamiento',vehiculo:'Vehículo',fabrial:'Fabrial'};
+var WC_LABEL={light:'Ligera',heavy:'Pesada',special:'Especial'};
+
+// El catálogo del DM se lee igual que el de los jugadores: solapas por tipo y
+// una tabla por tipo, como en el manual. Lo único distinto es la última columna,
+// que en vez de "Agarrar" trae ocultar / editar / borrar.
+var KIND_TABS=[{k:'arma',n:'⚔ Armas'},{k:'armadura',n:'🛡 Armaduras'},
+               {k:'equipo',n:'🎒 Equipo'},{k:'alojamiento',n:'🛏 Alojamiento'},
+               {k:'vehiculo',n:'🐂 Vehículos'},{k:'fabrial',n:'💎 Fabriales'}];
+var WCLASS=[{k:'light',n:'Ligeras'},{k:'heavy',n:'Pesadas'},{k:'special',n:'Especiales'}];
+var IT_KIND='arma', IT_CATEGORIA='';
+function setItKind(k){ IT_KIND=k; IT_CATEGORIA=''; renderItemsGrid(); }
+function setItCategoria(c){ IT_CATEGORIA=(c===IT_CATEGORIA)?'':c; renderItemsGrid(); }
 function clearItemFilters(){
-  ['itQ','itKindF','itCat'].forEach(function(id){
+  IT_CATEGORIA='';
+  ['itQ','itMin','itMax'].forEach(function(id){
     var el=document.getElementById(id); if(el)el.value='';});
   renderItemsGrid();
 }
+function renderKindBar(){
+  var hay={};
+  items.forEach(function(i){ hay[i.kind||'equipo']=(hay[i.kind||'equipo']||0)+1; });
+  var tabs=KIND_TABS.filter(function(t){return hay[t.k];});
+  var bar=document.getElementById('itKinds');
+  if(!tabs.length){ bar.innerHTML=''; return; }
+  if(!hay[IT_KIND]) IT_KIND=tabs[0].k;
+  bar.innerHTML=tabs.map(function(t){
+    return '<button class="kind-btn'+(t.k===IT_KIND?' on':'')+'" onclick="setItKind(\''+t.k+'\')">'
+      +t.n+' <span style="opacity:.6">'+hay[t.k]+'</span></button>';
+  }).join('');
+}
+function renderCatBar(){
+  var bar=document.getElementById('itCats'), cuenta={};
+  items.filter(function(i){return (i.kind||'equipo')===IT_KIND;}).forEach(function(i){
+    (i.categorias||[]).forEach(function(c){ cuenta[c]=(cuenta[c]||0)+1; });
+  });
+  var cats=Object.keys(cuenta).sort();
+  if(cats.length<2){ bar.innerHTML=''; IT_CATEGORIA=''; return; }
+  if(IT_CATEGORIA&&!cuenta[IT_CATEGORIA]) IT_CATEGORIA='';
+  bar.innerHTML='<button class="kind-btn'+(IT_CATEGORIA?'':' on')+'" onclick="setItCategoria(\'\')">Todas</button>'
+    +cats.map(function(c){
+      return '<button class="kind-btn'+(c===IT_CATEGORIA?' on':'')+'" onclick="setItCategoria(\''+c+'\')">'
+        +esc(c)+' <span style="opacity:.6">'+cuenta[c]+'</span></button>';
+    }).join('');
+}
+function _itNum(id){ var v=parseInt(document.getElementById(id).value); return isNaN(v)?null:v; }
 function itemPasses(it){
-  var k=document.getElementById('itKindF');
-  if(k&&k.value&&it.kind!==k.value)return false;
-  var c=document.getElementById('itCat');
-  if(c&&c.value&&(it.categorias||[]).indexOf(c.value)<0)return false;
+  if((it.kind||'equipo')!==IT_KIND)return false;
+  if(IT_CATEGORIA&&(it.categorias||[]).indexOf(IT_CATEGORIA)<0)return false;
+  var min=_itNum('itMin'), max=_itNum('itMax');
+  if(min!=null&&(it.precio||0)<min)return false;
+  if(max!=null&&(it.precio||0)>max)return false;
   var q=document.getElementById('itQ');
   if(q&&q.value.trim()){
     var hay=[it.name,it.descripcion,(it.categorias||[]).join(' ')].filter(Boolean).join(' ').toLowerCase();
@@ -2088,66 +2239,100 @@ function itemPasses(it){
   }
   return true;
 }
-var KIND_LABEL={arma:'Arma',armadura:'Armadura',equipo:'Equipo',
-  alojamiento:'Alojamiento',vehiculo:'Vehículo',fabrial:'Fabrial'};
-var WC_LABEL={light:'Ligera',heavy:'Pesada',special:'Especial'};
-// Ficha corta según el tipo: un arma no se lista como una posada.
-function itemStatsHTML(it){
-  var s=it.stats||{}, L=[];
-  if(it.kind==='arma'){
-    if(s.damage)L.push('<b>'+esc(s.damage)+'</b>');
-    if(s.range)L.push(esc(s.range));
-    if(s.skill)L.push('<span style="color:var(--text3)">'+esc(s.skill)+'</span>');
-    var t=(s.traits||[]).map(function(x){return '<span class="meta-badge">'+esc(x)+'</span>';}).join('');
-    var e=(s.expert_traits||[]).map(function(x){
-      return '<span class="meta-badge" style="border-color:var(--gold2);color:var(--gold2)" title="Rasgo de experto">'+esc(x)+'</span>';}).join('');
-    return '<div class="cstats">'+L.join(' · ')+'</div>'+((t||e)?'<div class="meta-badges">'+t+e+'</div>':'');
-  }
-  if(it.kind==='armadura'){
-    var t2=(s.traits||[]).map(function(x){return '<span class="meta-badge">'+esc(x)+'</span>';}).join('');
-    var e2=(s.expert_traits||[]).map(function(x){
-      return '<span class="meta-badge" style="border-color:var(--gold2);color:var(--gold2)">'+esc(x)+'</span>';}).join('');
-    return '<div class="cstats">Deflect <b>'+(s.deflect||0)+'</b></div>'
-      +((t2||e2)?'<div class="meta-badges">'+t2+e2+'</div>':'');
-  }
-  if(it.kind==='alojamiento')
-    return '<div class="cstats">💠 '+(s.per_night||0)+' por persona por noche</div>';
-  if(it.kind==='vehiculo')
-    return '<div class="cstats">'+[s.vehicle_type,s.speed,(s.rental?'alquiler 💠'+s.rental+'/día':'')]
-      .filter(Boolean).map(esc).join(' · ')+'</div>';
-  if(it.kind==='fabrial')
-    return '<div class="cstats">'+(s.charges||0)+' carga(s)</div>';
-  return '';
-}
-function itemCard(it){
-  var cats=(it.categorias||[]).map(function(c){
-    return '<span class="meta-badge">'+esc(c)+'</span>';}).join('');
-  var wc=(it.kind==='arma'&&it.stats&&it.stats.weapon_class)?' '+(WC_LABEL[it.stats.weapon_class]||''):'';
+function _tr(cells,cls){ return '<tr'+(cls?' class="'+cls+'"':'')+'>'+cells.join('')+'</tr>'; }
+function _td(v,cls){ return '<td'+(cls?' class="'+cls+'"':'')+'>'+(v==null||v===''?'—':v)+'</td>'; }
+function _itNombre(it){
   var extra=[];
-  if(it.usos_max)extra.push(it.usos_max+' usos');
-  if(it.contenedor_capacidad)extra.push('guarda '+it.contenedor_capacidad);
-  if(it.capacity_bonus)extra.push('+'+it.capacity_bonus+' capacidad');
-  if(it.peso)extra.push(esc(it.peso));
-  return '<div class="card">'
-    +'<div class="card-head"><span class="cname">'+esc(it.name)
-      +(it.secreto?' <span class="pet-badge" title="No aparece en el catálogo de los jugadores">🔒 oculto</span>':'')+'</span>'
-    +'<div><button class="pet-btn'+(it.secreto?' on':'')+'" onclick="toggleItemSecret('+it.id+')" title="'+(it.secreto?'Mostrar a los jugadores':'Ocultar del catálogo de los jugadores')+'">🔒</button> '
+  if(it.usos_max)extra.push('<span style="color:#e8c840;font-size:11px">'+it.usos_max+' usos</span>');
+  if(it.contenedor_capacidad)extra.push('<span style="color:#6aaae8;font-size:11px">guarda '+it.contenedor_capacidad+'</span>');
+  if(it.capacity_bonus)extra.push('<span style="color:#7ac88c;font-size:11px">+'+it.capacity_bonus+' cap</span>');
+  return '<td><span class="n">'+esc(it.name)+'</span>'
+    +(it.secreto?' <span class="pet-badge" title="No aparece en el catálogo de los jugadores">🔒 oculto</span>':'')
+    +(extra.length?' '+extra.join(' '):'')
+    +(it.descripcion?'<div class="d">'+esc(it.descripcion)+'</div>':'')+'</td>';
+}
+function _itRasgos(s){
+  var t=(s.traits||[]).map(esc).join(', ');
+  var e=(s.expert_traits||[]).map(esc).join(', ');
+  return [t, e?'<span style="color:var(--text3)">Experto: '+e+'</span>':''].filter(Boolean).join('<br>');
+}
+function _itAcciones(it){
+  return '<td class="act">'
+    +'<button class="pet-btn'+(it.secreto?' on':'')+'" onclick="toggleItemSecret('+it.id+')" title="'
+      +(it.secreto?'Mostrar a los jugadores':'Ocultar del catálogo de los jugadores')+'">🔒</button> '
     +'<button class="edit-btn" onclick="openItemEditor('+it.id+')">editar</button> '
-    +'<button class="del-btn" onclick="delItem('+it.id+')">✕</button></div></div>'
-    +'<div class="ctype">'+esc((KIND_LABEL[it.kind]||it.kind)+wc)+'</div>'
-    +itemStatsHTML(it)
-    +(cats?'<div class="meta-badges">'+cats+'</div>':'')
-    +'<div class="cstats">💠 '+it.precio+' · '+it.slots+' slot'+(it.slots===1?'':'s')
-      +(extra.length?' · '+extra.join(' · '):'')+'</div>'
-    +(it.descripcion?'<div class="cstats" style="font-style:italic;margin-top:4px">'+esc(it.descripcion)+'</div>':'')
-    +'</div>';
+    +'<button class="del-btn" onclick="delItem('+it.id+')">✕</button></td>';
+}
+function _itPrecio(it){ return '<td class="num">💠 '+(it.precio||0)+'</td>'; }
+function itemTabla(list){
+  var k=IT_KIND, cab, filas;
+  if(k==='arma'){
+    cab=['Arma','Daño','Alcance','Rasgos','Slots','Peso','Precio',''];
+    filas=function(it){ var s=it.stats||{};
+      return _tr([_itNombre(it),_td(esc(s.damage||'')),_td(esc(s.range||'')),_td(_itRasgos(s)),
+                  _td(it.slots,'num'),_td(esc(it.peso||'')),_itPrecio(it),_itAcciones(it)],
+                 it.secreto?'oculto':''); };
+  }else if(k==='armadura'){
+    cab=['Armadura','Deflect','Rasgos','Slots','Peso','Precio',''];
+    filas=function(it){ var s=it.stats||{};
+      return _tr([_itNombre(it),_td(s.deflect||0,'num'),_td(_itRasgos(s)),
+                  _td(it.slots,'num'),_td(esc(it.peso||'')),_itPrecio(it),_itAcciones(it)],
+                 it.secreto?'oculto':''); };
+  }else if(k==='alojamiento'){
+    cab=['Alojamiento','Por persona y noche',''];
+    filas=function(it){ var s=it.stats||{};
+      return _tr([_itNombre(it),_td('💠 '+(s.per_night||it.precio||0),'num'),_itAcciones(it)],
+                 it.secreto?'oculto':''); };
+  }else if(k==='vehiculo'){
+    cab=['Vehículo','Tipo','Velocidad','Alquiler / día','Precio',''];
+    filas=function(it){ var s=it.stats||{};
+      return _tr([_itNombre(it),_td(esc(s.vehicle_type||'')),_td(esc(s.speed||'')),
+                  _td(s.rental?'💠 '+s.rental:'','num'),_itPrecio(it),_itAcciones(it)],
+                 it.secreto?'oculto':''); };
+  }else if(k==='fabrial'){
+    cab=['Fabrial','Cargas','Slots','Peso','Precio',''];
+    filas=function(it){ var s=it.stats||{};
+      return _tr([_itNombre(it),_td(s.charges||it.usos_max||'','num'),
+                  _td(it.slots,'num'),_td(esc(it.peso||'')),_itPrecio(it),_itAcciones(it)],
+                 it.secreto?'oculto':''); };
+  }else{
+    cab=['Objeto','Categorías','Slots','Peso','Precio',''];
+    filas=function(it){
+      return _tr([_itNombre(it),
+                  _td((it.categorias||[]).map(function(c){return '<span class="meta-badge">'+esc(c)+'</span>';}).join(' ')),
+                  _td(it.slots,'num'),_td(esc(it.peso||'')),_itPrecio(it),_itAcciones(it)],
+                 it.secreto?'oculto':''); };
+  }
+  return '<div class="cat-scroll"><table class="cat-tbl"><thead>'
+    +_tr(cab.map(function(c){return '<th>'+c+'</th>';}))+'</thead><tbody>'
+    +list.map(filas).join('')+'</tbody></table></div>';
 }
 function renderItemsGrid(){
+  renderKindBar(); renderCatBar();
   var g=document.getElementById('itemsGrid');
   document.getElementById('itemsEmpty').style.display=items.length?'none':'block';
   var list=items.filter(itemPasses);
-  if(items.length&&!list.length){g.innerHTML='<div class="empty">Ningún objeto coincide.</div>';return;}
-  g.innerHTML=list.map(itemCard).join('');
+  if(!list.length){ g.innerHTML=items.length?'<div class="empty">Ningún objeto coincide.</div>':''; return; }
+  var html='';
+  if(IT_KIND==='arma'){
+    WCLASS.forEach(function(w){
+      var sub=list.filter(function(i){return ((i.stats||{}).weapon_class||'light')===w.k;});
+      if(sub.length) html+='<div class="sec-lbl">'+w.n+'</div>'+itemTabla(sub);
+    });
+  }else if(IT_KIND==='equipo'&&!IT_CATEGORIA){
+    // el equipo va agrupado por categoría; lo que tiene varias sale en cada una
+    var grupos={}, sueltos=[];
+    list.forEach(function(i){
+      var cats=i.categorias||[];
+      if(!cats.length){ sueltos.push(i); return; }
+      cats.forEach(function(c){ (grupos[c]=grupos[c]||[]).push(i); });
+    });
+    Object.keys(grupos).sort().forEach(function(c){
+      html+='<div class="sec-lbl">'+esc(c)+'</div>'+itemTabla(grupos[c]);
+    });
+    if(sueltos.length) html+='<div class="sec-lbl">Sin categoría</div>'+itemTabla(sueltos);
+  }
+  g.innerHTML=html||itemTabla(list);
 }
 async function toggleItemSecret(id){ await api(API+'/items/'+id+'/secret','POST'); loadItems(); }
 async function delItem(id){

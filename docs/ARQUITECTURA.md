@@ -63,6 +63,10 @@ routers/*.py        ← endpoints por dominio (validan, orquestan)
 - **`app/access.py`**: `require_dm(conn, cid, user)` y `require_access(conn, cid, user)`
   (DM o miembro aceptado). Todos los routers de campaña los reusan para autorizar.
 - **`app/models.py`**: modelos Pydantic de los cuerpos de request (validación de entrada).
+- **`app/config.py`**: los ajustes de una campaña (`campaigns.config`, un JSON): qué
+  módulos están encendidos y cuánto ven los jugadores de cada stat ajeno. Vive aparte del
+  router de campañas porque lo consultan varios: el combate, los objetos y las tormentas.
+  Todo tiene default, así que una campaña que nunca tocó los ajustes anda igual que antes.
 - **Parsers**:
   - `app/pdf_import.py` — lee la ficha PDF de Cosmere (AcroForm `char_*`) y extrae el
     retrato.
@@ -70,11 +74,13 @@ routers/*.py        ← endpoints por dominio (validan, orquestan)
   - `app/cosmere_import.py` / `app/dnd_import.py` — parsean statblocks (YAML) del
     bestiario y los exportan de vuelta a YAML.
 - **`app/state.py`**: `combats` es un `CampaignCombats` con una **cache en memoria** del
-  combate por campaña, respaldada en la tabla `combats`. `player_view()` recorta lo que
-  ve un jugador (sin enemigos ocultos, sin nada si el combate está en preparación).
-- **`app/ws.py`**: `Hub` mantiene las salas (`cid -> [(ws, is_dm)]`). `push_state(cid)`
-  guarda el combate y lo difunde: al DM le manda el estado completo y a cada jugador su
-  `player_view`.
+  combate por campaña, respaldada en la tabla `combats`. `player_view(combat, cfg, user_id)`
+  arma lo que ve **un** jugador: sin enemigos ocultos, sin nada si el combate está en
+  preparación, y con los stats de los demás recortados según los ajustes (`mask_stats`).
+  Lo propio nunca se recorta.
+- **`app/ws.py`**: `Hub` mantiene las salas (`cid -> [(ws, is_dm, user_id)]`).
+  `push_state(cid)` guarda el combate y lo difunde: al DM el estado completo, y a cada
+  jugador su propia vista (se arma una por usuario y se reusa si tiene varias pestañas).
 
 ### Routers (`app/routers/`)
 
@@ -213,7 +219,7 @@ erDiagram
 | `name` | TEXT | |
 | `dm_id` | INTEGER FK→users | dueño/DM |
 | `system` | TEXT | `cosmere` \| `dnd` |
-| `config` | TEXT (JSON) | parámetros: rango de tormenta, curva de descarga de marcos |
+| `config` | TEXT (JSON) | ajustes de la campaña: módulos encendidos, qué ven los jugadores, rango de tormenta y curva de descarga (ver `app/config.py`) |
 | `day_count` | INTEGER | días **absolutos** transcurridos (`storm_tracker.day` se reinicia con cada tormenta) |
 | `created_at` | TEXT | |
 
@@ -362,9 +368,13 @@ ella**: la mochila se guarda llena.
   (rápido, mutable) y se persiste en la tabla `combats` en cada `push_state`. Si se
   reinicia el server a mitad de combate, se restaura. Asume **un solo worker** de uvicorn
   (la cache es un dict en proceso).
-- **Vista por rol**: el DM ve todo; el jugador ve `player_view` (sin enemigos ocultos, y
-  nada mientras el combate está en preparación). Se aplica tanto en el WebSocket como en
-  `GET /combat`.
+- **Vista por rol y por persona**: el DM ve todo; cada jugador ve su `player_view` (sin
+  enemigos ocultos, nada mientras el combate está en preparación, y los stats de los demás
+  recortados según los ajustes). Se aplica en el WebSocket, en `GET /combat` y en el
+  roster. **Se filtra en el servidor, no en el HTML**: en modo abstracto solo viaja un
+  porcentaje redondeado de a 5, así que el número exacto no se puede deducir mirando la
+  red. Cuesta armar una vista por usuario en cada broadcast, pero las salas son de pocas
+  personas y se cachea por `user_id` dentro del envío.
 - **Modo fijo por sesión**: el rol `dm`/`player` se elige al entrar y no se cambia sin
   volver a loguear; el router `frontend` redirige si intentás entrar al panel del otro
   rol.

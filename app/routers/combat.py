@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..access import campaign_or_404, require_access, require_dm
 from ..auth import current_user
+from ..config import get_config
 from ..database import db
 from ..models import (AddEnemyIn, ColorChange, InitiativeIn, StatChange,
                       StatusToggle, TurnChange, VidaMaxIn)
@@ -287,8 +288,9 @@ async def add_enemy(cid: int, payload: AddEnemyIn, user=Depends(current_user)):
 def get_combat(cid: int, user=Depends(current_user)):
     with db() as conn:
         _, is_dm = require_access(conn, cid, user)
+        cfg = None if is_dm else get_config(conn, cid)
     combat = combats.get(cid)
-    return combat if is_dm else player_view(combat)
+    return combat if is_dm else player_view(combat, cfg, user["id"])
 
 
 @router.post("/stat")

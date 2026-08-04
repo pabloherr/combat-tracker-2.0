@@ -60,6 +60,18 @@ class ConfigIn(BaseModel):
     storm_day: int | None = None        # estado actual: día del ciclo
     storm_target: int | None = None     # estado actual: día en que cae la tormenta
     storm_moment: str | None = None     # estado actual: momento del día
+    # Módulos que se pueden apagar en la campaña
+    modulo_objetos: bool | None = None      # catálogo, inventario y guardados
+    modulo_tormentas: bool | None = None    # tracker de altas tormentas
+    # Qué ven los jugadores de los demás en combate: no | abstracto | exacto
+    ver_vida_enemigos: str | None = None
+    ver_focus_enemigos: str | None = None
+    ver_inv_enemigos: str | None = None
+    ver_estados_enemigos: bool | None = None
+    ver_vida_aliados: str | None = None
+    ver_focus_aliados: str | None = None
+    ver_inv_aliados: str | None = None
+    ver_estados_aliados: bool | None = None
 
 
 # ── Personajes ─────────────────────────────────────────────

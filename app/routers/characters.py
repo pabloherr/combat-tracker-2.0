@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from ..auth import current_user
+from ..config import get_config
 from ..database import db
 from ..dnd_pdf import parse_dnd_pdf
 from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
@@ -775,6 +776,12 @@ def _pet_capacity(conn, pet, rows) -> dict:
     return carrying_capacity(stats.get("size"), fuerza, rows)
 
 
+def _require_objetos(conn, ch):
+    """El DM puede apagar los objetos y el inventario en su campaña."""
+    if ch["campaign_id"] and not get_config(conn, ch["campaign_id"])["modulo_objetos"]:
+        raise HTTPException(400, "El DM apagó los objetos en esta campaña")
+
+
 def _can_create_items(conn, ch, user) -> bool:
     """Permiso que el DM le da a un jugador para crear objetos propios."""
     m = conn.execute(
@@ -961,13 +968,16 @@ def character_inventory(conn, ch) -> dict:
 def get_inventory(cid: int, user=Depends(current_user)):
     """Inventario del personaje y de cada mascota, con su capacidad de carga."""
     with db() as conn:
-        return character_inventory(conn, _owned_or_dm(conn, cid, user))
+        ch = _owned_or_dm(conn, cid, user)
+        _require_objetos(conn, ch)
+        return character_inventory(conn, ch)
 
 
 @router.post("/{cid}/inventory")
 def add_inventory(cid: int, payload: InventoryIn, user=Depends(current_user)):
     with db() as conn:
         ch = _owned_or_dm(conn, cid, user)
+        _require_objetos(conn, ch)
         is_dm = ch["dm_id"] == user["id"]
         _add_inventory(conn, payload, character_id=cid, campaign_id=ch["campaign_id"],
                        owner_id=ch["dm_id"], is_dm=is_dm,
@@ -979,6 +989,7 @@ def add_inventory(cid: int, payload: InventoryIn, user=Depends(current_user)):
 def add_pet_inventory(cid: int, pid: int, payload: InventoryIn, user=Depends(current_user)):
     with db() as conn:
         ch = _owned_or_dm(conn, cid, user)
+        _require_objetos(conn, ch)
         pet = conn.execute("SELECT * FROM pets WHERE id=? AND character_id=?",
                            (pid, cid)).fetchone()
         if not pet:
@@ -999,6 +1010,7 @@ def take_from_catalog(cid: int, t: TakeIn, user=Depends(current_user)):
     lo elige él."""
     with db() as conn:
         ch = _owned_or_dm(conn, cid, user)
+        _require_objetos(conn, ch)
         is_dm = ch["dm_id"] == user["id"]
         it = conn.execute("SELECT * FROM items WHERE id=? AND owner_id=?",
                           (t.item_id, ch["dm_id"])).fetchone()

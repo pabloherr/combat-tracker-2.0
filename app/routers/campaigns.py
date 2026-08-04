@@ -8,8 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..access import campaign_or_404, require_access, require_dm
 from ..auth import current_user
+from ..config import (CONFIG_DEFAULTS, VER_MODOS, coerce, get_config,
+                      player_config, sane, save_config)
 from ..database import db
 from ..models import CampaignIn, ConfigIn, InviteIn, LongRestIn, MarcosChange
+from ..state import mask_stats
 
 router = APIRouter(prefix="/api", tags=["campaigns"])
 
@@ -17,35 +20,13 @@ router = APIRouter(prefix="/api", tags=["campaigns"])
 STORM_MOMENTS = ["al amanecer", "por la mañana", "al mediodía",
                  "por la tarde", "al anochecer", "de madrugada"]
 
-# Parámetros por defecto, ajustables por el DM (se guardan en campaigns.config).
-CONFIG_DEFAULTS = {
-    "storm_min": 8,          # mínimo de días entre tormentas
-    "storm_max": 12,         # máximo de días entre tormentas
-    "discharge_start": 5,    # día desde el que los marcos empiezan a apagarse
-    "discharge_full": 15,    # día en que ya no queda luz
-    "discharge_curve": 2.0,  # exponente: 1 = pareja; más alto = arranca más lento
-}
-_CONFIG_INT_KEYS = {"storm_min", "storm_max", "discharge_start", "discharge_full"}
+# Los parámetros ajustables viven en app/config.py (los consultan varios routers).
+_get_config = get_config
 
 
-def _get_config(conn, cid: int) -> dict:
-    row = conn.execute("SELECT config FROM campaigns WHERE id=?", (cid,)).fetchone()
-    cfg = dict(CONFIG_DEFAULTS)
-    if row and row["config"]:
-        try:
-            saved = json.loads(row["config"])
-            for k, v in saved.items():
-                if k in CONFIG_DEFAULTS:
-                    cfg[k] = int(v) if k in _CONFIG_INT_KEYS else float(v)
-        except (ValueError, TypeError):
-            pass
-    # saneo básico para no romper la lógica
-    cfg["storm_min"] = max(1, cfg["storm_min"])
-    cfg["storm_max"] = max(cfg["storm_min"], cfg["storm_max"])
-    cfg["discharge_start"] = max(1, cfg["discharge_start"])
-    cfg["discharge_full"] = max(cfg["discharge_start"] + 1, cfg["discharge_full"])
-    cfg["discharge_curve"] = max(0.1, min(8.0, cfg["discharge_curve"]))
-    return cfg
+def _actual(valor, maximo):
+    """NULL en la columna significa 'está al máximo' (nunca se le tocó el stat)."""
+    return maximo if valor is None else valor
 
 
 def _new_target(cfg: dict) -> int:
@@ -380,7 +361,8 @@ def campaign_roster(cid: int, user=Depends(current_user)):
     """Estado en vivo de los personajes de la campaña (para gestionar fuera de
     combate y ver a los demás). Accesible al DM y a cualquier miembro aceptado."""
     with db() as conn:
-        c, _ = require_access(conn, cid, user)
+        c, is_dm = require_access(conn, cid, user)
+        cfg = _get_config(conn, cid)
         rows = conn.execute(
             "SELECT m.user_id, m.can_create_items, u.username, ch.* FROM campaign_members m "
             "JOIN users u ON u.id=m.user_id "
@@ -393,34 +375,44 @@ def campaign_roster(cid: int, user=Depends(current_user)):
         for r in rows:
             pets = [
                 {"id": p["id"], "name": p["name"],
-                 "vida": p["vida"], "vida_max": p["vida_max"],
-                 "focus": p["focus"], "focus_max": p["focus_max"],
-                 "inv": p["inv"], "inv_max": p["inv_max"],
+                 "vida": _actual(p["vida"], p["vida_max"]), "vida_max": p["vida_max"],
+                 "focus": _actual(p["focus"], p["focus_max"]), "focus_max": p["focus_max"],
+                 "inv": _actual(p["inv"], p["inv_max"]), "inv_max": p["inv_max"],
                  "statuses": json.loads(p["statuses"] or "[]"),
                  "stats": json.loads(p["stats"] or "{}"),
                  "acciones": json.loads(p["acciones"] or "[]")}
                 for p in conn.execute("SELECT * FROM pets WHERE character_id=? ORDER BY name", (r["id"],))
             ]
+            # De los demás jugadores se ve lo que el DM habilitó; lo propio y lo
+            # que ve el DM va entero.
+            ajeno = not is_dm and r["user_id"] != user["id"]
+            if ajeno:
+                pets = [mask_stats(p, cfg, "aliados") for p in pets]
+            char = {
+                "id": r["id"], "name": r["name"],
+                # NULL en la columna = está al máximo (nunca se le tocó el stat)
+                "vida": _actual(r["vida"], r["vida_max"]), "vida_max": r["vida_max"],
+                "focus": _actual(r["focus"], r["focus_max"]), "focus_max": r["focus_max"],
+                "inv": _actual(r["inv"], r["inv_max"]), "inv_max": r["inv_max"],
+                "statuses": json.loads(r["statuses"] or "[]"),
+                "injuries": json.loads(r["injuries"] or "[]"),
+                "sheet": json.loads(r["sheet"] or "{}"),
+                "has_pdf": bool(r["has_pdf"]),
+                "has_image": bool(r["has_image"]),
+                "marcos": r["marcos"] or 0,
+                "marcos_light": r["marcos_light"] or 0,
+                "dnd": json.loads(r["dnd_resources"] or "{}"),
+            }
+            if ajeno:
+                char = mask_stats(char, cfg, "aliados")
             members.append({
                 "user_id": r["user_id"], "username": r["username"],
                 "can_create_items": bool(r["can_create_items"]),
-                "character": {
-                    "id": r["id"], "name": r["name"],
-                    "vida": r["vida"], "vida_max": r["vida_max"],
-                    "focus": r["focus"], "focus_max": r["focus_max"],
-                    "inv": r["inv"], "inv_max": r["inv_max"],
-                    "statuses": json.loads(r["statuses"] or "[]"),
-                    "injuries": json.loads(r["injuries"] or "[]"),
-                    "sheet": json.loads(r["sheet"] or "{}"),
-                    "has_pdf": bool(r["has_pdf"]),
-                    "has_image": bool(r["has_image"]),
-                    "marcos": r["marcos"] or 0,
-                    "marcos_light": r["marcos_light"] or 0,
-                    "dnd": json.loads(r["dnd_resources"] or "{}"),
-                },
+                "character": char,
                 "pets": pets,
             })
-        return {"system": c["system"] or "cosmere", "members": members}
+        return {"system": c["system"] or "cosmere", "members": members,
+                "config": player_config(cfg)}
 
 
 @router.post("/campaigns/{cid}/long_rest")
@@ -515,8 +507,11 @@ def short_rest(cid: int, payload: LongRestIn, user=Depends(current_user)):
 
 
 def _storm_view(row, is_dm: bool, cfg: dict) -> dict:
-    """El DM ve el día y momento exactos; los jugadores solo la barra."""
-    base = {"day": row["day"], "min": cfg["storm_min"], "max": cfg["storm_max"]}
+    """El DM ve el día y momento exactos; los jugadores solo la barra.
+
+    `enabled` en false = el DM apagó el tracker: la barra no se dibuja."""
+    base = {"day": row["day"], "min": cfg["storm_min"], "max": cfg["storm_max"],
+            "enabled": cfg["modulo_tormentas"]}
     if is_dm:
         base["target"] = row["target"]
         base["moment"] = row["moment"]
@@ -568,7 +563,8 @@ def get_config(cid: int, user=Depends(current_user)):
         cfg = _get_config(conn, cid)
         row = _get_storm(conn, cid)
         cfg.update({"storm_day": row["day"], "storm_target": row["target"],
-                    "storm_moment": row["moment"], "moments": STORM_MOMENTS})
+                    "storm_moment": row["moment"], "moments": STORM_MOMENTS,
+                    "modos": list(VER_MODOS)})
         return cfg
 
 
@@ -578,17 +574,10 @@ def put_config(cid: int, c: ConfigIn, user=Depends(current_user)):
         require_dm(conn, cid, user)
         cfg = _get_config(conn, cid)
         for k in CONFIG_DEFAULTS:
-            v = getattr(c, k)
+            v = getattr(c, k, None)
             if v is not None:
-                cfg[k] = int(v) if k in _CONFIG_INT_KEYS else float(v)
-        # revalidar coherencia antes de guardar
-        cfg["storm_min"] = max(1, cfg["storm_min"])
-        cfg["storm_max"] = max(cfg["storm_min"], cfg["storm_max"])
-        cfg["discharge_start"] = max(1, cfg["discharge_start"])
-        cfg["discharge_full"] = max(cfg["discharge_start"] + 1, cfg["discharge_full"])
-        cfg["discharge_curve"] = max(0.1, min(8.0, cfg["discharge_curve"]))
-        conn.execute("UPDATE campaigns SET config=? WHERE id=?",
-                     (json.dumps({k: cfg[k] for k in CONFIG_DEFAULTS}), cid))
+                cfg[k] = coerce(k, v)
+        save_config(conn, cid, sane(cfg))
         # estado actual de la tormenta (opcional)
         row = _get_storm(conn, cid)
         day = c.storm_day if c.storm_day is not None else row["day"]

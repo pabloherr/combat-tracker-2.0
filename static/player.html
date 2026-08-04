@@ -48,7 +48,11 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .color-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;}
 .health-text{font-family:'Cinzel',serif;font-size:13px;display:block;margin-bottom:4px;}
 .hbar{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-bottom:6px;}
-.hbar-fill{height:100%;width:100%;border-radius:3px;transition:background .5s;}
+.hbar-fill{height:100%;width:100%;border-radius:3px;transition:background .5s,width .3s;}
+/* stats de una tarjeta de combate: vida, focus e investidura */
+.cstat{margin-bottom:6px;}
+.cstat-head{display:flex;justify-content:space-between;align-items:baseline;font-family:'Cinzel',serif;font-size:11px;margin-bottom:3px;}
+.cstat-l{color:var(--text3);font-size:9px;letter-spacing:.08em;text-transform:uppercase;}
 .stags{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px;}
 .stag{font-size:10px;padding:2px 7px;border-radius:20px;border:.5px solid;font-family:'Cinzel',serif;}
 .empty-msg{text-align:center;color:var(--text3);font-style:italic;padding:2.5rem 0;font-size:14px;}
@@ -291,6 +295,8 @@ var SC={Determined:'#5aaa70',Enhanced:'#6aaae8',Empowered:'#e8c840',Focus:'#aa8a
 var POS=['Determined','Enhanced','Empowered','Focus'];
 var NEG=['Restrained','Surprised','Stunned','Slowed','Disoriented','Prone','Exhausted','Unconscious','Immobilized','Afflicted'];
 var COMBAT=null;
+var CONFIG={};     // ajustes de la campaña que le tocan al jugador (qué módulos hay)
+function OBJETOS(){ return SYSTEM!=='dnd' && CONFIG.modulo_objetos!==false; }
 var MY_UID=null;   // id de mi usuario (para reconocer mi personaje en el combate)
 var CID=parseInt(location.pathname.split('/').filter(Boolean).pop());
 var API='/api/campaigns/'+CID;
@@ -547,6 +553,37 @@ function hl(pct){
   if(pct>0)return{t:'Al borde',c:'#e05050'};
   return{t:'Caído',c:'#804040'};
 }
+// Focus e investidura no tienen "heridas": se leen como un depósito.
+function nivel(pct,col){
+  var t=pct>=100?'Pleno':pct>=75?'Alto':pct>=50?'A medias':pct>=25?'Bajo':pct>0?'Casi vacío':'Vacío';
+  return {t:t,c:pct>0?col:'#6b6255'};
+}
+var STAT_META={
+  vida:{lbl:'Vida',col:'#e05050',nivel:hl},
+  focus:{lbl:'Focus',col:'#6aaae8',nivel:function(p){return nivel(p,'#6aaae8');}},
+  inv:{lbl:'Investidura',col:'#aa8aec',nivel:function(p){return nivel(p,'#aa8aec');}}
+};
+// Porcentaje representativo de cada tramo, para elegir etiqueta y color cuando
+// el backend solo manda el tramo (modo 'color').
+var NIVEL_PCT=[0,10,30,60,80,100];
+// Una barra por stat. Según lo que el DM deje ver de ese grupo, el backend manda
+// los números, un porcentaje (la barra se vacía), un tramo (la barra queda llena
+// y solo cambia de color) o nada.
+function statBar(p,stat){
+  var m=STAT_META[stat];
+  var exacto=(p[stat]!=null&&p[stat+'_max']!=null);
+  var pct, llena=false;
+  if(exacto) pct=(p[stat+'_max']>0?Math.round(p[stat]/p[stat+'_max']*100):0);
+  else if(p[stat+'_pct']!=null) pct=p[stat+'_pct'];
+  else if(p[stat+'_nivel']!=null){ pct=NIVEL_PCT[p[stat+'_nivel']]; llena=true; }
+  if(pct==null) return '';                 // el DM no deja ver este stat
+  var n=m.nivel(pct);
+  return '<div class="cstat">'
+    +'<div class="cstat-head"><span class="cstat-l">'+m.lbl+'</span>'
+      +'<span style="color:'+n.c+'">'+(exacto?p[stat]+' / '+p[stat+'_max']:n.t)+'</span></div>'
+    +'<div class="hbar"><div class="hbar-fill" style="width:'+(llena?100:pct)+'%;background:'+n.c+'"></div></div>'
+    +'</div>';
+}
 
 function mkTags(statuses){
   var c={};(statuses||[]).forEach(function(s){c[s]=(c[s]||0)+1;});
@@ -564,8 +601,6 @@ function turnInfo(p){
 }
 // enemyView: en los enemigos NO se muestra su turno ni su tier/tipo
 function card(p,enemyView){
-  var pct=p.vida_max>0?Math.round(p.vida/p.vida_max*100):0;
-  var h=hl(pct);
   var t=mkTags(p.statuses);
   var acted=p.turn==='both'?(p.acted&&p.acted_slow):p.acted;
   var ti=turnInfo(p);
@@ -579,8 +614,7 @@ function card(p,enemyView){
     +(p.kind==='pet'?'<div class="ctype">🐾 mascota'+(p.owner_name?' de '+esc(p.owner_name):'')+'</div>':'')
     +(enemyView&&!dnd?'':(p.tipo?'<div class="ctype">'+esc(p.tipo)+'</div>':''))
     +turnTag
-    +'<div class="health-text" style="color:'+h.c+'">'+h.t+'</div>'
-    +'<div class="hbar"><div class="hbar-fill" style="background:'+h.c+'"></div></div>'
+    +statBar(p,'vida')+(dnd?'':statBar(p,'focus')+statBar(p,'inv'))
     +(t?'<div class="stags">'+t+'</div>':'')
     +(acted?'<div class="acted-mark">✓ Ya actuó esta ronda</div>':'')
     +'</div>';
@@ -663,12 +697,14 @@ async function loadRoster(){
   if(MY_UID==null)return;
   try{ ROSTER=await api(API+'/roster'); }catch(e){ return; }
   SYSTEM=ROSTER.system||'cosmere';
-  // objetos, tiendas e inventario son reglas de Cosmere
+  CONFIG=ROSTER.config||{};
+  // los objetos son de Cosmere, y además el DM puede apagarlos en su campaña
   document.querySelectorAll('.cosmere-only').forEach(function(el){
-    el.style.display=(SYSTEM==='dnd')?'none':'';
+    el.style.display=OBJETOS()?'':'none';
   });
+  if(!OBJETOS()&&TAB==='tiendas') setTab('pj');
   renderRoster();
-  if(SYSTEM!=='dnd') loadInventory();           // el inventario cuelga de la ficha
+  if(OBJETOS()) loadInventory();                // el inventario cuelga de la ficha
   if(COMBAT&&COMBAT.active) renderMe(COMBAT);   // refresca el recuadro de marcos del combate
 }
 // tracker de altas tormentas: el jugador ve la barra pero NO el día/momento exactos
@@ -684,7 +720,8 @@ function renderStorm(s){
   }
   document.getElementById('stormCells').innerHTML=cells;
   document.getElementById('stormInfo').textContent='Día '+s.day;
-  document.getElementById('stormBar').style.display='';
+  // el DM puede apagar el tracker de tormentas en su campaña
+  document.getElementById('stormBar').style.display=(s.enabled===false)?'none':'';
 }
 async function loadStorm(){ try{ renderStorm(await api(API+'/storm')); }catch(e){} }
 function ocUrl(target){ return target==='c' ? '/api/characters/'+MYCHAR : '/api/characters/'+MYCHAR+'/pets/'+target.slice(1); }
@@ -936,9 +973,7 @@ async function dndDelCounter(kid){
 
 function allyCard(m){
   var c=m.character;
-  var cur=(c.vida==null?c.vida_max:c.vida);
-  var pct=c.vida_max>0?Math.round(cur/c.vida_max*100):0;
-  var h=hl(pct); var t=mkTags(c.statuses);
+  var t=mkTags(c.statuses);
   var inj=(c.injuries||[]).length?'<div class="stags">'+(c.injuries||[]).map(function(i){
     return '<span class="stag" style="border-color:#c87830;color:#c87830">🩹 '+esc(i.name)+(i.permanent?'':' ('+i.days+'d)')+'</span>';}).join('')+'</div>':'';
   var dndChips='';
@@ -952,8 +987,7 @@ function allyCard(m){
   }
   return '<div class="card"><div class="cname">'+esc(c.name)+'</div>'
     +'<div class="ctype">'+esc(m.username)+'</div>'
-    +'<div class="health-text" style="color:'+h.c+'">'+h.t+'</div>'
-    +'<div class="hbar"><div class="hbar-fill" style="background:'+h.c+'"></div></div>'
+    +statBar(c,'vida')+(SYSTEM==='dnd'?'':statBar(c,'focus')+statBar(c,'inv'))
     +(t?'<div class="stags">'+t+'</div>':'')+inj+dndChips+'</div>';
 }
 function renderRoster(){
@@ -996,7 +1030,7 @@ function renderRoster(){
       }).join('');
     }
     // el inventario va después de las vidas: las del personaje y las de sus mascotas
-    if(SYSTEM!=='dnd') html+='<div id="invPanel"></div>';
+    if(OBJETOS()) html+='<div id="invPanel"></div>';
     // ficha detallada del personaje
     html+='<div class="pj-sheet-wrap">'
       +charSheetHTML({name:c.name,stats:c.sheet,vida_max:c.vida_max,focus_max:c.focus_max,inv_max:c.inv_max})

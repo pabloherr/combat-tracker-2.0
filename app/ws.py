@@ -9,6 +9,7 @@ cookie de sesión y valida que el usuario sea el DM o un miembro aceptado.
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .auth import COOKIE_NAME, user_for_token
+from .config import get_config
 from .database import db
 from .state import combats, player_view
 
@@ -17,25 +18,33 @@ router = APIRouter()
 
 class Hub:
     def __init__(self):
-        # cid -> lista de (ws, is_dm): así cada quien recibe su propia vista.
-        self.rooms: dict[int, list[tuple[WebSocket, bool]]] = {}
+        # cid -> lista de (ws, is_dm, user_id): cada quien recibe su vista, que
+        # depende de quién es (lo propio se ve entero) y de los ajustes del DM.
+        self.rooms: dict[int, list[tuple[WebSocket, bool, int]]] = {}
 
-    async def connect(self, cid: int, ws: WebSocket, is_dm: bool):
+    async def connect(self, cid: int, ws: WebSocket, is_dm: bool, user_id: int):
         await ws.accept()
-        self.rooms.setdefault(cid, []).append((ws, is_dm))
+        self.rooms.setdefault(cid, []).append((ws, is_dm, user_id))
 
     def disconnect(self, cid: int, ws: WebSocket):
         room = self.rooms.get(cid)
         if room:
-            self.rooms[cid] = [(w, d) for (w, d) in room if w is not ws]
+            self.rooms[cid] = [t for t in room if t[0] is not ws]
 
-    async def broadcast(self, cid: int, combat: dict):
+    async def broadcast(self, cid: int, combat: dict, cfg: dict):
         dm_payload = {"type": "combat", "data": combat}
-        player_payload = {"type": "combat", "data": player_view(combat)}
+        vistas = {}      # una vista por jugador, reusada si tiene varias pestañas
         dead = []
-        for ws, is_dm in self.rooms.get(cid, []):
+        for ws, is_dm, uid in self.rooms.get(cid, []):
+            if is_dm:
+                payload = dm_payload
+            else:
+                if uid not in vistas:
+                    vistas[uid] = {"type": "combat",
+                                   "data": player_view(combat, cfg, uid)}
+                payload = vistas[uid]
             try:
-                await ws.send_json(dm_payload if is_dm else player_payload)
+                await ws.send_json(payload)
             except Exception:
                 dead.append(ws)
         for ws in dead:
@@ -46,9 +55,15 @@ hub = Hub()
 
 
 async def push_state(cid: int):
-    """Guarda y difunde el combate de una campaña (vista según el rol)."""
+    """Guarda y difunde el combate de una campaña (vista según quién mira)."""
     combats.save(cid)
-    await hub.broadcast(cid, combats.get(cid))
+    room = hub.rooms.get(cid) or []
+    # solo leemos los ajustes si hay algún jugador escuchando
+    cfg = None
+    if any(not is_dm for _, is_dm, _ in room):
+        with db() as conn:
+            cfg = get_config(conn, cid)
+    await hub.broadcast(cid, combats.get(cid), cfg)
 
 
 def _is_dm(cid: int, user_id: int):
@@ -73,9 +88,15 @@ async def websocket_endpoint(ws: WebSocket, cid: int):
     if is_dm is None:
         await ws.close(code=1008)
         return
-    await hub.connect(cid, ws, is_dm)
+    await hub.connect(cid, ws, is_dm, user["id"])
     combat = combats.get(cid)
-    await ws.send_json({"type": "combat", "data": combat if is_dm else player_view(combat)})
+    if is_dm:
+        await ws.send_json({"type": "combat", "data": combat})
+    else:
+        with db() as conn:
+            cfg = get_config(conn, cid)
+        await ws.send_json({"type": "combat",
+                            "data": player_view(combat, cfg, user["id"])})
     try:
         while True:
             raw = await ws.receive_text()  # keep-alive / heartbeat del cliente
