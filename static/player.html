@@ -94,6 +94,11 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .pet-tag{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:20px;border:1px solid #7ac88c;color:#7ac88c;margin-left:8px;vertical-align:middle;}
 .me-sheet-row{display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
 .btn-sheet{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:8px 14px;border-radius:var(--r);cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--gold2);text-decoration:none;display:inline-block;}
+.btn-sheet.off{color:var(--text3);border-color:var(--border);}
+/* contenedor: la mochila o la carreta con lo que guarda adentro */
+.cont-box{border:1px solid var(--border2);border-radius:var(--rl,10px);margin-bottom:8px;background:rgba(255,255,255,.015);}
+.cont-box .inv-row{margin-bottom:0;border:none;background:transparent;}
+.cont-box .cont-box{margin:0;}
 .btn-sheet:hover{background:rgba(224,189,124,.12);border-color:var(--gold);}
 /* modal ficha */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:flex-start;justify-content:center;padding:1.5rem 1rem;overflow:auto;z-index:50;}
@@ -149,6 +154,32 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .import-ta{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:'Courier New',monospace;font-size:12px;line-height:1.5;outline:none;resize:vertical;min-height:150px;white-space:pre;}
 .import-ta:focus{border-color:var(--gold);}
 .inv-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;}
+/* dosis y cargas: − 3/5 + */
+.uses-box{display:inline-flex;align-items:center;border:1px solid #e8c840;border-radius:20px;overflow:hidden;flex:none;}
+.uses-btn{background:none;border:none;color:#e8c840;font-size:14px;line-height:1;padding:3px 8px;cursor:pointer;font-family:inherit;}
+.uses-btn:hover{background:rgba(232,200,64,.16);}
+.uses-n{font-family:'Cinzel',serif;font-size:11px;color:#e8c840;padding:0 4px;cursor:pointer;min-width:34px;text-align:center;}
+.uses-n:hover{background:rgba(232,200,64,.16);}
+.uses-inp{width:38px;background:var(--bg2);border:none;color:#e8c840;font-family:'Cinzel',serif;font-size:11px;text-align:center;outline:none;padding:0;-moz-appearance:textfield;}
+.uses-inp::-webkit-outer-spin-button,.uses-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+/* catálogo: solapas por tipo y tablas al estilo del manual */
+.kind-bar{display:flex;flex-wrap:wrap;gap:6px;}
+.kind-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text3);border-radius:20px;padding:5px 13px;font-family:'Cinzel',serif;font-size:11px;letter-spacing:.05em;cursor:pointer;}
+.kind-btn:hover{border-color:var(--gold2);color:var(--text2);}
+.kind-btn.on{background:var(--gold);border-color:var(--gold);color:#1c1915;}
+.cat-filters{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0;}
+.cat-f-lbl{font-size:11px;color:var(--text3);font-family:'Cinzel',serif;}
+.cat-f-num{width:76px;-moz-appearance:textfield;}
+.cat-f-num::-webkit-outer-spin-button,.cat-f-num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.cat-scroll{overflow-x:auto;margin-bottom:14px;}
+.cat-tbl{width:100%;border-collapse:collapse;font-size:13px;min-width:520px;}
+.cat-tbl th{font-family:'Cinzel',serif;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);text-align:left;font-weight:400;padding:6px 8px;border-bottom:1px solid var(--border2);white-space:nowrap;}
+.cat-tbl td{padding:7px 8px;border-bottom:1px solid var(--border);vertical-align:top;}
+.cat-tbl tr:hover td{background:rgba(255,255,255,.02);}
+.cat-tbl .n{color:var(--gold2);font-weight:600;}
+.cat-tbl .d{font-size:12px;color:var(--text3);font-style:italic;}
+.cat-tbl .num{text-align:right;font-family:'Cinzel',serif;color:var(--gold2);white-space:nowrap;}
+.cat-tbl .act{text-align:right;white-space:nowrap;}
 /* marcos (esferas): recuadro chico total/cargados/opacos */
 .marcos-w{border:1px solid var(--border2);border-radius:8px;overflow:hidden;width:104px;text-align:center;background:var(--bg3);flex:none;}
 .marcos-w-total{font-family:'Cinzel',serif;color:var(--gold2);font-size:15px;padding:3px 6px;border-bottom:1px solid var(--border2);white-space:nowrap;}
@@ -197,6 +228,7 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
     <button class="tab" id="tab-pj" onclick="setTab('pj')">Mi personaje</button>
     <button class="tab" id="tab-grupo" onclick="setTab('grupo')">Grupo</button>
     <button class="tab" id="tab-combate" onclick="setTab('combate')">Combate<span class="tab-badge" id="combBadge" style="display:none">●</span></button>
+    <button class="tab cosmere-only" id="tab-tiendas" onclick="setTab('tiendas')">Catálogo</button>
   </div>
 
   <div id="tabPJ" class="tabpanel">
@@ -227,6 +259,22 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
       <div class="section-lbl" id="enemiesLbl">Enemigos</div>
       <div class="grid" id="enemiesGrid"></div>
     </div>
+  </div>
+
+  <div id="tabTiendas" class="tabpanel" style="display:none">
+    <div class="section-lbl">📖 Catálogo</div>
+    <div class="sh-meta" style="margin-bottom:8px">Todo lo que se consigue. Agarrá lo que quieras: al llevarlo elegís el precio (el DM puede hacerte un descuento, o puede ser un hallazgo) y con qué esferas lo pagás.</div>
+    <div class="kind-bar" id="catKinds"></div>
+    <div class="cat-filters">
+      <input class="oc-fi" type="search" id="catQ" placeholder="Buscar objeto…" oninput="renderCatalog()" style="flex:1;min-width:150px"/>
+      <span class="cat-f-lbl">💠 desde</span>
+      <input class="oc-fi cat-f-num" type="number" min="0" id="catMin" oninput="renderCatalog()"/>
+      <span class="cat-f-lbl">hasta</span>
+      <input class="oc-fi cat-f-num" type="number" min="0" id="catMax" oninput="renderCatalog()"/>
+      <button class="btn-sheet" onclick="limpiarFiltros()" title="Quitar todos los filtros">Limpiar</button>
+    </div>
+    <div class="kind-bar" id="catCats"></div>
+    <div id="catalogPanel"></div>
   </div>
 </div>
 
@@ -539,7 +587,7 @@ function card(p,enemyView){
 }
 
 var PREV_ACTIVE=null;   // para autocambiar a Combate cuando arranca
-var PANELS={pj:'tabPJ',grupo:'tabGrupo',combate:'tabCombate'};
+var PANELS={pj:'tabPJ',grupo:'tabGrupo',combate:'tabCombate',tiendas:'tabTiendas'};
 function setTab(t){
   TAB=t;
   Object.keys(PANELS).forEach(function(x){
@@ -547,6 +595,7 @@ function setTab(t){
     document.getElementById('tab-'+x).classList.toggle('on',x===t);
   });
   if(t==='pj'||t==='grupo') loadRoster();
+  if(t==='tiendas') loadCatalog();
 }
 
 function render(combat){
@@ -614,7 +663,12 @@ async function loadRoster(){
   if(MY_UID==null)return;
   try{ ROSTER=await api(API+'/roster'); }catch(e){ return; }
   SYSTEM=ROSTER.system||'cosmere';
+  // objetos, tiendas e inventario son reglas de Cosmere
+  document.querySelectorAll('.cosmere-only').forEach(function(el){
+    el.style.display=(SYSTEM==='dnd')?'none':'';
+  });
   renderRoster();
+  if(SYSTEM!=='dnd') loadInventory();           // el inventario cuelga de la ficha
   if(COMBAT&&COMBAT.active) renderMe(COMBAT);   // refresca el recuadro de marcos del combate
 }
 // tracker de altas tormentas: el jugador ve la barra pero NO el día/momento exactos
@@ -941,6 +995,8 @@ function renderRoster(){
           +ocStatuses('p'+p.id,p.statuses)+'</div>';
       }).join('');
     }
+    // el inventario va después de las vidas: las del personaje y las de sus mascotas
+    if(SYSTEM!=='dnd') html+='<div id="invPanel"></div>';
     // ficha detallada del personaje
     html+='<div class="pj-sheet-wrap">'
       +charSheetHTML({name:c.name,stats:c.sheet,vida_max:c.vida_max,focus_max:c.focus_max,inv_max:c.inv_max})
@@ -958,6 +1014,7 @@ function renderRoster(){
     var injSnap=snapInjForm();
     mp.innerHTML=html;
     restoreInjForm(injSnap);
+    renderInventory();          // el div queda vacío al reconstruir el panel
   }
   var os=ROSTER.members.filter(function(m){return m.user_id!==MY_UID&&m.character;});
   document.getElementById('ocOthersLbl').style.display=os.length?'':'none';
@@ -1079,6 +1136,531 @@ async function delPet(petId){
 }
 
 // ─── WebSocket con heartbeat y reconexión ───
+// ═══════════ INVENTARIO (capacidad de carga) ═══════════
+var INV=null, CAN_CREATE=false, INV_CONTENEDORES=[];
+function canCreateItems(){
+  var m=ROSTER&&ROSTER.members.find(function(x){return x.user_id===MY_UID;});
+  return !!(m&&m.can_create_items);
+}
+async function loadInventory(){
+  if(!MYCHAR){ INV=null; return; }
+  CAN_CREATE=canCreateItems();
+  try{ INV=await api('/api/characters/'+MYCHAR+'/inventory'); }catch(e){ return; }
+  renderInventory();
+}
+function capBar(c){
+  var pct=c.capacidad>0?Math.min(100,Math.round(c.usado/c.capacidad*100)):0;
+  var col=c.sobrecargado?'#e05050':'#7ac88c';
+  return '<div class="mstat" style="margin-bottom:8px">'
+    +'<div class="mstat-head"><span class="mstat-l">Carga</span>'
+      +'<span class="mstat-v" style="color:'+col+'">'+c.usado+' <span style="font-size:12px;color:var(--text3)">/ '+c.capacidad+'</span>'
+      +(c.sobrecargado?' <span style="font-size:11px">⚠ Sobrecargado</span>':'')+'</span></div>'
+    +'<div class="mbar"><div class="mbar-fill" style="width:'+pct+'%;background:'+col+'"></div></div>'
+    +'<div style="font-size:11px;color:var(--text3);margin-top:3px">base '+c.base+' + fuerza '+c.fuerza
+      +(c.bonus?' + '+c.bonus+' de mochila':'')+'</div></div>';
+}
+// Ficha corta por tipo (un arma muestra daño y rasgos; una posada, el precio).
+function invStatsHTML(it){
+  var s=it.stats||{};
+  if(it.kind==='arma'){
+    var t=(s.traits||[]).concat(s.expert_traits||[]);
+    return '<div style="font-size:12px;color:var(--text3)">'
+      +[s.damage,s.range].filter(Boolean).map(esc).join(' · ')
+      +(t.length?' · '+t.map(esc).join(', '):'')+'</div>';
+  }
+  if(it.kind==='armadura')
+    return '<div style="font-size:12px;color:var(--text3)">Deflect '+(s.deflect||0)
+      +((s.traits||[]).length?' · '+(s.traits||[]).map(esc).join(', '):'')+'</div>';
+  if(it.kind==='vehiculo')
+    return '<div style="font-size:12px;color:var(--text3)">'
+      +[s.vehicle_type,s.speed].filter(Boolean).map(esc).join(' · ')+'</div>';
+  return '';
+}
+// zona: '' = encima · 'personal' = mi guardado · 'grupo' = guardado del grupo
+function invItemRow(it,dentro,zona){
+  var guardado=!!zona;
+  // Dosis y cargas: se gastan y se reponen a mano (raciones, antisépticos,
+  // fabriales). Tocando el número se escribe el valor exacto.
+  var usos=it.usos_max
+    ? '<span class="uses-box" title="Dosis o cargas que le quedan">'
+        +'<button class="uses-btn" onclick="invUse('+it.id+',-1)" title="Gastar una">−</button>'
+        +'<span class="uses-n" onclick="editUsos(this,'+it.id+','+it.usos_max+')">'
+          +it.usos+'/'+it.usos_max+'</span>'
+        +'<button class="uses-btn" onclick="invUse('+it.id+',1)" title="Reponer una">+</button></span>'
+    : '';
+  // mover: adentro de un contenedor o afuera
+  var mover='';
+  if(!it.contenedor&&!guardado){
+    if(dentro) mover='<button class="btn-sheet" onclick="invMove('+it.id+',null)" title="Sacarlo del contenedor">⇧ sacar</button>';
+    else if(INV_CONTENEDORES.length)
+      mover='<button class="btn-sheet" onclick="openMove('+it.id+')" title="Guardar en un contenedor">⇩ guardar</button>';
+  }
+  var eq=(guardado||dentro)?''
+    : it.contenedor
+    ? '<button class="btn-sheet'+(it.equipado?'':' off')+'" onclick="invEquip('+it.id+')" title="'+(it.equipado?'Lo llevás encima: tocá para dejarlo':'Lo dejaste: no cuenta para tu carga')+'">'+(it.equipado?'🎒 llevando':'🎒 dejado')+'</button>'
+    : '<button class="btn-sheet'+(it.equipado?'':' off')+'" onclick="invEquip('+it.id+')" title="'+(it.equipado?'Equipado':'Guardado: no cuenta')+'">'+(it.equipado?'✓':'○')+'</button>';
+  // lo que está dentro de un contenedor viaja con él: la zona la decide la mochila
+  var zonaBtn=dentro?''
+    : '<button class="btn-sheet" onclick="openStash('+it.id+',\''+(zona||'')+'\')" title="Mover a otra zona">⇄</button>';
+  var pasar=dentro?''
+    : '<button class="btn-sheet" onclick="openTransfer('+it.id+')" title="Pasárselo a otro">🤝</button>';
+  var head='<div class="inv-row"'+(it.equipado||guardado?'':' style="opacity:.55"')+'>'
+    +'<span style="flex:1"><b style="color:var(--gold2)">'+esc(it.name)+'</b>'
+      +(it.cantidad>1?' <span style="color:var(--text3)">x'+it.cantidad+'</span>':'')
+      +' <span style="color:var(--text3);font-size:12px">'+it.slots+' slot'+(it.slots===1?'':'s')
+      +(it.capacity_bonus?' · +'+it.capacity_bonus+' cap':'')+'</span> '+usos
+      +invStatsHTML(it)
+      +(it.descripcion?'<div style="font-size:12px;color:var(--text3);font-style:italic">'+esc(it.descripcion)+'</div>':'')
+    +'</span>'
+    +mover+eq+zonaBtn+pasar
+    +'<button class="btn-sheet" onclick="invQty('+it.id+',1)">+</button>'
+    +'<button class="btn-sheet" onclick="invQty('+it.id+',-1)">−</button>'
+    +'<button class="btn-sheet" style="color:#e05050;border-color:#e05050" onclick="invDel('+it.id+')">✕</button></div>';
+  if(!it.contenedor) return head;
+  // contenedor: su propia barra y lo que guarda adentro
+  var cap=it.contenedor_capacidad||0, usado=it.cont_usado||0;
+  var pct=cap>0?Math.min(100,Math.round(usado/cap*100)):0;
+  var col=it.cont_lleno?'#e05050':'#6aaae8';
+  return '<div class="cont-box">'+head
+    +'<div style="padding:0 10px 8px">'
+      +'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3)">'
+        +'<span>Guarda</span><span style="color:'+col+'">'+usado+' / '+cap+(it.cont_lleno?' ⚠ lleno':'')+'</span></div>'
+      +'<div class="mbar"><div class="mbar-fill" style="width:'+pct+'%;background:'+col+'"></div></div>'
+      +((it.children||[]).length
+        ? '<div style="margin-top:6px">'+it.children.map(function(c){return invItemRow(c,true,zona);}).join('')+'</div>'
+        : '<div style="font-size:12px;color:var(--text3);font-style:italic;margin-top:6px">Vacío.</div>')
+    +'</div></div>';
+}
+function renderInventory(){
+  var panel=document.getElementById('invPanel');
+  if(!INV||!panel)return;
+  var ae=document.activeElement;
+  if(ae&&panel.contains(ae)&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName))return;
+  INV_CONTENEDORES=contenedoresDe(INV);
+  var c=INV.character;
+  var sizes=['Pequeño','Mediano','Grande','Enorme','Gargantuesco'];
+  var html='<div class="me-card"><div class="me-head"><span class="me-name">🎒 Inventario</span>'
+    +'<span style="flex:1"></span>'
+    +(CAN_CREATE?'<button class="btn-sheet" onclick="openCreateItem(\'c\')">+ Crear objeto</button>':'')
+    +'</div>'
+    +'<div class="me-sheet-row" style="border:none;padding:0;margin:0 0 8px;gap:6px">'
+      +'<span style="font-size:12px;color:var(--text3)">Tamaño</span>'
+      +'<select class="oc-fi" onchange="setSize(this.value)">'
+      +sizes.map(function(s){return '<option'+(s===c.size?' selected':'')+'>'+s+'</option>';}).join('')
+      +'</select></div>'
+    +capBar(c.capacity)
+    +zonaEncima(c.items||[],'','No llevás nada en la mano.')
+    +'</div>';
+  (INV.pets||[]).forEach(function(p){
+    html+='<div class="me-card"><div class="me-head"><span class="me-name">'+esc(p.name)+' <span class="pet-tag">Mascota</span></span>'
+      +'<span style="flex:1"></span>'
+      +(CAN_CREATE?'<button class="btn-sheet" onclick="openCreateItem(\'p'+p.id+'\')">+ Crear objeto</button>':'')
+      +'</div>'+capBar(p.capacity)
+      +zonaEncima(p.items||[],'','No lleva nada encima.')
+      +'</div>';
+  });
+  html+=stashCard('🏠 Mi guardado',
+    'Lo que tenés pero no cargás encima: en la posada, en tu cuarto. No pesa ni tiene tope.',
+    INV.character.guardado||[],'personal','Tu guardado está vacío.');
+  html+=stashCard('👥 Guardado del grupo',
+    'Compartido con toda la mesa: cualquiera puede dejar o llevarse cosas de acá.',
+    INV.grupo||[],'grupo','El grupo no guardó nada todavía.');
+  panel.innerHTML=html;
+}
+// Contenedores donde se puede guardar algo: los que lleva el personaje encima y
+// los de sus mascotas (la mochila, la carreta del chull).
+function contenedoresDe(inv){
+  var out=[];
+  if(!inv)return out;
+  ((inv.character&&inv.character.items)||[]).forEach(function(i){
+    if(i.contenedor) out.push(Object.assign({owner:inv.character.name},i));});
+  (inv.pets||[]).forEach(function(p){
+    (p.items||[]).forEach(function(i){
+      if(i.contenedor) out.push(Object.assign({owner:p.name},i));});});
+  return out;
+}
+function invEmpty(txt){
+  return '<div style="color:var(--text3);font-style:italic;font-size:13px">'+txt+'</div>';
+}
+// Lo que se lleva en la mano va aparte de lo que va en la mochila (o en la
+// carreta): cada contenedor arma su propio bloque.
+function zonaEncima(list,zona,vacio){
+  var sueltos=list.filter(function(i){return !i.contenedor;});
+  var conts=list.filter(function(i){return i.contenedor;});
+  return '<div class="section-lbl" style="margin-top:2px">🖐 Encima</div>'
+    +(sueltos.length?sueltos.map(function(i){return invItemRow(i,false,zona);}).join(''):invEmpty(vacio))
+    +conts.map(function(i){return invItemRow(i,false,zona);}).join('');
+}
+function stashCard(titulo,hint,list,zona,vacio){
+  return '<div class="me-card"><div class="me-head"><span class="me-name">'+titulo+'</span></div>'
+    +'<div class="sh-meta" style="margin-bottom:8px">'+hint+'</div>'
+    +(list.length?list.map(function(i){return invItemRow(i,false,zona);}).join(''):invEmpty(vacio))
+    +'</div>';
+}
+async function invQty(eid,delta){
+  await api('/api/characters/'+MYCHAR+'/inventory/'+eid+'/qty','POST',{delta:delta});
+  loadInventory();
+}
+async function invEquip(eid){
+  await api('/api/characters/'+MYCHAR+'/inventory/'+eid+'/equip','POST');
+  loadInventory();
+}
+async function invUse(eid,delta){
+  if(!delta)return;
+  var r=await fetch('/api/characters/'+MYCHAR+'/inventory/'+eid+'/use',
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({delta:delta})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'Error');return;}
+  loadInventory();
+}
+// Escribir los usos que quedan de una (media botella, tres raciones…).
+function editUsos(el,eid,max){
+  if(el.querySelector('input'))return;
+  var actual=parseInt(String(el.textContent).split('/')[0])||0;
+  el.innerHTML='<input class="uses-inp" type="number" min="0" max="'+max+'" value="'+actual+'"/>';
+  var inp=el.firstChild, listo=false;
+  inp.focus(); inp.select();
+  inp.onkeydown=function(e){ if(e.key==='Enter')inp.blur(); else if(e.key==='Escape'){listo=true;renderInventory();} };
+  inp.onblur=function(){
+    if(listo)return; listo=true;
+    var v=Math.max(0,Math.min(max,parseInt(inp.value)||0));
+    if(v===actual) renderInventory(); else invUse(eid,v-actual);
+  };
+}
+async function invMove(eid,parentId){
+  var r=await fetch('/api/characters/'+MYCHAR+'/inventory/'+eid+'/move',
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({parent_id:parentId})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo mover');return;}
+  closeModal(); loadInventory();
+}
+// Elegir en qué contenedor guardar (mochila del personaje, carreta del chull…)
+function openMove(eid){
+  if(!INV_CONTENEDORES.length){alert('No tenés contenedores.');return;}
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">Guardar en…</div>'
+    +'<div class="sh-meta" style="margin-bottom:10px">Lo que va adentro ocupa el espacio del contenedor, no el tuyo.</div>'
+    +INV_CONTENEDORES.map(function(c){
+      var libre=(c.contenedor_capacidad||0)-(c.cont_usado||0);
+      return '<div class="inv-row"><span style="flex:1"><b style="color:var(--gold2)">'+esc(c.name)+'</b>'
+        +' <span style="color:var(--text3);font-size:12px">'+(c.owner||'')+' · libre '+libre+'/'+(c.contenedor_capacidad||0)+'</span></span>'
+        +'<button class="btn-sheet" onclick="invMove('+eid+','+c.id+')">Guardar</button></div>';
+    }).join('');
+  document.getElementById('overlay').classList.add('on');
+}
+async function invDel(eid){
+  if(!confirm('¿Sacar este objeto del inventario?'))return;
+  await api('/api/characters/'+MYCHAR+'/inventory/'+eid,'DELETE');
+  loadInventory();
+}
+async function setSize(size){
+  await api('/api/characters/'+MYCHAR+'/size','PUT',{size:size});
+  loadInventory();
+}
+// ─── Zonas: encima / mi guardado / guardado del grupo ───
+var ZONAS=[{k:'',n:'🖐 Encima',d:'Lo cargás vos: cuenta para tu capacidad.'},
+           {k:'personal',n:'🏠 Mi guardado',d:'Lo tenés pero no lo llevás. Sin tope.'},
+           {k:'grupo',n:'👥 Guardado del grupo',d:'Compartido con toda la mesa.'}];
+function openStash(eid,actual){
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">Mover a…</div>'
+    +'<div class="sh-meta" style="margin-bottom:10px">Lo que está dentro de un contenedor se mueve con él.</div>'
+    +ZONAS.filter(function(z){return z.k!==actual;}).map(function(z){
+      return '<div class="inv-row"><span style="flex:1"><b style="color:var(--gold2)">'+z.n+'</b>'
+        +'<div style="font-size:12px;color:var(--text3)">'+z.d+'</div></span>'
+        +'<button class="btn-sheet" onclick="invStash('+eid+',\''+z.k+'\')">Mover</button></div>';
+    }).join('');
+  document.getElementById('overlay').classList.add('on');
+}
+async function invStash(eid,zona){
+  var r=await fetch('/api/characters/'+MYCHAR+'/inventory/'+eid+'/stash',
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({stash:zona})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo mover');return;}
+  closeModal(); loadInventory();
+}
+function openTransfer(eid){
+  var destinos=(INV.aliados||[]).map(function(a){
+    return {lbl:esc(a.name),body:'{"character_id":'+a.id+'}'};});
+  (INV.pets||[]).forEach(function(p){
+    destinos.push({lbl:'🐾 '+esc(p.name)+' (tu mascota)',body:'{"pet_id":'+p.id+'}'});});
+  if(!destinos.length){alert('No hay nadie más en la campaña a quien pasárselo.');return;}
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">Pasarle el objeto a…</div>'
+    +'<div class="sh-meta" style="margin-bottom:10px">Le queda encima. Si es un contenedor, va con todo lo que lleva adentro.</div>'
+    +destinos.map(function(d){
+      return '<div class="inv-row"><span style="flex:1"><b style="color:var(--gold2)">'+d.lbl+'</b></span>'
+        +'<button class="btn-sheet" onclick=\'invTransfer('+eid+','+d.body+')\'>Pasar</button></div>';
+    }).join('');
+  document.getElementById('overlay').classList.add('on');
+}
+async function invTransfer(eid,body){
+  var r=await fetch('/api/characters/'+MYCHAR+'/inventory/'+eid+'/transfer',
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo pasar');return;}
+  var j=await r.json();
+  closeModal(); loadInventory();
+  alert('Se lo pasaste a '+j.a+'.');
+}
+function openCreateItem(target){
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">Crear objeto</div>'
+    +'<div class="sh-meta" style="margin-bottom:10px">El DM te habilitó a cargar objetos propios.</div>'
+    +'<div style="display:flex;flex-direction:column;gap:9px">'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nombre</span>'
+        +'<input class="oc-fi" id="ciName" style="flex:1;max-width:280px"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Descripción</span>'
+        +'<input class="oc-fi" id="ciDesc" style="flex:1;max-width:280px"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Slots</span>'
+        +'<input class="oc-fi" type="number" min="0" id="ciSlots" value="1" style="width:90px"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>+ Capacidad</span>'
+        +'<input class="oc-fi" type="number" min="0" id="ciCap" value="0" style="width:90px"/></label>'
+    +'</div>'
+    +'<div class="me-sheet-row" style="justify-content:flex-end;border:none;margin-top:12px">'
+      +'<button class="btn-sheet" style="background:var(--gold);color:#1c1915;border-color:var(--gold)" onclick="saveCreateItem(\''+target+'\')">Crear</button></div>';
+  document.getElementById('overlay').classList.add('on');
+}
+async function saveCreateItem(target){
+  var name=document.getElementById('ciName').value.trim();
+  if(!name){alert('Poné un nombre.');return;}
+  var url=target==='c' ? '/api/characters/'+MYCHAR+'/inventory'
+                       : '/api/characters/'+MYCHAR+'/pets/'+target.slice(1)+'/inventory';
+  var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name,descripcion:document.getElementById('ciDesc').value.trim(),
+      slots:parseInt(document.getElementById('ciSlots').value)||0,
+      capacity_bonus:parseInt(document.getElementById('ciCap').value)||0})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo crear');return;}
+  closeModal(); loadInventory();
+}
+
+// ═══════════ CATÁLOGO: agarrar un objeto y pagarlo ═══════════
+var CATALOG=[];
+async function loadCatalog(){
+  if(!MYCHAR) await loadRoster();
+  try{ CATALOG=await api(API+'/catalog'); }catch(e){ return; }
+  if(!INV&&MYCHAR){ try{ INV=await api('/api/characters/'+MYCHAR+'/inventory'); }catch(e){} }
+  renderCatalog();
+}
+// Cada tipo se lee distinto, así que cada uno tiene su tabla, como en el manual.
+var KIND_TABS=[{k:'arma',n:'⚔ Armas'},{k:'armadura',n:'🛡 Armaduras'},
+               {k:'equipo',n:'🎒 Equipo'},{k:'alojamiento',n:'🛏 Alojamiento'},
+               {k:'vehiculo',n:'🐂 Vehículos'},{k:'fabrial',n:'💎 Fabriales'}];
+var WCLASS=[{k:'light',n:'Ligeras'},{k:'heavy',n:'Pesadas'},{k:'special',n:'Especiales'}];
+var CAT_KIND='arma', CAT_CATEGORIA='';
+function setCatKind(k){ CAT_KIND=k; CAT_CATEGORIA=''; renderCatalog(); }
+function setCatCategoria(c){ CAT_CATEGORIA=(c===CAT_CATEGORIA)?'':c; renderCatalog(); }
+function limpiarFiltros(){
+  CAT_CATEGORIA='';
+  ['catQ','catMin','catMax'].forEach(function(id){ document.getElementById(id).value=''; });
+  renderCatalog();
+}
+function renderKindBar(){
+  // solo los tipos que el DM realmente cargó
+  var hay={};
+  CATALOG.forEach(function(i){ hay[i.kind||'equipo']=(hay[i.kind||'equipo']||0)+1; });
+  var tabs=KIND_TABS.filter(function(t){return hay[t.k];});
+  if(!tabs.length){ document.getElementById('catKinds').innerHTML=''; return; }
+  if(!hay[CAT_KIND]) CAT_KIND=tabs[0].k;
+  document.getElementById('catKinds').innerHTML=tabs.map(function(t){
+    return '<button class="kind-btn'+(t.k===CAT_KIND?' on':'')+'" onclick="setCatKind(\''+t.k+'\')">'
+      +t.n+' <span style="opacity:.6">'+hay[t.k]+'</span></button>';
+  }).join('');
+}
+function _catNum(id){ var v=parseInt(document.getElementById(id).value); return isNaN(v)?null:v; }
+function catFiltrado(){
+  var qEl=document.getElementById('catQ'), q=qEl?qEl.value:'';
+  var min=_catNum('catMin'), max=_catNum('catMax');
+  var list=CATALOG.filter(function(i){return (i.kind||'equipo')===CAT_KIND;});
+  if(q.trim()){
+    var words=q.trim().toLowerCase().split(/\s+/);
+    list=list.filter(function(it){
+      var hay=[it.name,it.descripcion,(it.categorias||[]).join(' ')].filter(Boolean).join(' ').toLowerCase();
+      for(var i=0;i<words.length;i++){ if(hay.indexOf(words[i])<0) return false; }
+      return true;
+    });
+  }
+  if(min!=null) list=list.filter(function(i){return (i.precio||0)>=min;});
+  if(max!=null) list=list.filter(function(i){return (i.precio||0)<=max;});
+  if(CAT_CATEGORIA)
+    list=list.filter(function(i){return (i.categorias||[]).indexOf(CAT_CATEGORIA)>=0;});
+  return list;
+}
+// Chips de categoría del tipo que se está mirando (con lo que hay cargado).
+function renderCatBar(){
+  var bar=document.getElementById('catCats');
+  var deTipo=CATALOG.filter(function(i){return (i.kind||'equipo')===CAT_KIND;});
+  var cuenta={};
+  deTipo.forEach(function(i){
+    (i.categorias||[]).forEach(function(c){ cuenta[c]=(cuenta[c]||0)+1; });
+  });
+  var cats=Object.keys(cuenta).sort();
+  if(cats.length<2){ bar.innerHTML=''; CAT_CATEGORIA=''; return; }
+  if(CAT_CATEGORIA&&!cuenta[CAT_CATEGORIA]) CAT_CATEGORIA='';
+  bar.innerHTML='<button class="kind-btn'+(CAT_CATEGORIA?'':' on')+'" onclick="setCatCategoria(\'\')">Todas</button>'
+    +cats.map(function(c){
+      return '<button class="kind-btn'+(c===CAT_CATEGORIA?' on':'')+'" onclick="setCatCategoria(\''+c+'\')">'
+        +esc(c)+' <span style="opacity:.6">'+cuenta[c]+'</span></button>';
+    }).join('');
+}
+function _tr(cells){ return '<tr>'+cells.join('')+'</tr>'; }
+function _td(v,cls){ return '<td'+(cls?' class="'+cls+'"':'')+'>'+(v==null||v===''?'—':v)+'</td>'; }
+function _nombre(it){
+  return '<td><span class="n">'+esc(it.name)+'</span>'
+    +(it.usos_max?' <span style="color:#e8c840;font-size:11px">'+it.usos_max+' usos</span>':'')
+    +(it.contenedor?' <span style="color:#6aaae8;font-size:11px">guarda '+it.contenedor_capacidad+'</span>':'')
+    +(it.descripcion?'<div class="d">'+esc(it.descripcion)+'</div>':'')+'</td>';
+}
+function _rasgos(s){
+  var t=(s.traits||[]).map(esc).join(', ');
+  var e=(s.expert_traits||[]).map(esc).join(', ');
+  return [t, e?'<span style="color:var(--text3)">Experto: '+e+'</span>':''].filter(Boolean).join('<br>');
+}
+function _agarrar(it){
+  return '<td class="act"><button class="btn-sheet" onclick="openTake('+it.id+')">Agarrar</button></td>';
+}
+function _precio(it){ return '<td class="num">💠 '+(it.precio||0)+'</td>'; }
+function catTabla(list){
+  var k=CAT_KIND, cab, filas;
+  if(k==='arma'){
+    cab=['Arma','Daño','Alcance','Rasgos','Slots','Peso','Precio',''];
+    filas=function(it){ var s=it.stats||{};
+      return _tr([_nombre(it),_td(esc(s.damage||'')),_td(esc(s.range||'')),_td(_rasgos(s)),
+                  _td(it.slots,'num'),_td(esc(it.peso||'')),_precio(it),_agarrar(it)]); };
+  }else if(k==='armadura'){
+    cab=['Armadura','Deflect','Rasgos','Slots','Peso','Precio',''];
+    filas=function(it){ var s=it.stats||{};
+      return _tr([_nombre(it),_td(s.deflect||0,'num'),_td(_rasgos(s)),
+                  _td(it.slots,'num'),_td(esc(it.peso||'')),_precio(it),_agarrar(it)]); };
+  }else if(k==='alojamiento'){
+    cab=['Alojamiento','Por persona y noche',''];
+    filas=function(it){ var s=it.stats||{};
+      return _tr([_nombre(it),_td('💠 '+(s.per_night||it.precio||0),'num'),_agarrar(it)]); };
+  }else if(k==='vehiculo'){
+    cab=['Vehículo','Tipo','Velocidad','Alquiler / día','Precio',''];
+    filas=function(it){ var s=it.stats||{};
+      return _tr([_nombre(it),_td(esc(s.vehicle_type||'')),_td(esc(s.speed||'')),
+                  _td(s.rental?'💠 '+s.rental:'','num'),_precio(it),_agarrar(it)]); };
+  }else if(k==='fabrial'){
+    cab=['Fabrial','Cargas','Slots','Peso','Precio',''];
+    filas=function(it){ var s=it.stats||{};
+      return _tr([_nombre(it),_td(s.charges||it.usos_max||'','num'),
+                  _td(it.slots,'num'),_td(esc(it.peso||'')),_precio(it),_agarrar(it)]); };
+  }else{
+    cab=['Objeto','Categorías','Slots','Peso','Precio',''];
+    filas=function(it){
+      return _tr([_nombre(it),
+                  _td((it.categorias||[]).map(function(c){return '<span class="stag">'+esc(c)+'</span>';}).join(' ')),
+                  _td(it.slots,'num'),_td(esc(it.peso||'')),_precio(it),_agarrar(it)]); };
+  }
+  return '<div class="cat-scroll"><table class="cat-tbl"><thead>'
+    +_tr(cab.map(function(c){return '<th>'+c+'</th>';}))+'</thead><tbody>'
+    +list.map(filas).join('')+'</tbody></table></div>';
+}
+function renderCatalog(){
+  renderKindBar(); renderCatBar();
+  var list=catFiltrado(), panel=document.getElementById('catalogPanel');
+  if(!list.length){ panel.innerHTML='<div class="empty-msg">Nada por acá.</div>'; return; }
+  var html='';
+  if(CAT_KIND==='arma'){
+    // las armas van separadas en ligeras, pesadas y especiales
+    WCLASS.forEach(function(w){
+      var sub=list.filter(function(i){return ((i.stats||{}).weapon_class||'light')===w.k;});
+      if(sub.length) html+='<div class="section-lbl">'+w.n+'</div>'+catTabla(sub);
+    });
+  }else if(CAT_KIND==='equipo'&&!CAT_CATEGORIA){
+    // el equipo va agrupado por categoría: la comida junta, la medicina junta…
+    // Lo que tiene varias aparece en cada una (una mochila es general y contenedor).
+    var grupos={}, sueltos=[];
+    list.forEach(function(i){
+      var cats=i.categorias||[];
+      if(!cats.length){ sueltos.push(i); return; }
+      cats.forEach(function(c){ (grupos[c]=grupos[c]||[]).push(i); });
+    });
+    Object.keys(grupos).sort().forEach(function(c){
+      html+='<div class="section-lbl">'+esc(c)+'</div>'+catTabla(grupos[c]);
+    });
+    if(sueltos.length) html+='<div class="section-lbl">Sin categoría</div>'+catTabla(sueltos);
+  }
+  panel.innerHTML=html||catTabla(list);
+}
+// Destinos posibles: la mano, un contenedor, una mascota o alguno de los guardados.
+function takeDestOpts(){
+  var o='<option value="c">🖐 Encima mío</option>';
+  contenedoresDe(INV).forEach(function(k){
+    o+='<option value="k'+k.id+'">🎒 '+esc(k.name)+' ('+esc(k.owner||'')+')</option>';});
+  ((INV&&INV.pets)||[]).forEach(function(p){
+    o+='<option value="p'+p.id+'">🐾 Encima de '+esc(p.name)+'</option>';});
+  return o+'<option value="s">🏠 Mi guardado</option><option value="g">👥 Guardado del grupo</option>';
+}
+function openTake(iid){
+  var it=CATALOG.filter(function(x){return x.id===iid;})[0];
+  if(!it)return;
+  var c=meChar()||{};
+  var light=Math.min(c.marcos_light||0,c.marcos||0), dun=Math.max(0,(c.marcos||0)-light);
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">'+esc(it.name)+'</div>'
+    +(it.descripcion?'<div class="sh-meta">'+esc(it.descripcion)+'</div>':'')
+    +'<div class="sh-meta" style="margin:8px 0 12px">Precio de lista 💠'+(it.precio||0)
+      +'. Cambialo si el DM te hizo un descuento, o ponelo en 0 si es un hallazgo: no se te va ninguna esfera.</div>'
+    +'<div style="display:flex;flex-direction:column;gap:9px">'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Cantidad</span>'
+        +'<input class="oc-fi" type="number" min="1" id="tkQty" value="1" style="width:90px" oninput="tkReset()"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Precio por unidad</span>'
+        +'<input class="oc-fi" type="number" min="0" id="tkPrecio" value="'+(it.precio||0)+'" style="width:90px" oninput="tkReset()"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>¿Dónde lo ponés?</span>'
+        +'<select class="oc-fi" id="tkDest" style="flex:1;max-width:260px">'+takeDestOpts()+'</select></label>'
+    +'</div>'
+    +'<div class="section-lbl" style="margin-top:14px">Con qué lo pagás</div>'
+    +'<div class="sh-meta" style="margin-bottom:8px">Tenés '+light+' cargadas y '+dun+' opacas. Repartilo como quieras.</div>'
+    +'<div style="display:flex;gap:10px">'
+      +'<label style="flex:1"><div style="font-size:11px;color:#e8c840">Cargadas</div>'
+        +'<input class="oc-fi" type="number" min="0" id="tkCarg" value="0" style="width:100%" oninput="tkFill(\'c\')"/></label>'
+      +'<label style="flex:1"><div style="font-size:11px;color:var(--text3)">Opacas</div>'
+        +'<input class="oc-fi" type="number" min="0" id="tkOpac" value="0" style="width:100%" oninput="tkFill(\'o\')"/></label>'
+    +'</div>'
+    +'<div id="tkTotal" style="margin-top:10px;font-family:\'Cinzel\',serif;color:var(--gold2)"></div>'
+    +'<div class="me-sheet-row" style="justify-content:flex-end;border:none;margin-top:12px">'
+      +'<button class="btn-sheet" style="background:var(--gold);color:#1c1915;border-color:var(--gold)" onclick="doTake('+iid+')">Agarrar</button></div>';
+  document.getElementById('overlay').classList.add('on');
+  tkReset();
+}
+function _tkNum(id){var v=parseInt(document.getElementById(id).value);return (isNaN(v)||v<0)?0:v;}
+function tkTotal(){ return _tkNum('tkPrecio')*Math.max(1,_tkNum('tkQty')); }
+function tkReset(){
+  // por defecto se van primero las opacas: guardarse la luz es lo sensato
+  var t=tkTotal(), c=meChar()||{};
+  var light=Math.min(c.marcos_light||0,c.marcos||0), dun=Math.max(0,(c.marcos||0)-light);
+  var op=Math.min(dun,t);
+  document.getElementById('tkOpac').value=op;
+  document.getElementById('tkCarg').value=t-op;
+  tkPaint();
+}
+function tkFill(which){
+  var t=tkTotal();
+  if(which==='c') document.getElementById('tkOpac').value=Math.max(0,t-_tkNum('tkCarg'));
+  else document.getElementById('tkCarg').value=Math.max(0,t-_tkNum('tkOpac'));
+  tkPaint();
+}
+function tkPaint(){
+  var t=tkTotal(), suma=_tkNum('tkCarg')+_tkNum('tkOpac');
+  document.getElementById('tkTotal').innerHTML='Total 💠 '+t
+    +(suma!==t?' <span style="color:#e05050;font-size:12px">· el reparto suma '+suma+'</span>':'');
+}
+async function doTake(iid){
+  var d=document.getElementById('tkDest').value;
+  var body={item_id:iid, cantidad:Math.max(1,_tkNum('tkQty')), precio:_tkNum('tkPrecio'),
+            pago_cargados:_tkNum('tkCarg'), pago_opacos:_tkNum('tkOpac')};
+  if(d==='s') body.stash='personal';
+  else if(d==='g') body.stash='grupo';
+  else if(d.charAt(0)==='p') body.pet_id=parseInt(d.slice(1));
+  else if(d.charAt(0)==='k') body.parent_id=parseInt(d.slice(1));
+  var r=await fetch('/api/characters/'+MYCHAR+'/inventory/take',
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo agarrar');return;}
+  var j=await r.json();
+  closeModal();
+  loadRoster();            // los marcos cambiaron
+  loadInventory();
+  if(j.total) alert('Pagaste 💠'+j.total+' ('+j.pago.cargados+' cargadas y '+j.pago.opacos+' opacas).');
+}
+
 // El proxy (Cloudflare) corta las conexiones ociosas, a veces sin avisar: queda
 // un socket "zombie" (onclose nunca se dispara) y el combate se congela. Por eso
 // mandamos un ping cada 25 s y, si no llega nada de vuelta en 70 s, lo cerramos

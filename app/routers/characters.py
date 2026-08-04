@@ -10,8 +10,9 @@ from ..auth import current_user
 from ..database import db
 from ..dnd_pdf import parse_dnd_pdf
 from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
-                      LiveStat, LiveStatus, MarcosChange, MarcosSet, PetFromEnemy,
-                      SlotsConfigIn, SlotSpend)
+                      InventoryIn, InventoryMove, InventoryQty, InventoryStash,
+                      InventoryTransfer, LiveStat, LiveStatus, MarcosChange, MarcosSet,
+                      PetFromEnemy, SizeIn, SlotsConfigIn, SlotSpend, TakeIn)
 from ..pdf_import import extract_pdf_image, parse_character_pdf
 from ..state import combats
 from ..ws import push_state
@@ -280,9 +281,35 @@ async def import_pdf(campaign_id: int, file: UploadFile = File(...), user=Depend
         cid = cur.lastrowid
         conn.execute("INSERT INTO character_pdfs (character_id, pdf) VALUES (?,?)", (cid, data))
         _apply_pdf_slots(conn, cid, p["slots"])
+        _seed_from_pdf(conn, cid, p, system)
         _link_membership(conn, campaign_id, user, cid)
         _store_extracted_image(conn, cid, data)
     return {"id": cid, "name": p["name"]}
+
+
+def _seed_from_pdf(conn, char_id: int, p: dict, system: str):
+    """Semilla inicial desde la ficha: inventario (armas + equipo) y marcos.
+
+    Solo corre al **crear** el personaje. Al reimportar el PDF para subir de
+    nivel no se toca nada de esto, porque para entonces el jugador ya compró,
+    gastó y reacomodó sus cosas en la app."""
+    if system != "cosmere":
+        return
+    sheet = p.get("sheet") or {}
+    camp = conn.execute("SELECT campaign_id FROM characters WHERE id=?", (char_id,)).fetchone()
+    for linea in (sheet.get("weapons") or []) + (sheet.get("equipment") or []):
+        nombre = str(linea).strip()
+        if nombre:
+            conn.execute(
+                "INSERT INTO inventory (character_id, campaign_id, name, slots, cantidad) "
+                "VALUES (?,?,?,1,1)",
+                (char_id, camp["campaign_id"] if camp else None, nombre[:120]),
+            )
+    marcos = max(0, int(p.get("spheres") or 0))
+    if marcos:
+        # Entran cargados; el jugador ajusta el reparto con el recuadro de marcos.
+        conn.execute("UPDATE characters SET marcos=?, marcos_light=? WHERE id=?",
+                     (marcos, marcos, char_id))
 
 
 # ── Mascotas (pets) de un personaje ────────────────────────
@@ -636,6 +663,523 @@ def character_marcos_set(cid: int, s: MarcosSet, user=Depends(current_user)):
         conn.execute("UPDATE characters SET marcos=?, marcos_light=? WHERE id=?",
                      (cargados + opacos, cargados, cid))
     return {"ok": True, "marcos": cargados + opacos, "marcos_light": cargados}
+
+
+# ── Inventario y capacidad de carga (regla opcional de Cosmere) ──
+#
+# Capacidad = base por tamaño + Fuerza (+ bonus de objetos como la mochila).
+# Cada objeto ocupa 1 slot salvo excepciones: el dinero y los insignificantes 0,
+# Cumbersome N ocupa 1+N, y los grandes más de 1 (queda a criterio del DM, que
+# carga el número de slots al crear el objeto).
+
+_SIZE_BASE = {"Pequeño": 4, "Mediano": 6, "Grande": 10, "Enorme": 15, "Gargantuesco": 20}
+# Los statblocks vienen en inglés; se mapean al tamaño del sistema.
+_SIZE_ALIASES = {"tiny": "Pequeño", "small": "Pequeño", "medium": "Mediano",
+                 "large": "Grande", "huge": "Enorme", "gargantuan": "Gargantuesco",
+                 "pequeño": "Pequeño", "mediano": "Mediano", "grande": "Grande",
+                 "enorme": "Enorme", "gargantuesco": "Gargantuesco"}
+
+
+def _norm_size(value) -> str:
+    return _SIZE_ALIASES.get(str(value or "").strip().lower(), "Mediano")
+
+
+# Zonas donde puede estar un objeto. Solo lo que está encima ('') pesa: los
+# guardados representan lo que el personaje tiene pero no carga (en la posada,
+# en el carro, en la casa del grupo) y no tienen tope.
+STASHES = ("", "personal", "grupo")
+
+
+def _norm_stash(value) -> str:
+    v = str(value or "").strip().lower()
+    return v if v in ("personal", "grupo") else ""
+
+
+def _inv_rows(conn, *, character_id=None, pet_id=None, campaign_id=None, stash=""):
+    """Objetos de una zona. `campaign_id` trae el guardado del grupo, que no es
+    de ningún personaje en particular."""
+    if campaign_id is not None:
+        return conn.execute(
+            "SELECT * FROM inventory WHERE campaign_id=? AND character_id IS NULL "
+            "AND pet_id IS NULL AND COALESCE(stash,'')='grupo' ORDER BY name",
+            (campaign_id,)).fetchall()
+    if character_id is not None:
+        return conn.execute(
+            "SELECT * FROM inventory WHERE character_id=? AND pet_id IS NULL "
+            "AND COALESCE(stash,'')=? ORDER BY name", (character_id, stash)).fetchall()
+    return conn.execute(
+        "SELECT * FROM inventory WHERE pet_id=? AND COALESCE(stash,'')=? ORDER BY name",
+        (pet_id, stash)).fetchall()
+
+
+def _inv_serialize(r) -> dict:
+    d = dict(r)
+    d["categorias"] = json.loads(d.get("categorias") or "[]")
+    d["stats"] = json.loads(d.get("stats") or "{}")
+    d["contenedor"] = bool(d.get("contenedor"))
+    d["equipado"] = bool(d.get("equipado"))
+    d["stash"] = _norm_stash(d.get("stash"))
+    return d
+
+
+def _slots_de(r) -> int:
+    """Slots que ocupa una entrada. Un paquete con usos (5 raciones) ocupa lo
+    mismo hasta que se agota, no un slot por unidad."""
+    return (r["slots"] or 0) * (r["cantidad"] or 1)
+
+
+def carrying_capacity(size: str, fuerza: int, rows) -> dict:
+    """Capacidad, uso y sobrecarga. No bloquea: solo informa.
+
+    Solo cuenta lo que la criatura lleva encima: lo **equipado** y que no esté
+    dentro de un contenedor (eso va contra la capacidad del contenedor)."""
+    base = _SIZE_BASE.get(_norm_size(size), 6)
+    encima = [r for r in rows if not r["parent_id"] and r["equipado"]]
+    bonus = sum((r["capacity_bonus"] or 0) * (r["cantidad"] or 1) for r in encima)
+    usado = sum(_slots_de(r) for r in encima)
+    capacidad = base + int(fuerza or 0) + bonus
+    return {"capacidad": capacidad, "usado": usado, "base": base,
+            "fuerza": int(fuerza or 0), "bonus": bonus,
+            "sobrecargado": usado > capacidad}
+
+
+def _nest(rows) -> list:
+    """Arma el árbol: los contenedores traen adentro lo que guardan, con su
+    propio uso de espacio."""
+    ser = {r["id"]: _inv_serialize(r) for r in rows}
+    for d in ser.values():
+        d["children"] = []
+    top = []
+    for r in rows:
+        d = ser[r["id"]]
+        padre = ser.get(r["parent_id"]) if r["parent_id"] else None
+        (padre["children"] if padre else top).append(d)
+    for d in ser.values():
+        if d["contenedor"]:
+            d["cont_usado"] = sum((c["slots"] or 0) * (c["cantidad"] or 1)
+                                  for c in d["children"])
+            d["cont_lleno"] = d["cont_usado"] > (d["contenedor_capacidad"] or 0)
+    return top
+
+
+def _char_capacity(conn, ch, rows) -> dict:
+    sheet = json.loads(ch["sheet"] or "{}")
+    fuerza = (sheet.get("attributes") or {}).get("STR") or 0
+    size = ch["size"] if "size" in ch.keys() else "Mediano"
+    return carrying_capacity(size, fuerza, rows)
+
+
+def _pet_capacity(conn, pet, rows) -> dict:
+    stats = json.loads(pet["stats"] or "{}")
+    fuerza = (stats.get("physical") or {}).get("str") or 0
+    return carrying_capacity(stats.get("size"), fuerza, rows)
+
+
+def _can_create_items(conn, ch, user) -> bool:
+    """Permiso que el DM le da a un jugador para crear objetos propios."""
+    m = conn.execute(
+        "SELECT can_create_items FROM campaign_members WHERE campaign_id=? AND user_id=?",
+        (ch["campaign_id"], user["id"]),
+    ).fetchone()
+    return bool(m and m["can_create_items"])
+
+
+def _item_copy(it) -> dict:
+    """Copia de un objeto del catálogo. Lo entregado no se altera si después el
+    DM edita el catálogo (mismo criterio que las mascotas del bestiario)."""
+    return {"name": it["name"], "kind": it["kind"] or "equipo", "desc": it["descripcion"],
+            "cats": it["categorias"], "peso": it["peso"] or "", "slots": it["slots"],
+            "cap_bonus": it["capacity_bonus"] or 0, "usos_max": it["usos_max"] or 0,
+            "cont_cap": it["contenedor_capacidad"] or 0, "stats": it["stats"] or "{}",
+            "item_id": it["id"]}
+
+
+def _inv_insert(conn, d, *, character_id=None, pet_id=None, campaign_id=None,
+                stash="", parent_id=None, cantidad=1, notas=""):
+    cur = conn.execute(
+        "INSERT INTO inventory (character_id, pet_id, campaign_id, stash, item_id, name, "
+        "kind, descripcion, categorias, peso, slots, capacity_bonus, usos, usos_max, "
+        "contenedor, contenedor_capacidad, stats, cantidad, notas, parent_id, equipado) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)",
+        (character_id, pet_id, campaign_id, stash, d["item_id"], d["name"], d["kind"],
+         d["desc"], d["cats"], d["peso"], d["slots"], d["cap_bonus"], d["usos_max"],
+         d["usos_max"], 1 if d["cont_cap"] else 0, d["cont_cap"], d["stats"],
+         max(1, cantidad), notas, parent_id),
+    )
+    return cur.lastrowid
+
+
+def _assert_una_mochila(conn, dest: dict, *, exclude_id=None):
+    """Solo se lleva **un contenedor encima**: una mochila, o una carreta si es
+    una mascota. Tener dos sería espacio infinito gratis.
+
+    En los guardados no aplica: ahí podés tener las que quieras."""
+    if dest["stash"]:
+        return
+    sql = ("SELECT name FROM inventory WHERE COALESCE(stash,'')='' AND parent_id IS NULL "
+           "AND contenedor=1 AND ")
+    if dest["pet_id"]:
+        sql += "pet_id=?"
+        params = [dest["pet_id"]]
+    else:
+        sql += "character_id=? AND pet_id IS NULL"
+        params = [dest["character_id"]]
+    if exclude_id:
+        sql += " AND id<>?"
+        params.append(exclude_id)
+    r = conn.execute(sql, params).fetchone()
+    if r:
+        quien = "La mascota ya lleva" if dest["pet_id"] else "Ya llevás"
+        raise HTTPException(
+            400, f"{quien} un contenedor encima ({r['name']}). Guardalo o pasalo "
+                 "antes de llevar otro.")
+
+
+def _dest_fields(ch, *, pet_id=None, stash="") -> dict:
+    """A quién queda pegada una entrada según la zona. Los guardados son del
+    personaje o del grupo: una mascota solo lleva cosas encima."""
+    stash = _norm_stash(stash)
+    if stash == "grupo":
+        return {"character_id": None, "pet_id": None, "stash": "grupo"}
+    if stash == "personal":
+        return {"character_id": ch["id"], "pet_id": None, "stash": "personal"}
+    if pet_id:
+        return {"character_id": None, "pet_id": pet_id, "stash": ""}
+    return {"character_id": ch["id"], "pet_id": None, "stash": ""}
+
+
+def _place(conn, entry, *, character_id=None, pet_id=None, campaign_id=None,
+           stash="", parent_id=None):
+    """Deja una entrada en una zona. Lo que hay dentro de un contenedor viaja
+    con él: la mochila se guarda llena."""
+    conn.execute(
+        "UPDATE inventory SET character_id=?, pet_id=?, campaign_id=?, stash=?, parent_id=? "
+        "WHERE id=?",
+        (character_id, pet_id, campaign_id, stash, parent_id, entry["id"]))
+    conn.execute(
+        "UPDATE inventory SET character_id=?, pet_id=?, campaign_id=?, stash=? "
+        "WHERE parent_id=?",
+        (character_id, pet_id, campaign_id, stash, entry["id"]))
+
+
+def _add_inventory(conn, payload, *, character_id=None, pet_id=None, campaign_id=None,
+                   owner_id=None, is_dm=False, can_create=False):
+    """Alta de un objeto. Del catálogo (item_id) solo puede el DM: el jugador que
+    quiere algo del catálogo lo agarra y lo paga (ver `take_from_catalog`)."""
+    if payload.item_id:
+        if not is_dm:
+            raise HTTPException(403, "Solo el DM puede entregar objetos del catálogo")
+        it = conn.execute("SELECT * FROM items WHERE id=?", (payload.item_id,)).fetchone()
+        if not it:
+            raise HTTPException(404, "Objeto no encontrado en el catálogo")
+        d = _item_copy(it)
+    else:
+        if not (is_dm or can_create):
+            raise HTTPException(403, "El DM no te habilitó a crear objetos")
+        name = (payload.name or "").strip()
+        if not name:
+            raise HTTPException(400, "Poné un nombre al objeto")
+        d = {"name": name, "kind": payload.kind or "equipo", "desc": payload.descripcion,
+             "cats": json.dumps([c.strip().lower() for c in payload.categorias if c.strip()]),
+             "peso": payload.peso, "slots": max(0, payload.slots),
+             "cap_bonus": max(0, payload.capacity_bonus),
+             "usos_max": max(0, payload.usos_max),
+             "cont_cap": max(0, payload.contenedor_capacidad),
+             "stats": json.dumps(payload.stats or {}), "item_id": None}
+        if payload.save_to_catalog and is_dm and owner_id:
+            d["item_id"] = conn.execute(
+                "INSERT INTO items (owner_id, name, kind, descripcion, categorias, precio, "
+                "peso, slots, capacity_bonus, usos_max, contenedor, contenedor_capacidad, "
+                "stats) VALUES (?,?,?,?,?,0,?,?,?,?,?,?,?)",
+                (owner_id, d["name"], d["kind"], d["desc"], d["cats"], d["peso"],
+                 d["slots"], d["cap_bonus"], d["usos_max"],
+                 1 if d["cont_cap"] else 0, d["cont_cap"], d["stats"]),
+            ).lastrowid
+    if d["cont_cap"] and not payload.parent_id:
+        _assert_una_mochila(conn, {"character_id": character_id, "pet_id": pet_id,
+                                   "stash": ""})
+    return _inv_insert(conn, d, character_id=character_id, pet_id=pet_id,
+                       campaign_id=campaign_id, parent_id=payload.parent_id,
+                       cantidad=payload.cantidad, notas=payload.notas)
+
+
+def _pay_marcos(conn, ch, total: int, cargados=None, opacos=None) -> dict:
+    """Cobra `total` marcos. El jugador elige con cuáles paga; si no manda
+    reparto, se van primero las opacas (guardarse la luz es lo sensato)."""
+    marcos = ch["marcos"] or 0
+    light = min(ch["marcos_light"] or 0, marcos)
+    dun = marcos - light
+    if total <= 0:
+        return {"cargados": 0, "opacos": 0, "marcos": marcos, "marcos_light": light}
+    if cargados is None and opacos is None:
+        opacos = min(dun, total)
+        cargados = total - opacos
+    cargados, opacos = max(0, int(cargados or 0)), max(0, int(opacos or 0))
+    if cargados + opacos != total:
+        raise HTTPException(
+            400, f"El reparto suma {cargados + opacos} y el precio es {total}")
+    if cargados > light:
+        raise HTTPException(400, f"No tenés {cargados} marcos cargados (tenés {light})")
+    if opacos > dun:
+        raise HTTPException(400, f"No tenés {opacos} marcos opacos (tenés {dun})")
+    conn.execute("UPDATE characters SET marcos=?, marcos_light=? WHERE id=?",
+                 (marcos - total, light - cargados, ch["id"]))
+    return {"cargados": cargados, "opacos": opacos,
+            "marcos": marcos - total, "marcos_light": light - cargados}
+
+
+def character_inventory(conn, ch) -> dict:
+    """Todo lo que rodea a un personaje: lo que lleva encima (con sus
+    contenedores), lo de sus mascotas, su guardado y el del grupo."""
+    cid = ch["id"]
+    rows = _inv_rows(conn, character_id=cid)
+    out = {"character": {"id": cid, "name": ch["name"],
+                         "size": ch["size"] if "size" in ch.keys() else "Mediano",
+                         "items": _nest(rows),
+                         "capacity": _char_capacity(conn, ch, rows),
+                         "guardado": _nest(_inv_rows(conn, character_id=cid,
+                                                     stash="personal"))},
+           "pets": []}
+    for pet in conn.execute("SELECT * FROM pets WHERE character_id=? ORDER BY name", (cid,)):
+        prows = _inv_rows(conn, pet_id=pet["id"])
+        out["pets"].append({"id": pet["id"], "name": pet["name"],
+                            "items": _nest(prows),
+                            "capacity": _pet_capacity(conn, pet, prows)})
+    out["grupo"] = _nest(_inv_rows(conn, campaign_id=ch["campaign_id"])) \
+        if ch["campaign_id"] else []
+    # Compañeros de campaña, para pasarles cosas.
+    out["aliados"] = [
+        {"id": r["id"], "name": r["name"]}
+        for r in conn.execute(
+            "SELECT id, name FROM characters WHERE campaign_id=? AND id<>? ORDER BY name",
+            (ch["campaign_id"], cid))
+    ] if ch["campaign_id"] else []
+    return out
+
+
+@router.get("/{cid}/inventory")
+def get_inventory(cid: int, user=Depends(current_user)):
+    """Inventario del personaje y de cada mascota, con su capacidad de carga."""
+    with db() as conn:
+        return character_inventory(conn, _owned_or_dm(conn, cid, user))
+
+
+@router.post("/{cid}/inventory")
+def add_inventory(cid: int, payload: InventoryIn, user=Depends(current_user)):
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        is_dm = ch["dm_id"] == user["id"]
+        _add_inventory(conn, payload, character_id=cid, campaign_id=ch["campaign_id"],
+                       owner_id=ch["dm_id"], is_dm=is_dm,
+                       can_create=_can_create_items(conn, ch, user))
+    return {"ok": True}
+
+
+@router.post("/{cid}/pets/{pid}/inventory")
+def add_pet_inventory(cid: int, pid: int, payload: InventoryIn, user=Depends(current_user)):
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        pet = conn.execute("SELECT * FROM pets WHERE id=? AND character_id=?",
+                           (pid, cid)).fetchone()
+        if not pet:
+            raise HTTPException(404, "Mascota no encontrada")
+        is_dm = ch["dm_id"] == user["id"]
+        _add_inventory(conn, payload, pet_id=pid, campaign_id=ch["campaign_id"],
+                       owner_id=ch["dm_id"], is_dm=is_dm,
+                       can_create=_can_create_items(conn, ch, user))
+    return {"ok": True}
+
+
+@router.post("/{cid}/inventory/take")
+def take_from_catalog(cid: int, t: TakeIn, user=Depends(current_user)):
+    """El jugador agarra un objeto del catálogo y lo paga.
+
+    El precio es editable: puede ser un descuento del DM o un hallazgo (0, y no
+    se le va ninguna esfera). El reparto entre esferas cargadas y opacas también
+    lo elige él."""
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        is_dm = ch["dm_id"] == user["id"]
+        it = conn.execute("SELECT * FROM items WHERE id=? AND owner_id=?",
+                          (t.item_id, ch["dm_id"])).fetchone()
+        # Lo oculto no existe para el jugador: ni siquiera se entera de que está.
+        if not it or (it["secreto"] and not is_dm):
+            raise HTTPException(404, "Objeto no encontrado en el catálogo")
+        pet_id = None
+        if t.pet_id:
+            pet = conn.execute("SELECT id FROM pets WHERE id=? AND character_id=?",
+                               (t.pet_id, cid)).fetchone()
+            if not pet:
+                raise HTTPException(404, "Mascota no encontrada")
+            pet_id = pet["id"]
+        cant = max(1, t.cantidad)
+        precio = it["precio"] if t.precio is None else max(0, t.precio)
+        total = precio * cant
+        dest = _dest_fields(ch, pet_id=pet_id, stash=t.stash)
+        if it["contenedor"] and not t.parent_id:
+            _assert_una_mochila(conn, dest)
+        pago = _pay_marcos(conn, ch, total, t.pago_cargados, t.pago_opacos)
+        _inv_insert(conn, _item_copy(it), campaign_id=ch["campaign_id"],
+                    parent_id=t.parent_id if not dest["stash"] else None,
+                    cantidad=cant, **dest)
+    return {"ok": True, "total": total, "pago": pago}
+
+
+@router.post("/{cid}/inventory/{eid}/qty")
+def inventory_qty(cid: int, eid: int, ch: InventoryQty, user=Depends(current_user)):
+    """Ajusta la cantidad; al llegar a 0 se saca del inventario."""
+    with db() as conn:
+        _owned_or_dm(conn, cid, user)
+        r = conn.execute(
+            "SELECT inv.* FROM inventory inv LEFT JOIN pets p ON p.id=inv.pet_id "
+            "WHERE inv.id=? AND (inv.character_id=? OR p.character_id=?)",
+            (eid, cid, cid)).fetchone()
+        if not r:
+            raise HTTPException(404, "Objeto no encontrado en el inventario")
+        val = (r["cantidad"] or 1) + ch.delta
+        if val <= 0:
+            conn.execute("DELETE FROM inventory WHERE id=?", (eid,))
+        else:
+            conn.execute("UPDATE inventory SET cantidad=? WHERE id=?", (val, eid))
+    return {"ok": True}
+
+
+def _inv_entry(conn, cid: int, eid: int):
+    """Una entrada que este personaje puede tocar: propia, de una mascota suya o
+    del guardado del grupo (que es de todos)."""
+    r = conn.execute(
+        "SELECT inv.* FROM inventory inv LEFT JOIN pets p ON p.id=inv.pet_id "
+        "WHERE inv.id=? AND (inv.character_id=? OR p.character_id=? OR "
+        "  (inv.character_id IS NULL AND inv.pet_id IS NULL AND inv.campaign_id="
+        "   (SELECT campaign_id FROM characters WHERE id=?)))",
+        (eid, cid, cid, cid)).fetchone()
+    if not r:
+        raise HTTPException(404, "Objeto no encontrado en el inventario")
+    return r
+
+
+@router.post("/{cid}/inventory/{eid}/equip")
+def toggle_equipado(cid: int, eid: int, user=Depends(current_user)):
+    """Equipar/desequipar. Lo desequipado (y lo que lleve adentro, si es un
+    contenedor) deja de contar para la capacidad: quedó en el suelo o en la carreta."""
+    with db() as conn:
+        _owned_or_dm(conn, cid, user)
+        r = _inv_entry(conn, cid, eid)
+        val = 0 if r["equipado"] else 1
+        conn.execute("UPDATE inventory SET equipado=? WHERE id=?", (val, eid))
+    return {"ok": True, "equipado": bool(val)}
+
+
+@router.post("/{cid}/inventory/{eid}/move")
+def move_inventory(cid: int, eid: int, m: InventoryMove, user=Depends(current_user)):
+    """Mete o saca un objeto de un contenedor (mochila, carreta del chull…)."""
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        r = _inv_entry(conn, cid, eid)
+        if m.parent_id:
+            if m.parent_id == eid:
+                raise HTTPException(400, "Un contenedor no puede guardarse a sí mismo")
+            parent = _inv_entry(conn, cid, m.parent_id)
+            if not parent["contenedor"]:
+                raise HTTPException(400, "Ese objeto no es un contenedor")
+            if r["contenedor"]:
+                raise HTTPException(400, "No se puede meter un contenedor dentro de otro")
+            # El objeto pasa a estar donde está el contenedor: así se carga la
+            # carreta del chull con cosas que llevaba el personaje.
+            _place(conn, r, character_id=parent["character_id"], pet_id=parent["pet_id"],
+                   campaign_id=parent["campaign_id"] or ch["campaign_id"],
+                   stash=_norm_stash(parent["stash"]), parent_id=parent["id"])
+        else:
+            # sacarlo lo devuelve a las manos del personaje
+            _place(conn, r, character_id=cid, campaign_id=ch["campaign_id"])
+    return {"ok": True}
+
+
+@router.post("/{cid}/inventory/{eid}/stash")
+def stash_inventory(cid: int, eid: int, s: InventoryStash, user=Depends(current_user)):
+    """Mueve un objeto entre lo que se lleva encima, el guardado propio y el del
+    grupo. Los guardados no tienen tope: es lo que se tiene pero no se carga."""
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        r = _inv_entry(conn, cid, eid)
+        stash = _norm_stash(s.stash)
+        if stash == "grupo" and not ch["campaign_id"]:
+            raise HTTPException(400, "El personaje no está en ninguna campaña")
+        dest = _dest_fields(ch, pet_id=r["pet_id"], stash=stash)
+        if r["contenedor"]:
+            _assert_una_mochila(conn, dest, exclude_id=r["id"])
+        _place(conn, r, campaign_id=ch["campaign_id"], **dest)
+    return {"ok": True, "stash": stash}
+
+
+@router.post("/{cid}/inventory/{eid}/transfer")
+def transfer_inventory(cid: int, eid: int, t: InventoryTransfer, user=Depends(current_user)):
+    """Le pasa un objeto a otro personaje de la campaña (o a una mascota suya).
+    Lo que va dentro de un contenedor se pasa con él."""
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        r = _inv_entry(conn, cid, eid)
+        if not ch["campaign_id"]:
+            raise HTTPException(400, "El personaje no está en ninguna campaña")
+        if t.pet_id:
+            dest = conn.execute(
+                "SELECT p.id, ch.id AS char_id, ch.campaign_id, ch.name FROM pets p "
+                "JOIN characters ch ON ch.id=p.character_id WHERE p.id=?", (t.pet_id,)).fetchone()
+            if not dest or dest["campaign_id"] != ch["campaign_id"]:
+                raise HTTPException(404, "Esa mascota no está en tu campaña")
+            if r["contenedor"]:
+                _assert_una_mochila(conn, {"character_id": None, "pet_id": dest["id"],
+                                           "stash": ""}, exclude_id=r["id"])
+            _place(conn, r, pet_id=dest["id"], campaign_id=ch["campaign_id"])
+            return {"ok": True, "a": dest["name"]}
+        dest = conn.execute("SELECT * FROM characters WHERE id=?", (t.character_id or 0,)).fetchone()
+        if not dest or dest["campaign_id"] != ch["campaign_id"]:
+            raise HTTPException(404, "Ese personaje no está en tu campaña")
+        campos = _dest_fields(dest, stash=t.stash)
+        if r["contenedor"]:
+            _assert_una_mochila(conn, campos, exclude_id=r["id"])
+        _place(conn, r, campaign_id=ch["campaign_id"], **campos)
+    return {"ok": True, "a": dest["name"]}
+
+
+@router.post("/{cid}/inventory/{eid}/use")
+def use_inventory(cid: int, eid: int, ch: InventoryQty, user=Depends(current_user)):
+    """Gasta (o repone) una dosis/carga. Al agotarse, el objeto se va."""
+    with db() as conn:
+        _owned_or_dm(conn, cid, user)
+        r = _inv_entry(conn, cid, eid)
+        if not (r["usos_max"] or 0):
+            raise HTTPException(400, "Ese objeto no tiene dosis ni cargas")
+        val = max(0, min(r["usos_max"], (r["usos"] or 0) + ch.delta))
+        if val <= 0:
+            # se acabaron: si había más de una unidad, arranca otra
+            resto = (r["cantidad"] or 1) - 1
+            if resto > 0:
+                conn.execute("UPDATE inventory SET cantidad=?, usos=? WHERE id=?",
+                             (resto, r["usos_max"], eid))
+            else:
+                conn.execute("DELETE FROM inventory WHERE id=?", (eid,))
+            return {"ok": True, "usos": 0, "agotado": True}
+        conn.execute("UPDATE inventory SET usos=? WHERE id=?", (val, eid))
+    return {"ok": True, "usos": val, "agotado": False}
+
+
+@router.delete("/{cid}/inventory/{eid}")
+def delete_inventory(cid: int, eid: int, user=Depends(current_user)):
+    with db() as conn:
+        _owned_or_dm(conn, cid, user)
+        r = _inv_entry(conn, cid, eid)
+        conn.execute("DELETE FROM inventory WHERE id=?", (r["id"],))
+    return {"ok": True}
+
+
+@router.put("/{cid}/size")
+def set_size(cid: int, s: SizeIn, user=Depends(current_user)):
+    size = _norm_size(s.size)
+    with db() as conn:
+        _owned_or_dm(conn, cid, user)
+        conn.execute("UPDATE characters SET size=? WHERE id=?", (size, cid))
+    return {"ok": True, "size": size}
 
 
 @router.post("/{cid}/marcos/charge_inv")

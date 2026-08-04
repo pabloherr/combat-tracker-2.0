@@ -269,3 +269,107 @@ def init_db():
         ecols = {r["name"] for r in conn.execute("PRAGMA table_info(enemies)")}
         if "system" not in ecols:
             conn.execute("ALTER TABLE enemies ADD COLUMN system TEXT DEFAULT 'cosmere'")
+
+        # ── Objetos, comercio e inventario (solo campañas Cosmere) ─────────
+        conn.executescript("""
+        -- Catálogo de objetos del DM (se comparte entre sus campañas, como el bestiario).
+        CREATE TABLE IF NOT EXISTS items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            descripcion TEXT DEFAULT '',
+            categorias TEXT DEFAULT '[]',      -- JSON: ["armas", "generales", ...]
+            precio INTEGER NOT NULL DEFAULT 0, -- precio base, en marcos
+            slots INTEGER NOT NULL DEFAULT 1,  -- 0 = no ocupa; Cumbersome N => 1+N
+            capacity_bonus INTEGER DEFAULT 0,  -- mochila = 2
+            secreto INTEGER DEFAULT 0,         -- no aparece en el catálogo del jugador
+            notas TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        -- Inventario de un personaje o de una mascota (copia del objeto).
+        CREATE TABLE IF NOT EXISTS inventory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            character_id INTEGER REFERENCES characters(id) ON DELETE CASCADE,
+            pet_id INTEGER REFERENCES pets(id) ON DELETE CASCADE,
+            item_id INTEGER REFERENCES items(id) ON DELETE SET NULL,
+            name TEXT NOT NULL,
+            descripcion TEXT DEFAULT '',
+            categorias TEXT DEFAULT '[]',
+            slots INTEGER NOT NULL DEFAULT 1,
+            capacity_bonus INTEGER DEFAULT 0,
+            cantidad INTEGER NOT NULL DEFAULT 1,
+            notas TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+        """)
+
+        # Tamaño del personaje (define la base de su capacidad de carga).
+        chcols = {r["name"] for r in conn.execute("PRAGMA table_info(characters)")}
+        if "size" not in chcols:
+            conn.execute("ALTER TABLE characters ADD COLUMN size TEXT DEFAULT 'Mediano'")
+
+        # Días absolutos transcurridos (storm_tracker.day se reinicia con cada
+        # tormenta, así que el calendario necesita su propio contador).
+        cpcols = {r["name"] for r in conn.execute("PRAGMA table_info(campaigns)")}
+        if "day_count" not in cpcols:
+            conn.execute("ALTER TABLE campaigns ADD COLUMN day_count INTEGER DEFAULT 0")
+
+        # Permiso por jugador: crear objetos en su propio inventario.
+        mcols = {r["name"] for r in conn.execute("PRAGMA table_info(campaign_members)")}
+        if "can_create_items" not in mcols:
+            conn.execute("ALTER TABLE campaign_members ADD COLUMN can_create_items INTEGER DEFAULT 0")
+
+        # Migración: cada objeto es de un tipo (arma, armadura, equipo, alojamiento,
+        # vehículo, fabrial) y guarda en `stats` los datos propios de ese tipo
+        # (daño y rasgos de un arma, deflect de una armadura, cargas de un fabrial…).
+        icols = {r["name"] for r in conn.execute("PRAGMA table_info(items)")}
+        for col, ddl in (
+            ("kind", "TEXT DEFAULT 'equipo'"),
+            ("stats", "TEXT DEFAULT '{}'"),
+            ("peso", "TEXT DEFAULT ''"),            # peso del manual, informativo
+            ("usos_max", "INTEGER DEFAULT 0"),      # dosis/cargas por unidad (0 = no aplica)
+            ("contenedor", "INTEGER DEFAULT 0"),    # mochila, carreta, alforja…
+            ("contenedor_capacidad", "INTEGER DEFAULT 0"),
+        ):
+            if col not in icols:
+                conn.execute(f"ALTER TABLE items ADD COLUMN {col} {ddl}")
+
+        # Migración: el inventario refleja lo mismo, más el estado de cada unidad
+        # (usos que le quedan, si está equipada y dentro de qué contenedor).
+        vcols = {r["name"] for r in conn.execute("PRAGMA table_info(inventory)")}
+        for col, ddl in (
+            ("kind", "TEXT DEFAULT 'equipo'"),
+            ("stats", "TEXT DEFAULT '{}'"),
+            ("peso", "TEXT DEFAULT ''"),
+            ("usos", "INTEGER DEFAULT 0"),
+            ("usos_max", "INTEGER DEFAULT 0"),
+            ("contenedor", "INTEGER DEFAULT 0"),
+            ("contenedor_capacidad", "INTEGER DEFAULT 0"),
+            ("equipado", "INTEGER DEFAULT 1"),
+            ("parent_id", "INTEGER REFERENCES inventory(id) ON DELETE CASCADE"),
+            # Zona donde está el objeto. '' = encima (o dentro de un contenedor
+            # que se lleva encima); 'personal' = guardado del personaje, lo que
+            # tiene pero no carga; 'grupo' = guardado compartido de la campaña.
+            # Solo lo que está en '' cuenta para la capacidad de carga.
+            ("stash", "TEXT DEFAULT ''"),
+            # Necesario para el guardado del grupo, que no es de nadie en
+            # particular: ahí character_id y pet_id van en NULL.
+            ("campaign_id", "INTEGER REFERENCES campaigns(id) ON DELETE CASCADE"),
+        ):
+            if col not in vcols:
+                conn.execute(f"ALTER TABLE inventory ADD COLUMN {col} {ddl}")
+
+        # Backfill: las entradas viejas son de un personaje; les completamos la
+        # campaña para que las consultas por campaña las vean.
+        conn.execute(
+            "UPDATE inventory SET campaign_id = ("
+            "  SELECT ch.campaign_id FROM characters ch WHERE ch.id = inventory.character_id"
+            ") WHERE campaign_id IS NULL AND character_id IS NOT NULL"
+        )
+        conn.execute(
+            "UPDATE inventory SET campaign_id = ("
+            "  SELECT ch.campaign_id FROM pets p JOIN characters ch ON ch.id = p.character_id"
+            "  WHERE p.id = inventory.pet_id"
+            ") WHERE campaign_id IS NULL AND pet_id IS NOT NULL"
+        )

@@ -157,6 +157,166 @@ campaña**: el mismo bestiario puede ofrecer mascotas distintas en cada campaña
 una, se guarda una **copia** de la ficha, así que si después editás el enemigo la mascota
 ya agregada no cambia.
 
+## Objetos e inventario (solo Cosmere)
+
+### Catálogo de objetos (pestaña **Objetos**)
+
+El DM arma su catálogo igual que el bestiario: a mano, **importando desde código**
+(YAML), **en bulk** (varias fichas separadas por `---`, o un archivo) y con **exportar**
+para hacer backup o pasárselo a otro DM.
+
+> **Ya viene cargado:** el archivo [`static/catalogo_cosmere.yaml`](static/catalogo_cosmere.yaml)
+> tiene los **123 objetos del manual** (armas ligeras, pesadas y especiales, armaduras,
+> equipo, alojamiento, vehículos y fabriales). Importalo con
+> *Objetos → ⭳⭳ Importar en bulk → Cargar archivo*.
+
+Cada objeto es de un **tipo**, y cada tipo se lista con sus propios datos:
+
+| Tipo | Qué guarda |
+|---|---|
+| **Arma** | clase (ligera/pesada/especial), daño, alcance, habilidad, rasgos y rasgos de experto |
+| **Armadura** | deflect, rasgos y rasgos de experto |
+| **Equipo** | precio y descripción; se subdivide con categorías (medicina, herramientas, comida…) |
+| **Alojamiento** | precio por persona por noche |
+| **Vehículo** | tipo, velocidad, alquiler por día y precio de compra |
+| **Fabrial** | cargas |
+
+Y en común: precio en marcos, peso, **slots**, **+capacidad**, **dosis/cargas** y
+**capacidad de contenedor**.
+
+```yaml
+kind: arma
+weapon_class: light
+name: "Jabalina"
+damage: "1d6 keen"
+range: "Melee"
+traits: "Thrown [30/120]"
+expert_traits: "Indirect"
+weight: "2 lb."
+price: 20
+---
+kind: equipo
+name: "Raciones (5 días)"
+categories: [comida]
+price: 1
+uses: 5           # 5 usos que ocupan 1 solo slot
+---
+kind: equipo
+name: "Mochila"
+categories: [generales, contenedores]
+price: 8
+container: 2      # guarda aparte: 2 slots propios
+---
+kind: armadura
+name: "Placa completa"
+deflect: 4
+traits: "Cumbersome [5]"
+slots: 6
+price: 1600
+```
+
+El catálogo es **del DM** y se comparte entre sus campañas. Con el botón 🔒 lo marcás como
+**oculto**: existe para vos, pero los jugadores ni se enteran de que está (así vienen
+cargadas la Hoja Esquirlada, el Moldeador de almas, etc.).
+
+### Agarrar del catálogo (pestaña **Catálogo** del jugador)
+
+No hay tiendas: los jugadores ven el catálogo entero **con precios** y agarran lo que
+quieran. Está separado en **solapas por tipo** (armas, armaduras, equipo, alojamiento,
+vehículos, fabriales), y cada tipo se lista **como en el manual**, con su propia tabla:
+
+- **Armas**, partidas en **ligeras**, **pesadas** y **especiales**, con daño, alcance,
+  rasgos y rasgos de experto.
+- **Armaduras** con su deflect y sus rasgos.
+- **Equipo** agrupado por categoría: la comida junta, la medicina junta, las herramientas
+  juntas, los contenedores juntos. Un objeto con varias categorías aparece en cada una (la
+  mochila está en *generales* y en *contenedores*).
+- **Vehículos** con tipo, velocidad, alquiler por día y precio de compra.
+- **Alojamiento** con el precio por persona y noche; **fabriales** con sus cargas.
+
+Además del buscador hay **filtro por categoría** (los chips de abajo, con cuántos hay en
+cada una) y **por precio** (desde / hasta), que se combinan entre sí. **Limpiar** los
+saca todos.
+
+Al tocar **Agarrar** se elige:
+
+- **Cantidad** y **precio por unidad**. El precio viene del catálogo pero **es editable**:
+  si el DM les hizo un descuento lo bajás, y si el objeto es un **hallazgo** lo ponés en
+  **0** y no se gasta ninguna esfera.
+- **Dónde lo ponés**: encima, dentro de la mochila (o de cualquier contenedor), encima de
+  una mascota, en tu guardado o en el del grupo.
+- **Con qué esferas lo pagás**: dos casilleros, **cargadas** y **opacas**, que se
+  completan solos para llegar al total. Por defecto se van primero las opacas (guardarse
+  la luz es lo sensato), pero podés repartirlo como quieras.
+
+Lo que el DM marcó como oculto no aparece ni se puede agarrar.
+
+### Dar objetos: el DM
+
+En la pestaña **Jugadores**, con **🎁 Dar objeto** le das algo a un personaje (o a su
+mascota) eligiéndolo del catálogo o **creándolo en el momento**, con la opción de
+guardarlo también en el catálogo — y sin cobrarle nada. Al lado, el toggle
+**✎ Crea objetos** le da permiso a ese jugador para cargarse objetos propios; sin ese
+permiso solo recibe o agarra del catálogo pagando.
+
+### Ver y editar los inventarios (pestaña **Inventarios** del DM)
+
+El DM ve de un vistazo **qué lleva cada uno**: lo que tiene encima, lo que va en cada
+contenedor, lo de sus mascotas, su guardado personal y el guardado del grupo, cada uno con
+su barra de carga. Desde ahí puede **darle** cosas (🎁), **ajustar cantidades** (+ / −) y
+**sacarle** lo que sea (✕).
+
+### Inventario y capacidad de carga
+
+Regla opcional del Cosmere RPG. El inventario vive en la pestaña **Mi personaje**, debajo
+de las vidas: las tuyas y las de tus mascotas.
+
+```
+Capacidad = base por tamaño + Fuerza
+Pequeño 4 · Mediano 6 · Grande 10 · Enorme 15 · Gargantuesco 20
+```
+
+Cada objeto ocupa **1 slot**, salvo: el dinero y las cosas insignificantes **0**,
+`Cumbersome N` ocupa **1+N**, la Placa y la Hoja Radiante **0**, y los objetos grandes más
+de 1 (a criterio del DM, se carga en el objeto). El personaje y **cada mascota** tienen su
+propia barra; si te pasás, se marca **Sobrecargado** en rojo pero **no te bloquea** (la
+penalización la decide el DM).
+
+**Encima y la mochila.** El inventario viene partido: **🖐 Encima** es lo que llevás en la
+mano, y cada **contenedor** (mochila, saco, cofre, la **carreta** del chull) es su propio
+bloque con su barra de espacio. Lo que metés adentro ocupa **ese** espacio, no el tuyo.
+Con **⇩ Guardar** elegís en qué contenedor va y con **⇧ Sacar** vuelve a tus manos; podés
+cargar la carreta del chull con cosas que llevabas encima. Cada mascota tiene el mismo
+corte: lo que lleva encima y lo que va en la carreta. Además cada cosa se puede **equipar
+o dejar** (🎒): lo que dejaste no cuenta para tu carga.
+
+**Una sola a la vez.** No se puede llevar **más de un contenedor encima**: una mochila, o
+una carreta si es una mascota. Tener dos sería espacio infinito gratis. Podés tener las
+que quieras en un guardado y cambiarlas cuando quieras.
+
+**Guardados (sin tope).** Además de lo que se carga hay dos depósitos, que representan lo
+que tenés pero **no llevás encima**:
+
+- **🏠 Mi guardado** — tuyo: lo que dejaste en la posada, en tu cuarto, en tu casa.
+- **👥 Guardado del grupo** — compartido con toda la mesa: cualquiera deja y cualquiera
+  saca.
+
+Ninguno de los dos pesa ni tiene límite. Con el botón **⇄** movés cualquier cosa entre las
+tres zonas; si movés un contenedor, se va con todo lo que lleva adentro.
+
+**Pasarse cosas.** Con **🤝** le das un objeto a otro personaje de la campaña o a una
+mascota tuya. Le queda encima, y si es un contenedor viaja lleno.
+
+**Dosis y cargas.** Los objetos con usos (raciones de 5 días, antisépticos de 5 dosis,
+venenos, fabriales con cargas) muestran un contador **− 3/5 +**: con los botones gastás y
+reponés de a una, y tocando el número escribís el que quede (media botella, tres
+raciones). Ocupan **un solo slot** hasta que se agotan, y ahí desaparecen (si tenías más
+de una unidad, arranca la siguiente). El DM tiene el mismo contador en **Inventarios**.
+
+Al **crear** el personaje desde el PDF se importan su equipo y sus armas como objetos, y
+sus esferas como marcos. Al **actualizar** el PDF (subir de nivel) el inventario y los
+marcos **no se tocan**.
+
 ### Buscar enemigos
 
 Tanto en el **Bestiario** como en el **creador de encuentros** hay un buscador por

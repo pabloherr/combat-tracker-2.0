@@ -161,6 +161,11 @@ select.fi{appearance:auto;}
 .filter-clear{margin-left:auto;align-self:center;}
 .meta-badges{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 2px;}
 .meta-badge{font-size:10px;letter-spacing:.03em;padding:1px 8px;border-radius:20px;border:.5px solid var(--border2);color:var(--text2);background:var(--bg3);}
+/* dosis y cargas de un objeto del inventario: − 3/5 + */
+.uses-box{display:inline-flex;align-items:center;border:1px solid #e8c840;border-radius:20px;overflow:hidden;flex:none;}
+.uses-btn{background:none;border:none;color:#e8c840;font-size:13px;line-height:1;padding:2px 7px;cursor:pointer;font-family:inherit;}
+.uses-btn:hover{background:rgba(232,200,64,.16);}
+.uses-n{font-family:'Cinzel',serif;font-size:11px;color:#e8c840;padding:0 4px;min-width:32px;text-align:center;}
 .meta-badge.tier{color:var(--gold2);border-color:var(--border2);}
 
 /* creador de encuentros visual */
@@ -316,6 +321,11 @@ select.fi{appearance:auto;}
 .mem-bar-v{width:52px;text-align:right;font-family:'Cinzel',serif;font-size:12px;}
 .mem-chips{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;}
 .mem-chip{font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid;font-family:'Cinzel',serif;letter-spacing:.03em;}
+/* comercio */
+.inv-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;margin-bottom:6px;}
+.stock-price{font-family:'Cinzel',serif;font-size:12px;color:var(--gold2);cursor:pointer;border-bottom:1px dashed var(--border2);padding:0 4px;}
+.stock-price:hover{color:var(--gold);border-bottom-color:var(--gold2);}
+.inv-row.hidden-enemy{opacity:.55;}
 </style>
 </head>
 <body>
@@ -344,6 +354,8 @@ select.fi{appearance:auto;}
     <button class="tab" data-tab="jugadores" onclick="showTab('jugadores')">Jugadores</button>
     <button class="tab" data-tab="bestiario" onclick="showTab('bestiario')">Bestiario</button>
     <button class="tab" data-tab="encuentros" onclick="showTab('encuentros')">Encuentros</button>
+    <button class="tab cosmere-only" data-tab="objetos" onclick="showTab('objetos')">Objetos</button>
+    <button class="tab cosmere-only" data-tab="comercio" onclick="showTab('comercio')">Inventarios</button>
   </div>
 
   <!-- ═══════════ COMBATE ═══════════ -->
@@ -474,6 +486,52 @@ select.fi{appearance:auto;}
     <div class="grid" id="encountersGrid"></div>
     <div class="empty" id="encountersEmpty">Sin encuentros preparados.</div>
   </div>
+
+  <!-- ═══════════ OBJETOS (catálogo del DM) ═══════════ -->
+  <div id="tab-objetos" style="display:none">
+    <div class="row">
+      <div class="section-label" style="margin-bottom:0">Catálogo de objetos</div>
+      <div class="sep"></div>
+      <button class="btn accent" onclick="toggleForm('itImportForm')">⭳ Importar desde código</button>
+      <button class="btn accent" onclick="toggleForm('itBulkForm')">⭳⭳ Importar en bulk</button>
+      <button class="btn ghost" onclick="exportItems()" title="Descarga el catálogo en un .yaml">⭱ Exportar</button>
+      <button class="btn" onclick="openItemEditor()">+ Agregar objeto</button>
+    </div>
+    <div class="form-wrap" id="itBulkForm" style="display:none">
+      <div class="form-title">Importar varios objetos</div>
+      <div class="import-hint">Pegá varias fichas separadas por <code>---</code>, o subí un archivo .yaml exportado.</div>
+      <textarea class="import-ta" id="itBulkCode" placeholder='name: "Cuerda"&#10;categories: [generales]&#10;price: 4&#10;---&#10;name: "Placa completa"&#10;categories: [armaduras]&#10;price: 400&#10;slots: 6'></textarea>
+      <div class="form-actions">
+        <label class="btn ghost" style="cursor:pointer">Cargar archivo<input type="file" accept=".yaml,.yml,.txt,.md" hidden onchange="itBulkFile(this)"/></label>
+        <button class="btn ghost" onclick="toggleForm('itBulkForm')">Cerrar</button>
+        <button class="btn accent" onclick="itBulkImport()">Importar todo</button>
+      </div>
+      <div id="itBulkResult" style="margin-top:10px"></div>
+    </div>
+    <div class="form-wrap" id="itImportForm" style="display:none">
+      <div class="form-title">Importar un objeto</div>
+      <textarea class="import-ta" id="itImportCode" placeholder='name: "Espada larga"&#10;categories: [armas]&#10;price: 25&#10;slots: 1&#10;description: "Arma de filo."'></textarea>
+      <div class="form-actions">
+        <button class="btn ghost" onclick="toggleForm('itImportForm')">Cancelar</button>
+        <button class="btn accent" onclick="importItem()">Importar</button>
+      </div>
+    </div>
+    <div class="filter-bar" id="itBar"></div>
+    <div class="grid" id="itemsGrid"></div>
+    <div class="empty" id="itemsEmpty">Todavía no cargaste objetos.</div>
+  </div>
+
+  <!-- ═══════════ INVENTARIOS (qué lleva cada uno) ═══════════ -->
+  <div id="tab-comercio" style="display:none">
+    <div class="row">
+      <div class="section-label" style="margin-bottom:0">Inventarios de la mesa</div>
+      <div class="sep"></div>
+      <button class="btn ghost" onclick="loadInventories()">↻ Actualizar</button>
+    </div>
+    <div class="import-hint" style="margin-bottom:12px">Lo que cada uno lleva encima, lo que guardó y lo del grupo. Podés darles o sacarles cosas desde acá.</div>
+    <div id="invList"></div>
+    <div class="empty" id="invEmpty">Todavía no hay personajes en la campaña.</div>
+  </div>
 </div>
 
 <div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
@@ -515,6 +573,8 @@ async function loadCampaign(){
       document.getElementById('importCode').placeholder='layout: D&D 5e\nname: "Goblin"\ntype: "Small Humanoid (Goblinoid), Neutral Evil"\nac: "15 (leather armor, shield)"\nhp: 7\nspeed: "30 ft."\ncr: "1/4 (50 XP)"\nstr: 8\ndex: 14\n...';
       document.getElementById('bulkCode').placeholder='layout: D&D 5e\nname: "Goblin"\nhp: 7\n---\nlayout: D&D 5e\nname: "Hobgoblin"\nhp: 11';
       document.getElementById('dndExampleBtn').style.display='';
+      // Objetos, tiendas e inventario son reglas de Cosmere.
+      document.querySelectorAll('.cosmere-only').forEach(function(el){el.style.display='none';});
     }
   }catch(e){}
 }
@@ -619,7 +679,7 @@ document.addEventListener('visibilitychange',function(){
 
 // ═══════════ tabs ═══════════
 function showTab(t){
-  ['combate','jugadores','bestiario','encuentros'].forEach(function(x){
+  ['combate','jugadores','bestiario','encuentros','objetos','comercio'].forEach(function(x){
     document.getElementById('tab-'+x).style.display=x===t?'':'none';
   });
   document.querySelectorAll('.tab').forEach(function(el){
@@ -629,6 +689,8 @@ function showTab(t){
   if(t==='bestiario')loadEnemies();
   if(t==='encuentros')loadEncounters();
   if(t==='combate')renderCombatSetup();
+  if(t==='objetos')loadItems();
+  if(t==='comercio')loadInventories();
 }
 function toggleForm(id){
   var f=document.getElementById(id);
@@ -685,6 +747,10 @@ function memberCard(m){
     +'<div class="card-actions" style="margin-top:10px">'
       +'<button class="btn sm" onclick="viewMemberSheet('+m.user_id+')">Ver ficha</button>'
       +(m.has_pdf?'<a class="btn sm" href="/api/characters/'+m.character_id+'/pdf" target="_blank">PDF</a>':'')
+      +(SYSTEM==='dnd'?'':'<button class="btn sm" onclick="openGive('+m.user_id+','+m.character_id+',\''+escA(m.character_name)+'\')">🎁 Dar objeto</button>'
+        +'<button class="btn sm'+(m.can_create_items?' accent':'')+'" onclick="toggleCreateItems('+m.user_id+')" '
+        +'title="'+(m.can_create_items?'Puede crear objetos: tocá para quitarle el permiso':'No puede crear objetos: tocá para habilitarlo')+'">'
+        +(m.can_create_items?'✎ Crea objetos':'✎ Sin crear')+'</button>')
     +'</div></div>';
 }
 // Controles de marcos del jugador (agregar/sacar total, cargar/apagar luz)
@@ -1982,6 +2048,424 @@ function toggleSection(gridId,toggleId){
   var hidden=g.style.display!=='none';
   g.style.display=hidden?'none':'';
   el.textContent=(hidden?'▸ ':'▾ ')+label;
+}
+
+// ═══════════ OBJETOS (catálogo) ═══════════
+var items=[], itemCats=[];
+async function loadItems(){
+  items=await api(API+'/items');
+  try{ itemCats=await api(API+'/items/categories'); }catch(e){ itemCats=[]; }
+  renderItemFilters();
+  renderItemsGrid();
+}
+function renderItemFilters(){
+  var opts='<option value="">Todas</option>'+itemCats.map(function(c){
+    return '<option value="'+esc(c)+'">'+esc(c)+'</option>';}).join('');
+  var kopts='<option value="">Todos</option>'+Object.keys(KIND_LABEL).map(function(k){
+    return '<option value="'+k+'">'+KIND_LABEL[k]+'</option>';}).join('');
+  document.getElementById('itBar').innerHTML=
+    '<div class="filter-f filter-q"><span class="fl">Buscar</span>'
+      +'<input class="fi" type="search" id="itQ" placeholder="nombre, descripción…" oninput="renderItemsGrid()"/></div>'
+    +'<div class="filter-f"><span class="fl">Tipo</span><select class="fi" id="itKindF" onchange="renderItemsGrid()">'+kopts+'</select></div>'
+    +'<div class="filter-f"><span class="fl">Categoría</span><select class="fi" id="itCat" onchange="renderItemsGrid()">'+opts+'</select></div>'
+    +'<button class="btn ghost sm filter-clear" onclick="clearItemFilters()">Limpiar</button>';
+}
+function clearItemFilters(){
+  ['itQ','itKindF','itCat'].forEach(function(id){
+    var el=document.getElementById(id); if(el)el.value='';});
+  renderItemsGrid();
+}
+function itemPasses(it){
+  var k=document.getElementById('itKindF');
+  if(k&&k.value&&it.kind!==k.value)return false;
+  var c=document.getElementById('itCat');
+  if(c&&c.value&&(it.categorias||[]).indexOf(c.value)<0)return false;
+  var q=document.getElementById('itQ');
+  if(q&&q.value.trim()){
+    var hay=[it.name,it.descripcion,(it.categorias||[]).join(' ')].filter(Boolean).join(' ').toLowerCase();
+    var words=q.value.trim().toLowerCase().split(/\s+/);
+    for(var i=0;i<words.length;i++){ if(hay.indexOf(words[i])<0) return false; }
+  }
+  return true;
+}
+var KIND_LABEL={arma:'Arma',armadura:'Armadura',equipo:'Equipo',
+  alojamiento:'Alojamiento',vehiculo:'Vehículo',fabrial:'Fabrial'};
+var WC_LABEL={light:'Ligera',heavy:'Pesada',special:'Especial'};
+// Ficha corta según el tipo: un arma no se lista como una posada.
+function itemStatsHTML(it){
+  var s=it.stats||{}, L=[];
+  if(it.kind==='arma'){
+    if(s.damage)L.push('<b>'+esc(s.damage)+'</b>');
+    if(s.range)L.push(esc(s.range));
+    if(s.skill)L.push('<span style="color:var(--text3)">'+esc(s.skill)+'</span>');
+    var t=(s.traits||[]).map(function(x){return '<span class="meta-badge">'+esc(x)+'</span>';}).join('');
+    var e=(s.expert_traits||[]).map(function(x){
+      return '<span class="meta-badge" style="border-color:var(--gold2);color:var(--gold2)" title="Rasgo de experto">'+esc(x)+'</span>';}).join('');
+    return '<div class="cstats">'+L.join(' · ')+'</div>'+((t||e)?'<div class="meta-badges">'+t+e+'</div>':'');
+  }
+  if(it.kind==='armadura'){
+    var t2=(s.traits||[]).map(function(x){return '<span class="meta-badge">'+esc(x)+'</span>';}).join('');
+    var e2=(s.expert_traits||[]).map(function(x){
+      return '<span class="meta-badge" style="border-color:var(--gold2);color:var(--gold2)">'+esc(x)+'</span>';}).join('');
+    return '<div class="cstats">Deflect <b>'+(s.deflect||0)+'</b></div>'
+      +((t2||e2)?'<div class="meta-badges">'+t2+e2+'</div>':'');
+  }
+  if(it.kind==='alojamiento')
+    return '<div class="cstats">💠 '+(s.per_night||0)+' por persona por noche</div>';
+  if(it.kind==='vehiculo')
+    return '<div class="cstats">'+[s.vehicle_type,s.speed,(s.rental?'alquiler 💠'+s.rental+'/día':'')]
+      .filter(Boolean).map(esc).join(' · ')+'</div>';
+  if(it.kind==='fabrial')
+    return '<div class="cstats">'+(s.charges||0)+' carga(s)</div>';
+  return '';
+}
+function itemCard(it){
+  var cats=(it.categorias||[]).map(function(c){
+    return '<span class="meta-badge">'+esc(c)+'</span>';}).join('');
+  var wc=(it.kind==='arma'&&it.stats&&it.stats.weapon_class)?' '+(WC_LABEL[it.stats.weapon_class]||''):'';
+  var extra=[];
+  if(it.usos_max)extra.push(it.usos_max+' usos');
+  if(it.contenedor_capacidad)extra.push('guarda '+it.contenedor_capacidad);
+  if(it.capacity_bonus)extra.push('+'+it.capacity_bonus+' capacidad');
+  if(it.peso)extra.push(esc(it.peso));
+  return '<div class="card">'
+    +'<div class="card-head"><span class="cname">'+esc(it.name)
+      +(it.secreto?' <span class="pet-badge" title="No aparece en el catálogo de los jugadores">🔒 oculto</span>':'')+'</span>'
+    +'<div><button class="pet-btn'+(it.secreto?' on':'')+'" onclick="toggleItemSecret('+it.id+')" title="'+(it.secreto?'Mostrar a los jugadores':'Ocultar del catálogo de los jugadores')+'">🔒</button> '
+    +'<button class="edit-btn" onclick="openItemEditor('+it.id+')">editar</button> '
+    +'<button class="del-btn" onclick="delItem('+it.id+')">✕</button></div></div>'
+    +'<div class="ctype">'+esc((KIND_LABEL[it.kind]||it.kind)+wc)+'</div>'
+    +itemStatsHTML(it)
+    +(cats?'<div class="meta-badges">'+cats+'</div>':'')
+    +'<div class="cstats">💠 '+it.precio+' · '+it.slots+' slot'+(it.slots===1?'':'s')
+      +(extra.length?' · '+extra.join(' · '):'')+'</div>'
+    +(it.descripcion?'<div class="cstats" style="font-style:italic;margin-top:4px">'+esc(it.descripcion)+'</div>':'')
+    +'</div>';
+}
+function renderItemsGrid(){
+  var g=document.getElementById('itemsGrid');
+  document.getElementById('itemsEmpty').style.display=items.length?'none':'block';
+  var list=items.filter(itemPasses);
+  if(items.length&&!list.length){g.innerHTML='<div class="empty">Ningún objeto coincide.</div>';return;}
+  g.innerHTML=list.map(itemCard).join('');
+}
+async function toggleItemSecret(id){ await api(API+'/items/'+id+'/secret','POST'); loadItems(); }
+async function delItem(id){
+  if(!confirm('¿Borrar este objeto del catálogo?'))return;
+  await api(API+'/items/'+id,'DELETE'); loadItems();
+}
+function exportItems(){
+  if(!items.length){alert('El catálogo está vacío.');return;}
+  window.location.href=API+'/items/export';
+}
+async function importItem(){
+  var code=document.getElementById('itImportCode').value.trim();
+  if(!code){alert('Pegá la ficha del objeto.');return;}
+  await api(API+'/items/import','POST',{code:code});
+  document.getElementById('itImportCode').value='';
+  toggleForm('itImportForm'); loadItems();
+}
+function itBulkFile(input){
+  var f=input.files&&input.files[0]; if(!f)return;
+  var rd=new FileReader();
+  rd.onload=function(){document.getElementById('itBulkCode').value=rd.result;};
+  rd.readAsText(f); input.value='';
+}
+async function itBulkImport(){
+  var code=document.getElementById('itBulkCode').value.trim();
+  if(!code){alert('Pegá o cargá las fichas.');return;}
+  var r=await api(API+'/items/import-bulk','POST',{code:code});
+  document.getElementById('itBulkResult').innerHTML=
+    '<div class="cstats">Se cargaron <b>'+r.added+'</b> objeto(s).'
+    +(r.errors&&r.errors.length?' <span style="color:#e05050">'+r.errors.length+' con error:</span> '+esc(r.errors.join(' · ')):'')+'</div>';
+  document.getElementById('itBulkCode').value='';
+  loadItems();
+}
+// Campos propios de cada tipo (un arma pide daño y rasgos; una posada, el precio
+// por noche). Se redibujan al cambiar el tipo, sin tocar los campos comunes.
+function _f(label,id,val,type,ph){
+  return '<div><div class="fl">'+label+'</div><input class="fi" id="'+id+'" '
+    +(type?'type="'+type+'" ':'')+(ph?'placeholder="'+ph+'" ':'')
+    +'value="'+escA(val==null?'':String(val))+'"/></div>';
+}
+function renderKindFields(kind,it){
+  var s=(it&&it.stats)||{}, h='';
+  if(kind==='arma'){
+    var wc=s.weapon_class||'light';
+    h='<div class="fg" style="grid-template-columns:1fr 1fr 1fr">'
+      +'<div><div class="fl">Clase</div><select class="fi" id="itWc">'
+        +['light','heavy','special'].map(function(k){
+          return '<option value="'+k+'"'+(k===wc?' selected':'')+'>'+WC_LABEL[k]+'</option>';}).join('')
+      +'</select></div>'
+      +_f('Daño','itDamage',s.damage,'','1d6 keen')
+      +_f('Alcance','itRange',s.range,'','Melee / Ranged [80/320]')
+      +'</div>'
+      +'<div class="fg" style="grid-template-columns:1fr 1fr 1fr">'
+      +_f('Habilidad','itSkill',s.skill,'','Light Weaponry')
+      +_f('Rasgos','itTraits',(s.traits||[]).join(', '),'','Two-Handed')
+      +_f('Rasgos de experto','itExpert',(s.expert_traits||[]).join(', '),'','Deadly')
+      +'</div>';
+  }else if(kind==='armadura'){
+    h='<div class="fg" style="grid-template-columns:1fr 2fr 2fr">'
+      +_f('Deflect','itDeflect',s.deflect||0,'number')
+      +_f('Rasgos','itTraits',(s.traits||[]).join(', '),'','Cumbersome [3]')
+      +_f('Rasgos de experto','itExpert',(s.expert_traits||[]).join(', '))
+      +'</div>';
+  }else if(kind==='alojamiento'){
+    h='<div class="import-hint">El precio de arriba es <b>por persona por noche</b>.</div>';
+  }else if(kind==='vehiculo'){
+    h='<div class="fg" style="grid-template-columns:1fr 1fr 1fr">'
+      +_f('Tipo','itVtype',s.vehicle_type,'','Tierra / Agua')
+      +_f('Velocidad','itSpeed',s.speed,'','2 mph')
+      +_f('Alquiler por día','itRental',s.rental||0,'number')
+      +'</div>';
+  }else if(kind==='fabrial'){
+    h='<div class="fg" style="grid-template-columns:1fr">'
+      +_f('Cargas','itCharges',s.charges||0,'number')+'</div>';
+  }
+  document.getElementById('itKindFields').innerHTML=h;
+}
+function onKindChange(){
+  renderKindFields(document.getElementById('itKind').value, window.__editingItem);
+}
+function openItemEditor(id){
+  var it=id?items.find(function(x){return x.id===id;}):null;
+  window.__editingItem=it;
+  var kind=it?it.kind:'equipo';
+  var kopts=Object.keys(KIND_LABEL).map(function(k){
+    return '<option value="'+k+'"'+(k===kind?' selected':'')+'>'+KIND_LABEL[k]+'</option>';}).join('');
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="form-title">'+(it?'Editar objeto':'Nuevo objeto')+'</div>'
+    +'<div class="fg" style="grid-template-columns:2fr 1fr">'
+      +'<div><div class="fl">Nombre</div><input class="fi" id="itName" value="'+escA(it?it.name:'')+'"/></div>'
+      +'<div><div class="fl">Tipo</div><select class="fi" id="itKind" onchange="onKindChange()">'+kopts+'</select></div>'
+    +'</div>'
+    +'<div id="itKindFields"></div>'
+    +'<div class="fg" style="grid-template-columns:1fr 1fr 1fr 1fr">'
+      +_f('Precio (marcos)','itPrice',it?it.precio:0,'number')
+      +_f('Slots','itSlots',it?it.slots:1,'number')
+      +_f('Peso (manual)','itWeight',it?it.peso:'','','2 lb.')
+      +_f('+ Capacidad','itCap',it?it.capacity_bonus:0,'number')
+    +'</div>'
+    +'<div class="fg" style="grid-template-columns:2fr 1fr 1fr">'
+      +'<div><div class="fl">Categorías (coma)</div><input class="fi" id="itCats" value="'+escA(it?(it.categorias||[]).join(', '):'')+'" placeholder="medicina, herramientas"/></div>'
+      +_f('Dosis / cargas','itUses',it?it.usos_max:0,'number')
+      +_f('Guarda (contenedor)','itCont',it?it.contenedor_capacidad:0,'number')
+    +'</div>'
+    +'<div><div class="fl">Descripción</div><input class="fi" id="itDesc" value="'+escA(it?it.descripcion:'')+'"/></div>'
+    +'<div class="import-hint" style="margin-top:8px">Ocupa 1 slot por defecto: poné <b>0</b> para dinero o cosas insignificantes y <b>1+N</b> para los <i>Cumbersome N</i>. '
+      +'<b>Dosis</b>: 5 raciones ocupan 1 slot hasta agotarse. <b>Guarda</b>: >0 lo convierte en contenedor (mochila = 2).</div>'
+    +'<div class="form-actions"><button class="btn ghost" onclick="closeModal()">Cancelar</button>'
+    +'<button class="btn accent" onclick="saveItem('+(it?it.id:0)+')">Guardar</button></div>';
+  renderKindFields(kind,it);
+  document.getElementById('overlay').classList.add('on');
+}
+function _v(id){ var el=document.getElementById(id); return el?el.value.trim():''; }
+function _n(id){ var el=document.getElementById(id); return el?(parseInt(el.value)||0):0; }
+function _list(id){ return _v(id).split(/,(?![^\[\(]*[\]\)])/).map(function(s){return s.trim();}).filter(Boolean); }
+function _itemBody(){
+  var kind=document.getElementById('itKind').value, stats={};
+  if(kind==='arma') stats={weapon_class:document.getElementById('itWc').value,
+    damage:_v('itDamage'), range:_v('itRange'), skill:_v('itSkill'),
+    traits:_list('itTraits'), expert_traits:_list('itExpert')};
+  else if(kind==='armadura') stats={deflect:_n('itDeflect'),
+    traits:_list('itTraits'), expert_traits:_list('itExpert')};
+  else if(kind==='alojamiento') stats={per_night:_n('itPrice')};
+  else if(kind==='vehiculo') stats={vehicle_type:_v('itVtype'), speed:_v('itSpeed'), rental:_n('itRental')};
+  else if(kind==='fabrial') stats={charges:_n('itCharges')};
+  return {name:_v('itName'), kind:kind, descripcion:_v('itDesc'),
+          categorias:_v('itCats').split(',').map(function(s){return s.trim();}).filter(Boolean),
+          precio:_n('itPrice'), peso:_v('itWeight'), slots:_n('itSlots'),
+          capacity_bonus:_n('itCap'), usos_max:_n('itUses'),
+          contenedor_capacidad:_n('itCont'), stats:stats};
+}
+async function saveItem(id){
+  var body=_itemBody();
+  if(!body.name){alert('Poné un nombre.');return;}
+  if(id) await api(API+'/items/'+id,'PUT',body);
+  else await api(API+'/items','POST',body);
+  closeModal(); loadItems();
+}
+
+// ═══════════ INVENTARIOS (qué lleva cada uno) ═══════════
+var INVENTORIES={characters:[],grupo:[]};
+async function loadInventories(){
+  if(!items.length){ try{ items=await api(API+'/items'); }catch(e){} }
+  try{ INVENTORIES=await api(API+'/inventories'); }catch(e){ return; }
+  renderInventories();
+}
+function dmCapBar(c){
+  var pct=c.capacidad>0?Math.min(100,Math.round(c.usado/c.capacidad*100)):0;
+  var col=c.sobrecargado?'#e05050':'#7ac88c';
+  return '<div style="margin:4px 0 8px">'
+    +'<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3)">'
+      +'<span>Carga (base '+c.base+' + fuerza '+c.fuerza+(c.bonus?' + '+c.bonus:'')+')</span>'
+      +'<span style="color:'+col+'">'+c.usado+' / '+c.capacidad+(c.sobrecargado?' ⚠ sobrecargado':'')+'</span></div>'
+    +'<div class="mbar" style="height:5px;background:var(--bg3);border-radius:3px;overflow:hidden">'
+      +'<div style="height:100%;width:'+pct+'%;background:'+col+'"></div></div></div>';
+}
+function dmInvRow(chid,it,dentro){
+  var usos=(it.usos_max&&chid)
+    ? '<span class="uses-box" title="Dosis o cargas">'
+        +'<button class="uses-btn" onclick="dmInvUse('+chid+','+it.id+',-1)">−</button>'
+        +'<span class="uses-n">'+it.usos+'/'+it.usos_max+'</span>'
+        +'<button class="uses-btn" onclick="dmInvUse('+chid+','+it.id+',1)">+</button></span>'
+    : (it.usos_max?'<span class="meta-badge" style="border-color:#e8c840;color:#e8c840">'+it.usos+'/'+it.usos_max+'</span>':'');
+  // sin personaje de referencia (mesa vacía) no hay a quién pegarle los cambios
+  var ctl=chid
+    ? '<button class="btn ghost sm" onclick="dmInvQty('+chid+','+it.id+',1)">+</button> '
+      +'<button class="btn ghost sm" onclick="dmInvQty('+chid+','+it.id+',-1)">−</button> '
+      +'<button class="del-btn" onclick="dmInvDel('+chid+','+it.id+')">✕</button>'
+    : '';
+  var head='<div class="inv-row" style="align-items:center'+(it.equipado?'':';opacity:.6')+'">'
+    +'<span style="flex:1"><b style="color:var(--gold2)">'+esc(it.name)+'</b>'
+      +(it.cantidad>1?' <span style="color:var(--text3)">x'+it.cantidad+'</span>':'')
+      +' <span style="color:var(--text3);font-size:12px">'+it.slots+' slot'+(it.slots===1?'':'s')
+      +(it.capacity_bonus?' · +'+it.capacity_bonus+' cap':'')+'</span>'
+      +(it.descripcion?'<div class="ctype">'+esc(it.descripcion)+'</div>':'')+'</span>'
+    +usos+ctl+'</div>';
+  if(!it.contenedor) return head;
+  var cap=it.contenedor_capacidad||0, usado=it.cont_usado||0;
+  return '<div class="sel-card" style="margin:4px 0">'+head
+    +'<div style="padding:0 10px 8px;font-size:11px;color:var(--text3)">Guarda '+usado+' / '+cap
+      +(it.cont_lleno?' ⚠ lleno':'')+'</div>'
+    +((it.children||[]).length
+      ? it.children.map(function(c){return dmInvRow(chid,c,true);}).join('')
+      : '<div class="empty" style="margin:0 10px 8px">Vacío.</div>')
+    +'</div>';
+}
+// Lo que lleva en la mano va aparte de lo que va en la mochila o en la carreta.
+function dmZona(chid,list,vacio){
+  var sueltos=list.filter(function(i){return !i.contenedor;});
+  var conts=list.filter(function(i){return i.contenedor;});
+  return '<div class="ctype" style="margin-top:6px">🖐 Encima</div>'
+    +(sueltos.length?sueltos.map(function(i){return dmInvRow(chid,i,false);}).join('')
+      :'<div class="empty" style="margin:0">'+vacio+'</div>')
+    +conts.map(function(i){return dmInvRow(chid,i,false);}).join('');
+}
+function renderInventories(){
+  var chars=INVENTORIES.characters||[];
+  var html=chars.map(function(e){
+    var c=e.character;
+    var h='<div class="form-wrap" style="margin-bottom:14px">'
+      +'<div class="row" style="margin-bottom:4px">'
+        +'<div class="form-title" style="margin:0">'+esc(c.name)+'</div>'
+        +'<span class="meta-badge">'+esc(c.size||'Mediano')+'</span>'
+        +'<div class="sep"></div>'
+        +'<button class="btn ghost sm" onclick="openGiveFor('+c.id+')">🎁 Dar objeto</button>'
+      +'</div>'
+      +dmCapBar(c.capacity)
+      +dmZona(c.id,c.items||[],'No lleva nada en la mano.');
+    (e.pets||[]).forEach(function(p){
+      h+='<div class="section-label" style="margin:12px 0 2px">🐾 '+esc(p.name)+'</div>'
+        +dmCapBar(p.capacity)+dmZona(c.id,p.items||[],'No lleva nada encima.');
+    });
+    h+='<div class="ctype" style="margin-top:12px">🏠 Guardado de '+esc(c.name)+'</div>'
+      +((e.character.guardado||[]).length
+        ? e.character.guardado.map(function(i){return dmInvRow(c.id,i,false);}).join('')
+        : '<div class="empty" style="margin:0">Vacío.</div>');
+    return h+'</div>';
+  }).join('');
+  // El guardado del grupo es de la campaña: se edita a través de cualquier PJ.
+  var anyChar=chars.length?chars[0].character.id:0;
+  html+='<div class="form-wrap">'
+    +'<div class="form-title">👥 Guardado del grupo</div>'
+    +'<div class="import-hint" style="margin-bottom:8px">Compartido: cualquiera de la mesa puede dejar o llevarse cosas de acá.</div>'
+    +((INVENTORIES.grupo||[]).length
+      ? INVENTORIES.grupo.map(function(i){return dmInvRow(anyChar,i,false);}).join('')
+      : '<div class="empty" style="margin:0">Vacío.</div>')
+    +'</div>';
+  document.getElementById('invList').innerHTML=chars.length?html:'';
+  document.getElementById('invEmpty').style.display=chars.length?'none':'block';
+}
+async function dmInvQty(chid,eid,delta){
+  await api('/api/characters/'+chid+'/inventory/'+eid+'/qty','POST',{delta:delta});
+  loadInventories();
+}
+async function dmInvUse(chid,eid,delta){
+  await api('/api/characters/'+chid+'/inventory/'+eid+'/use','POST',{delta:delta});
+  loadInventories();
+}
+async function dmInvDel(chid,eid){
+  if(!confirm('¿Sacarle este objeto?'))return;
+  await api('/api/characters/'+chid+'/inventory/'+eid,'DELETE');
+  loadInventories();
+}
+
+// ═══════════ Dar objeto a un jugador ═══════════
+async function openGive(uid,charId,charName){
+  var pets=[];
+  try{
+    var roster=await api(API+'/roster');
+    var m=roster.members.find(function(x){return x.user_id===uid;});
+    pets=m?m.pets:[];
+  }catch(e){}
+  giveModal(charId,charName,pets);
+}
+// Desde Inventarios ya tenemos las mascotas cargadas: no hace falta el roster.
+function openGiveFor(charId){
+  var e=(INVENTORIES.characters||[]).filter(function(x){return x.character.id===charId;})[0];
+  if(!e)return;
+  giveModal(charId,e.character.name,e.pets||[]);
+}
+async function giveModal(charId,charName,pets){
+  if(!items.length){ try{ items=await api(API+'/items'); }catch(e){} }
+  var destOpts='<option value="c">'+esc(charName)+'</option>'
+    +pets.map(function(p){return '<option value="p'+p.id+'">🐾 '+esc(p.name)+'</option>';}).join('');
+  var catOpts=items.length
+    ? items.map(function(i){return '<option value="'+i.id+'">'+esc(i.name)+' — '+i.slots+' slot(s)</option>';}).join('')
+    : '<option value="">— catálogo vacío —</option>';
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="form-title">🎁 Dar objeto a '+esc(charName)+'</div>'
+    +'<div><div class="fl">Destino</div><select class="fi" id="gvDest">'+destOpts+'</select></div>'
+    +'<div class="section-label" style="margin-top:14px">Del catálogo</div>'
+    +'<div class="row" style="gap:8px"><select class="fi" id="gvItem" style="flex:1">'+catOpts+'</select>'
+      +'<input class="fi" type="number" min="1" id="gvQty" value="1" style="width:80px"/>'
+      +'<button class="btn accent" onclick="giveFromCatalog('+charId+')">Dar</button></div>'
+    +'<div class="section-label" style="margin-top:16px">…o crear uno nuevo</div>'
+    +'<div class="fg" style="grid-template-columns:2fr 1fr 1fr">'
+      +'<div><div class="fl">Nombre</div><input class="fi" id="gvName"/></div>'
+      +'<div><div class="fl">Slots</div><input class="fi" type="number" min="0" id="gvSlots" value="1"/></div>'
+      +'<div><div class="fl">+ Capacidad</div><input class="fi" type="number" min="0" id="gvCap" value="0"/></div>'
+    +'</div>'
+    +'<div><div class="fl">Descripción</div><input class="fi" id="gvDesc"/></div>'
+    +'<label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:13px">'
+      +'<input type="checkbox" id="gvSave"/> Guardarlo también en el catálogo</label>'
+    +'<div class="form-actions"><button class="btn ghost" onclick="closeModal()">Cerrar</button>'
+    +'<button class="btn accent" onclick="giveNew('+charId+')">Crear y dar</button></div>';
+  document.getElementById('overlay').classList.add('on');
+}
+function _giveUrl(charId){
+  var d=document.getElementById('gvDest').value;
+  return d==='c' ? '/api/characters/'+charId+'/inventory'
+                 : '/api/characters/'+charId+'/pets/'+d.slice(1)+'/inventory';
+}
+async function giveFromCatalog(charId){
+  var iid=parseInt(document.getElementById('gvItem').value);
+  if(!iid){alert('El catálogo está vacío.');return;}
+  await api(_giveUrl(charId),'POST',{item_id:iid,
+    cantidad:Math.max(1,parseInt(document.getElementById('gvQty').value)||1)});
+  closeModal(); afterGive();
+}
+async function giveNew(charId){
+  var name=document.getElementById('gvName').value.trim();
+  if(!name){alert('Poné un nombre al objeto.');return;}
+  await api(_giveUrl(charId),'POST',{
+    name:name, descripcion:document.getElementById('gvDesc').value.trim(),
+    slots:parseInt(document.getElementById('gvSlots').value)||0,
+    capacity_bonus:parseInt(document.getElementById('gvCap').value)||0,
+    save_to_catalog:document.getElementById('gvSave').checked});
+  closeModal(); afterGive();
+}
+// Se puede dar un objeto desde Jugadores o desde Inventarios: refrescamos la
+// vista que esté abierta.
+function afterGive(){
+  if(document.getElementById('tab-comercio').style.display!=='none') loadInventories();
+  else loadMembers();
+}
+async function toggleCreateItems(uid){
+  await api(API+'/members/'+uid+'/can-create-items','POST');
+  loadMembers();
 }
 
 // init

@@ -66,6 +66,9 @@ def _get_storm(conn, cid: int):
 
 def _advance_storm(conn, cid: int) -> dict:
     """Pasa un día. Si toca, cae la tormenta y arranca un ciclo nuevo."""
+    # Días absolutos: `day` se reinicia con cada tormenta, así que el restock de
+    # las tiendas necesita su propio contador que nunca vuelve atrás.
+    conn.execute("UPDATE campaigns SET day_count=COALESCE(day_count,0)+1 WHERE id=?", (cid,))
     row = _get_storm(conn, cid)
     day = row["day"] + 1
     stormed = False
@@ -164,7 +167,8 @@ def list_members(cid: int, user=Depends(current_user)):
     with db() as conn:
         require_dm(conn, cid, user)
         rows = conn.execute(
-            "SELECT m.user_id, m.status, m.character_id, u.username, ch.name AS character_name, "
+            "SELECT m.user_id, m.status, m.character_id, m.can_create_items, "
+            "u.username, ch.name AS character_name, "
             "ch.has_pdf, ch.has_image, ch.marcos, ch.marcos_light, ch.sheet, "
             "ch.vida, ch.vida_max, ch.focus, ch.focus_max, ch.inv, ch.inv_max, "
             "ch.statuses, ch.injuries, ch.dnd_resources "
@@ -176,6 +180,7 @@ def list_members(cid: int, user=Depends(current_user)):
         out = []
         for r in rows:
             d = dict(r)
+            d["can_create_items"] = bool(d.get("can_create_items"))
             if d.get("character_id"):
                 sheet = json.loads(d.get("sheet") or "{}")
                 d["clase"] = sheet.get("paths") or ""
@@ -329,6 +334,23 @@ def remove_pet_option(cid: int, eid: int, user=Depends(current_user)):
     return {"ok": True}
 
 
+@router.post("/campaigns/{cid}/members/{uid}/can-create-items")
+def toggle_can_create_items(cid: int, uid: int, user=Depends(current_user)):
+    """Habilita/deshabilita que ese jugador cree objetos en su inventario."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+        m = conn.execute(
+            "SELECT can_create_items FROM campaign_members WHERE campaign_id=? AND user_id=?",
+            (cid, uid)).fetchone()
+        if not m:
+            raise HTTPException(404, "Ese jugador no está en la campaña")
+        val = 0 if m["can_create_items"] else 1
+        conn.execute(
+            "UPDATE campaign_members SET can_create_items=? WHERE campaign_id=? AND user_id=?",
+            (val, cid, uid))
+    return {"ok": True, "can_create_items": bool(val)}
+
+
 @router.get("/campaigns/{cid}/party")
 def campaign_party(cid: int, user=Depends(current_user)):
     """Jugadores aceptados con el nivel de su personaje (para calcular dificultad)."""
@@ -360,7 +382,7 @@ def campaign_roster(cid: int, user=Depends(current_user)):
     with db() as conn:
         c, _ = require_access(conn, cid, user)
         rows = conn.execute(
-            "SELECT m.user_id, u.username, ch.* FROM campaign_members m "
+            "SELECT m.user_id, m.can_create_items, u.username, ch.* FROM campaign_members m "
             "JOIN users u ON u.id=m.user_id "
             "JOIN characters ch ON ch.id=m.character_id "
             "WHERE m.campaign_id=? AND m.status='accepted' AND m.character_id IS NOT NULL "
@@ -381,6 +403,7 @@ def campaign_roster(cid: int, user=Depends(current_user)):
             ]
             members.append({
                 "user_id": r["user_id"], "username": r["username"],
+                "can_create_items": bool(r["can_create_items"]),
                 "character": {
                     "id": r["id"], "name": r["name"],
                     "vida": r["vida"], "vida_max": r["vida_max"],

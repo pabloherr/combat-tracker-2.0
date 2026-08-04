@@ -131,6 +131,90 @@ class CounterValue(BaseModel):
     delta: int
 
 
+# ── Objetos, comercio e inventario ─────────────────────────
+
+class ItemIn(BaseModel):
+    name: str
+    kind: str = "equipo"         # arma | armadura | equipo | alojamiento | vehiculo | fabrial
+    descripcion: str = ""
+    categorias: list[str] = []   # subcategorías: medicina, herramientas, comida…
+    precio: int = 0
+    peso: str = ""               # peso del manual (informativo)
+    slots: int = 1
+    capacity_bonus: int = 0      # suma capacidad al que lo lleva
+    usos_max: int = 0            # dosis/cargas por unidad (5 raciones = 1 slot)
+    contenedor_capacidad: int = 0  # >0 => es contenedor (mochila, carreta…)
+    stats: dict = {}             # datos propios del tipo (daño, deflect, cargas…)
+    notas: str = ""
+    secreto: bool = False        # no aparece en el catálogo de los jugadores
+
+
+class ItemImportIn(BaseModel):
+    code: str                    # YAML de uno o varios objetos
+
+
+class InventoryIn(BaseModel):
+    """Alta de un objeto en el inventario.
+
+    El DM puede dar uno del catálogo (`item_id`) o crearlo al vuelo; el jugador
+    con permiso solo puede crearlo al vuelo."""
+    item_id: int | None = None
+    name: str = ""
+    kind: str = "equipo"
+    descripcion: str = ""
+    categorias: list[str] = []
+    peso: str = ""
+    slots: int = 1
+    capacity_bonus: int = 0
+    usos_max: int = 0
+    contenedor_capacidad: int = 0
+    stats: dict = {}
+    cantidad: int = 1
+    notas: str = ""
+    parent_id: int | None = None    # dentro de qué contenedor entra
+    save_to_catalog: bool = False   # además, guardarlo en el catálogo del DM
+
+
+class InventoryQty(BaseModel):
+    delta: int
+
+
+class InventoryMove(BaseModel):
+    parent_id: int | None = None    # null = sacarlo del contenedor
+
+
+class InventoryStash(BaseModel):
+    """Mover un objeto entre zonas: encima, el guardado propio o el del grupo."""
+    stash: str = ""                 # "" (encima) | personal | grupo
+
+
+class InventoryTransfer(BaseModel):
+    """Pasarle un objeto a otro personaje (o a una mascota) de la campaña."""
+    character_id: int | None = None
+    pet_id: int | None = None
+    stash: str = ""                 # zona en la que cae, en el destino
+
+
+class TakeIn(BaseModel):
+    """El jugador agarra un objeto del catálogo y lo paga como quiera.
+
+    `precio` es editable: el DM puede hacerle un descuento, o el objeto puede
+    ser un hallazgo (precio 0). El reparto de esferas también lo elige él; si no
+    manda ninguno, se cobra con opacas primero."""
+    item_id: int
+    cantidad: int = 1
+    precio: int | None = None       # por unidad; None = el del catálogo
+    pago_cargados: int | None = None
+    pago_opacos: int | None = None
+    pet_id: int | None = None       # destino: una mascota en vez del personaje
+    parent_id: int | None = None    # destino: dentro de un contenedor
+    stash: str = ""                 # destino: encima, guardado propio o del grupo
+
+
+class SizeIn(BaseModel):
+    size: str                    # Pequeño | Mediano | Grande | Enorme | Gargantuesco
+
+
 class AccionIn(BaseModel):
     nombre: str
     coste: str = ""          # ej: "1 acción", "2 focus"

@@ -117,6 +117,9 @@ def parse_character_pdf(data: bytes) -> dict:
 
     return {
         "name": _s(g("char_name")) or "Personaje",
+        # Esferas anotadas en la ficha: solo se usan al crear el personaje, como
+        # semilla de sus marcos (después el jugador los gestiona en la app).
+        "spheres": _i(g("char_spheres"), 0),
         "vida_max": vida_max,
         "vida": _i(g("char_health_current"), vida_max),
         "focus_max": focus_max,
