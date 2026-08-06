@@ -553,7 +553,8 @@ select.fi{appearance:auto;}
       <input class="fi cat-f-num" type="number" min="0" id="itMax" oninput="renderItemsGrid()"/>
       <button class="btn ghost sm" onclick="clearItemFilters()">Limpiar</button>
     </div>
-    <div class="kind-bar" id="itCats"></div>
+    <!-- ojo: no usar "itCats", que es el campo de categorías del editor -->
+    <div class="kind-bar" id="itCatBar"></div>
     <div id="itemsGrid"></div>
     <div class="empty" id="itemsEmpty">Todavía no cargaste objetos.</div>
   </div>
@@ -2281,7 +2282,7 @@ function renderKindBar(){
   }).join('');
 }
 function renderCatBar(){
-  var bar=document.getElementById('itCats'), cuenta={};
+  var bar=document.getElementById('itCatBar'), cuenta={};
   items.filter(function(i){return (i.kind||'equipo')===IT_KIND;}).forEach(function(i){
     (i.categorias||[]).forEach(function(c){ cuenta[c]=(cuenta[c]||0)+1; });
   });
@@ -2481,7 +2482,7 @@ function renderKindFields(kind,it){
   document.getElementById('itKindFields').innerHTML=h;
 }
 function onKindChange(){
-  renderKindFields(document.getElementById('itKind').value, window.__editingItem);
+  renderKindFields(_v('itKind'), window.__editingItem);
 }
 function openItemEditor(id){
   var it=id?items.find(function(x){return x.id===id;}):null;
@@ -2515,12 +2516,18 @@ function openItemEditor(id){
   renderKindFields(kind,it);
   document.getElementById('overlay').classList.add('on');
 }
-function _v(id){ var el=document.getElementById(id); return el?el.value.trim():''; }
-function _n(id){ var el=document.getElementById(id); return el?(parseInt(el.value)||0):0; }
+// Los campos del editor se buscan **dentro del modal**: la pestaña de atrás
+// sigue en el DOM y un id repetido nos devolvería su elemento (y no un input).
+function _el(id){
+  var m=document.getElementById('modal');
+  return (m&&m.querySelector('#'+id))||document.getElementById(id);
+}
+function _v(id){ var el=_el(id); return el&&el.value!=null?String(el.value).trim():''; }
+function _n(id){ var el=_el(id); return el?(parseInt(el.value)||0):0; }
 function _list(id){ return _v(id).split(/,(?![^\[\(]*[\]\)])/).map(function(s){return s.trim();}).filter(Boolean); }
 function _itemBody(){
-  var kind=document.getElementById('itKind').value, stats={};
-  if(kind==='arma') stats={weapon_class:document.getElementById('itWc').value,
+  var kind=_v('itKind'), stats={};
+  if(kind==='arma') stats={weapon_class:_v('itWc'),
     damage:_v('itDamage'), range:_v('itRange'), skill:_v('itSkill'),
     traits:_list('itTraits'), expert_traits:_list('itExpert')};
   else if(kind==='armadura') stats={deflect:_n('itDeflect'),
