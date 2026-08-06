@@ -172,6 +172,19 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .import-ta{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:'Courier New',monospace;font-size:12px;line-height:1.5;outline:none;resize:vertical;min-height:150px;white-space:pre;}
 .import-ta:focus{border-color:var(--gold);}
 .inv-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;}
+/* El texto pide 180px: si no entra junto con los botones, la fila se parte y los
+   botones bajan enteros. Antes el nombre se estrujaba en una columna de una
+   letra de ancho. */
+.inv-info{flex:1 1 180px;min-width:0;}
+.inv-btns{display:flex;align-items:center;flex-wrap:wrap;gap:8px;flex:none;}
+@media (max-width:640px){
+  .inv-btns{width:100%;justify-content:flex-end;border-top:1px solid var(--border);padding-top:8px;}
+}
+/* descripción: dos líneas y el resto se abre tocándola */
+.inv-desc{font-size:12px;color:var(--text3);font-style:italic;cursor:pointer;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.inv-desc.on{display:block;}
+.inv-desc:hover{color:var(--text2);}
 /* dosis y cargas: − 3/5 + */
 .uses-box{display:inline-flex;align-items:center;border:1px solid #e8c840;border-radius:20px;overflow:hidden;flex:none;}
 .uses-btn{background:none;border:none;color:#e8c840;font-size:14px;line-height:1;padding:3px 8px;cursor:pointer;font-family:inherit;}
@@ -1353,6 +1366,19 @@ function invStatsHTML(it){
       +[s.vehicle_type,s.speed].filter(Boolean).map(esc).join(' · ')+'</div>';
   return '';
 }
+// Descripciones plegadas: en el celular una parrafada de tres líneas tapa todo
+// lo demás. Se muestran cortadas y se abren tocándolas.
+var DESC_ABIERTA={};
+function toggleDesc(eid){
+  if(DESC_ABIERTA[eid]) delete DESC_ABIERTA[eid]; else DESC_ABIERTA[eid]=1;
+  renderInventory();
+}
+function invDescHTML(it){
+  if(!it.descripcion)return '';
+  var on=!!DESC_ABIERTA[it.id];
+  return '<div class="inv-desc'+(on?' on':'')+'" onclick="toggleDesc('+it.id+')" '
+    +'title="'+(on?'Tocá para plegarla':'Tocá para leerla entera')+'">'+esc(it.descripcion)+'</div>';
+}
 // zona: '' = encima · 'personal' = mi guardado · 'grupo' = guardado del grupo
 function invItemRow(it,dentro,zona){
   var guardado=!!zona;
@@ -1382,17 +1408,19 @@ function invItemRow(it,dentro,zona){
   var pasar=dentro?''
     : '<button class="btn-sheet" onclick="openTransfer('+it.id+')" title="Pasárselo a otro">🤝</button>';
   var head='<div class="inv-row"'+(it.equipado||guardado?'':' style="opacity:.55"')+'>'
-    +'<span style="flex:1"><b style="color:var(--gold2)">'+esc(it.name)+'</b>'
+    +'<span class="inv-info"><b style="color:var(--gold2)">'+esc(it.name)+'</b>'
       +(it.cantidad>1?' <span style="color:var(--text3)">x'+it.cantidad+'</span>':'')
       +' <span style="color:var(--text3);font-size:12px">'+it.slots+' slot'+(it.slots===1?'':'s')
       +(it.capacity_bonus?' · +'+it.capacity_bonus+' cap':'')+'</span> '+usos
       +invStatsHTML(it)
-      +(it.descripcion?'<div style="font-size:12px;color:var(--text3);font-style:italic">'+esc(it.descripcion)+'</div>':'')
+      +invDescHTML(it)
     +'</span>'
+    +'<span class="inv-btns">'
     +mover+eq+zonaBtn+pasar
     +'<button class="btn-sheet" onclick="invQty('+it.id+',1)">+</button>'
     +'<button class="btn-sheet" onclick="invQty('+it.id+',-1)">−</button>'
-    +'<button class="btn-sheet" style="color:#e05050;border-color:#e05050" onclick="invDel('+it.id+')">✕</button></div>';
+    +'<button class="btn-sheet" style="color:#e05050;border-color:#e05050" onclick="invDel('+it.id+')">✕</button>'
+    +'</span></div>';
   if(!it.contenedor) return head;
   // contenedor: su propia barra y lo que guarda adentro
   var cap=it.contenedor_capacidad||0, usado=it.cont_usado||0;

@@ -97,6 +97,8 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .pcard.player-kind{border-left:3px solid #5aaa70;}
 .stat-line{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px;}
 .stat-lbl{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);}
+/* la defensa que se opone a esa barra, al lado de su etiqueta */
+.def-chip{font-family:'Cinzel',serif;font-size:10px;letter-spacing:0;color:var(--text2);border:1px solid var(--border2);border-radius:20px;padding:1px 7px;margin-left:7px;white-space:nowrap;}
 .stat-val{font-family:'Cinzel',serif;font-size:14px;}
 .bar{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-bottom:5px;}
 .bar-fill{height:100%;border-radius:2px;transition:width .3s;}
@@ -2004,6 +2006,21 @@ function editInit(el,uid){
   };
 }
 
+// Cada barra tiene su defensa enfrente: física ↔ vida, cognitiva ↔ focus,
+// espiritual ↔ investidura. Sale del statblock (enemigos y mascotas) o de la
+// ficha del PDF (jugadores), que la guardan distinto.
+var DEF_STAT={vida:['physical','física'],focus:['cognitive','cognitiva'],inv:['spiritual','espiritual']};
+function defensaDe(p,stat){
+  var s=p.stats||{}, k=DEF_STAT[stat][0];
+  var v=(s[k]||{}).def;                     // statblock: physical.def
+  if(v==null) v=(s.defenses||{})[k];        // ficha de jugador: defenses.physical
+  return (typeof v==='number'&&v>0)?v:null;
+}
+function defChip(p,stat){
+  var v=defensaDe(p,stat);
+  if(v==null)return '';
+  return '<span class="def-chip" title="Defensa '+DEF_STAT[stat][1]+'">🛡 '+v+'</span>';
+}
 function statBlock(p,stat,color,lblPlus,lblMinus,clsPlus,clsMinus){
   var mx=p[stat+'_max'];
   if(stat!=='vida'&&mx===0)return '';
@@ -2011,7 +2028,8 @@ function statBlock(p,stat,color,lblPlus,lblMinus,clsPlus,clsMinus){
   var maxPart=(stat==='vida'&&p.kind==='enemy')
     ? '<span class="vmax-edit" onclick="editVidaMax(this,\''+p.uid+'\')" title="Editar vida máxima (solo este combate)">/ '+mx+'</span>'
     : '<span style="font-size:11px;color:var(--text3)">/ '+mx+'</span>';
-  return '<div class="stat-line"><span class="stat-lbl">'+(stat==='vida'?'Vida':stat==='focus'?'Focus':'Investidura')+'</span>'
+  return '<div class="stat-line"><span class="stat-lbl">'
+    +(stat==='vida'?'Vida':stat==='focus'?'Focus':'Investidura')+defChip(p,stat)+'</span>'
     +'<span class="stat-val" style="color:'+color+'">'+p[stat]+' '+maxPart+'</span></div>'
     +'<div class="bar"><div class="bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
     +'<div class="adj">'
@@ -2047,6 +2065,23 @@ function lockedCounts(injuries){
   (injuries||[]).forEach(function(it){var e=INJURY_STATUS[it.name];if(e)m[e[0]]=(m[e[0]]||0)+e[1];});
   return m;
 }
+// Qué desplegables dejó abiertos el DM, por participante. Vive acá y no en el
+// DOM porque cada cambio de stat rearma las tarjetas: si no, al pegarle a un
+// enemigo se le cerraban la ficha y las acciones que estabas leyendo.
+var PANEL_ABIERTO={};
+function panelCss(uid,tipo){ return PANEL_ABIERTO[uid+':'+tipo]?'':'display:none;'; }
+function panelToggle(uid,tipo,label){
+  var on=!!PANEL_ABIERTO[uid+':'+tipo];
+  return '<div class="acciones-toggle" data-lbl="'+esc(label)+'" '
+    +'onclick="togglePanel(this,\''+uid+'\',\''+tipo+'\')">'+(on?'▾':'▸')+' '+esc(label)+'</div>';
+}
+function togglePanel(el,uid,tipo){
+  var k=uid+':'+tipo;
+  if(PANEL_ABIERTO[k]) delete PANEL_ABIERTO[k]; else PANEL_ABIERTO[k]=1;
+  var on=!!PANEL_ABIERTO[k];
+  el.nextElementSibling.style.display=on?'':'none';
+  el.textContent=(on?'▾ ':'▸ ')+el.dataset.lbl;
+}
 function participantCard(p){
   var statusBtns='';
   var locked=lockedCounts(p.injuries);
@@ -2074,8 +2109,8 @@ function participantCard(p){
   });
   var acciones='';
   if(p.acciones&&p.acciones.length){
-    acciones='<div class="acciones-toggle" onclick="var d=this.nextElementSibling;d.style.display=d.style.display===\'none\'?\'\':\'none\'">▸ Ver acciones ('+p.acciones.length+')</div>'
-      +'<div style="display:none;margin-top:5px">'
+    acciones=panelToggle(p.uid,'acciones','Ver acciones ('+p.acciones.length+')')
+      +'<div style="'+panelCss(p.uid,'acciones')+'margin-top:5px">'
       +p.acciones.map(function(a){
         return '<div class="accion-item"><span class="accion-nombre">'+esc(a.nombre)+'</span>'
           +(a.coste?'<span class="accion-coste">['+esc(a.coste)+']</span>':'')
@@ -2085,8 +2120,8 @@ function participantCard(p){
   var ficha='';
   var sbCombat=anyStatblock(p,true);  // sin acciones (ya están arriba)
   if(sbCombat){
-    ficha='<div class="acciones-toggle" onclick="var d=this.nextElementSibling;d.style.display=d.style.display===\'none\'?\'\':\'none\'">▸ Ver ficha</div>'
-      +'<div style="display:none">'+sbCombat+'</div>';
+    ficha=panelToggle(p.uid,'ficha','Ver ficha')
+      +'<div style="'+panelCss(p.uid,'ficha')+'">'+sbCombat+'</div>';
   }
   var isEnemy=p.kind==='enemy';
   var dnd=isDndCombat();

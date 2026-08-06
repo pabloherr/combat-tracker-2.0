@@ -397,8 +397,15 @@ Así armás un "Archer veterano" con más vida y otro color reusando la misma fi
   derecha ("/ 12") para **cambiarle la vida máxima** a mitad de combate. Si la vida
   actual supera el nuevo máximo, se recorta. Solo afecta a **ese combate**: ni el
   bestiario ni el encuentro cambian
+- **Defensas a la vista:** al lado de cada barra va la defensa que se le opone —
+  🛡 física con la **vida**, cognitiva con el **focus** y espiritual con la
+  **investidura**— así no hay que abrir la ficha para resolver un ataque. Sale del
+  statblock (enemigos y mascotas) o de la ficha PDF (jugadores); si no está cargada,
+  no se muestra nada
 - "Marcar como actuado" atenúa la tarjeta; "Siguiente ronda" limpia todas las marcas
-- Los enemigos muestran sus acciones y su ficha desplegables (▸ Ver acciones / ▸ Ver ficha)
+- Los enemigos muestran sus acciones y su ficha desplegables (▸ Ver acciones / ▸ Ver ficha).
+  Lo que dejes abierto **queda abierto**: pegarle a alguien redibuja las tarjetas pero no
+  te cierra lo que estabas leyendo
 - **Exhausted** es apilable: click izquierdo agrega una carga, click derecho quita una
 - En los controles de stats, **bajar está a la izquierda (−) y subir a la derecha (+)**
 
