@@ -297,6 +297,33 @@ select.fi{appearance:auto;}
 .storm-cell.storm{background:#e05050;box-shadow:0 0 5px rgba(224,80,80,.7);}
 .storm-info{font-size:11px;color:var(--text3);font-style:italic;white-space:nowrap;}
 .storm-ctrl{display:flex;gap:4px;}
+/* calendario rosharano */
+.cal-chip{cursor:pointer;font-style:normal;font-family:'Cinzel',serif;color:var(--gold2);letter-spacing:.03em;}
+.cal-chip:hover{color:var(--gold);}
+.cal-head{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:10px 0 8px;}
+.cal-month{font-family:'Cinzel',serif;font-size:17px;color:var(--gold2);min-width:150px;text-align:center;}
+.cal-today{font-size:12px;color:var(--text3);font-style:italic;text-align:center;margin-bottom:4px;}
+.cal-scroll{overflow-x:auto;}
+.cal-grid{width:100%;border-collapse:collapse;font-size:12px;min-width:520px;}
+.cal-grid th{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);font-weight:400;padding:4px 6px;border-bottom:1px solid var(--border2);}
+.cal-wk{font-family:'Cinzel',serif;font-size:10px;color:var(--text3);text-align:right;padding-right:7px;white-space:nowrap;border-right:1px solid var(--border2);}
+.cal-cell{border:1px solid var(--border);height:44px;width:19%;vertical-align:top;padding:3px 4px;cursor:pointer;background:var(--bg3);}
+.cal-cell:hover{background:var(--bg4);}
+.cal-cell.past{opacity:.5;}
+.cal-cell.today{background:rgba(224,189,124,.14);outline:1.5px solid var(--gold);outline-offset:-1.5px;}
+.cal-cell.sel{outline:1.5px dashed var(--gold2);outline-offset:-1.5px;}
+.cal-n{font-family:'Cinzel',serif;font-size:10px;color:var(--text3);}
+.cal-cell.today .cal-n{color:var(--gold2);}
+.cal-pins{display:flex;flex-wrap:wrap;gap:2px;margin-top:3px;}
+.cal-pin{width:7px;height:7px;border-radius:50%;background:var(--gold);}
+.cal-pin.secreto{border:1px solid var(--text3);}
+.cal-day-h{font-family:'Cinzel',serif;font-size:15px;color:var(--gold2);margin-top:2px;}
+.cal-note{display:flex;align-items:flex-start;gap:8px;background:var(--bg3);border-left:2px solid var(--gold);border-radius:0 var(--r) var(--r) 0;padding:6px 9px;margin-bottom:5px;font-size:13px;}
+.cal-note .who{font-size:10px;color:var(--text3);font-family:'Cinzel',serif;letter-spacing:.04em;}
+.cal-note .txt{flex:1;min-width:0;word-break:break-word;}
+.cal-colors{display:flex;gap:5px;align-items:center;}
+.cal-color{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent;}
+.cal-color.on{border-color:var(--text2);}
 /* ajustes (config) */
 .cfg-sec{font-family:'Cinzel',serif;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--border);}
 .cfg-lrow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;font-size:14px;color:var(--text2);}
@@ -367,13 +394,18 @@ select.fi{appearance:auto;}
     </div>
   </div>
 
+  <!-- Barra del paso del tiempo: la tormenta y el calendario se prenden por
+       separado, y los botones de pasar días valen para los dos. -->
   <div class="storm-bar" id="stormBar" style="display:none">
-    <span class="storm-lbl">⚡ Alta tormenta</span>
+    <span class="storm-lbl" id="stormLbl">⚡ Alta tormenta</span>
     <div class="storm-cells" id="stormCells"></div>
     <span class="storm-info" id="stormInfo"></span>
+    <span class="storm-info cal-chip" id="calInfo" style="display:none" onclick="openCalendar()" title="Abrir el calendario"></span>
     <span class="storm-ctrl">
-      <button class="btn ghost sm" onclick="stormAdvance()" title="Pasar un día (sin descanso)">+1 día</button>
-      <button class="btn ghost sm" onclick="stormReset()" title="Reiniciar el ciclo">⟳</button>
+      <button class="btn ghost sm" onclick="stormAdvance(1)" title="Pasar un día (sin descanso)">+1 día</button>
+      <button class="btn ghost sm" id="skipDaysBtn" onclick="stormAdvance()" title="Pasar varios días de una (se ajusta en Ajustes → Calendario)">+5 días</button>
+      <button class="btn ghost sm" id="stormResetBtn" onclick="stormReset()" title="Reiniciar el ciclo">⟳</button>
+      <button class="btn ghost sm" id="calBtn" style="display:none" onclick="openCalendar()" title="Calendario rosharano">📅 Calendario</button>
     </span>
   </div>
 
@@ -878,8 +910,9 @@ async function doLongRest(){
   var r=await api(API+'/long_rest','POST',{exclude:_restExcludes()});
   closeModal();
   loadMembers();
-  if(SYSTEM!=='dnd'){ if(r.state) renderStorm(r.state); else loadStorm(); }
+  if(SYSTEM!=='dnd'){ if(r.state) renderStorm(r.state); else loadStorm(); loadCalendar(); }
   var msg='Descanso largo aplicado a '+r.characters+' personaje(s).';
+  if(r.storm&&r.storm.date&&CAL&&CAL.enabled) msg+='\nAhora es '+r.storm.date.day_name+' ('+r.storm.date.formal+').';
   if(r.storm&&r.storm.stormed) msg+='\n\n⚡ ¡Alta tormenta! Cayó el día '+r.storm.storm_day+' '+r.storm.storm_moment+'.';
   alert(msg);
 }
@@ -891,8 +924,10 @@ async function doShortRest(){
 }
 
 // ─── Tracker de altas tormentas (DM: ve día y momento exactos) ───
+var STORM=null;
 function renderStorm(s){
   if(!s)return;
+  STORM=s;
   var cells='';
   for(var i=1;i<=s.max;i++){
     var cls='storm-cell';
@@ -904,20 +939,200 @@ function renderStorm(s){
   }
   document.getElementById('stormCells').innerHTML=cells;
   document.getElementById('stormInfo').textContent='Día '+s.day+' · cae el día '+s.target+' '+s.moment;
-  // el DM puede apagar el tracker desde los ajustes
-  document.getElementById('stormBar').style.display=(s.enabled===false)?'none':'';
+  applyDayBar();
+}
+// La barra la comparten la tormenta y el calendario: cada uno se prende por su
+// lado y los botones de pasar días valen para los dos.
+function applyDayBar(){
+  var bar=document.getElementById('stormBar'); if(!bar)return;
+  var cosmere=SYSTEM!=='dnd';
+  var st=cosmere&&STORM&&STORM.enabled!==false;
+  var cl=cosmere&&CAL&&!!CAL.enabled;
+  bar.style.display=(st||cl)?'':'none';
+  ['stormLbl','stormCells','stormInfo','stormResetBtn'].forEach(function(id){
+    var e=document.getElementById(id); if(e) e.style.display=st?'':'none';
+  });
+  ['calBtn','calInfo'].forEach(function(id){
+    var e=document.getElementById(id); if(e) e.style.display=cl?'':'none';
+  });
 }
 async function loadStorm(){ try{ renderStorm(await api(API+'/storm')); }catch(e){} }
-async function stormAdvance(){
-  var r=await api(API+'/storm/advance','POST');
+// n días de una: sin argumento usa el salto que fijó el DM (5 = una semana).
+async function stormAdvance(n){
+  var days=n||calSalto();
+  var r=await api(API+'/storm/advance','POST',{days:days});
   renderStorm(r.state);
   loadMembers();
-  if(r.storm&&r.storm.stormed) alert('⚡ ¡Alta tormenta! Cayó el día '+r.storm.storm_day+' '+r.storm.storm_moment+'.');
+  loadCalendar();
+  var caidas=(r.storm&&r.storm.storms)||[];
+  if(caidas.length===1)
+    alert('⚡ ¡Alta tormenta! Cayó el día '+caidas[0].storm_day+' '+caidas[0].storm_moment+'.');
+  else if(caidas.length>1)
+    alert('⚡ Cayeron '+caidas.length+' altas tormentas en esos '+days+' días.\nLa última, el día '
+          +caidas[caidas.length-1].storm_day+' '+caidas[caidas.length-1].storm_moment+'.');
 }
 async function stormReset(){
   if(!confirm('¿Reiniciar el ciclo de tormentas? Se sortea un nuevo día y momento.'))return;
   var r=await api(API+'/storm/reset','POST');
   renderStorm(r.state);
+}
+
+// ─── Calendario rosharano ───────────────────────────────────
+// 10 meses × 10 semanas × 5 días = 500. Los nombres se arman por composición
+// (mes + sufijo de semana + sufijo de día), igual que en app/roshar.py.
+var CAL=null;        // estado del calendario que devuelve la API
+var CAL_VIEW=null;   // {year, month} del mes que se está mirando
+var CAL_SEL=null;    // día elegido (índice absoluto)
+var CAL_MONTHS=['Jes','Nan','Chach','Vev','Palah','Shash','Betab','Kak','Tanat','Ishi'];
+var CAL_WSUF=['es','an','ach','ev','ah','ash','ab','ak','at','ish'];
+var CAL_DSUF=['es','an','ach','ev','ah'];
+var CAL_WD=['Jesel','Nanel','Chachel','Vevel','Palahel'];
+var CAL_COLORS=['#e0bd7c','#6aaae8','#5aaa70','#e07070','#aa8aec','#e8a840'];
+var CAL_COLOR=CAL_COLORS[0];
+function calIndex(y,m,w,d){ return ((y*10+(m-1))*10+(w-1))*5+(d-1); }
+function calFrom(i){
+  var y=Math.floor(i/500), r=i%500, m=Math.floor(r/50);
+  r=r%50;
+  return {year:y,month:m+1,week:Math.floor(r/5)+1,day:r%5+1};
+}
+function calWeekName(m,w){ return CAL_MONTHS[m-1]+CAL_WSUF[w-1]; }
+function calDayName(m,w,d){ return calWeekName(m,w)+CAL_DSUF[d-1]; }
+function calFormal(f){ return f.year+'.'+f.month+'.'+f.week+'.'+f.day; }
+function calSalto(){ return (CAL&&CAL.salto_dias)||5; }
+function calNotesOf(idx){
+  return ((CAL&&CAL.notes)||[]).filter(function(n){return n.day_index===idx;});
+}
+function renderCalBar(){
+  var chip=document.getElementById('calInfo');
+  if(chip&&CAL&&CAL.today) chip.textContent='📅 '+CAL.today.day_name+' · '+CAL.today.formal;
+  var b=document.getElementById('skipDaysBtn');
+  if(b) b.textContent='+'+calSalto()+' días';
+  applyDayBar();
+}
+async function loadCalendar(){
+  try{ CAL=await api(API+'/calendar'); }catch(e){ return; }
+  renderCalBar();
+  if(document.getElementById('calGrid')) paintCalendar();   // el modal está abierto
+}
+async function openCalendar(){
+  try{ CAL=await api(API+'/calendar'); }catch(e){ return; }
+  renderCalBar();
+  if(!CAL.enabled){ alert('El calendario está apagado. Prendelo en Ajustes → Calendario.'); return; }
+  CAL_VIEW={year:CAL.today.year,month:CAL.today.month};
+  CAL_SEL=CAL.today.index;
+  paintCalendar();
+  document.getElementById('modal').classList.add('wide');
+  document.getElementById('overlay').classList.add('on');
+}
+function calNav(dm,dy){
+  var m=CAL_VIEW.month+(dm||0), y=CAL_VIEW.year+(dy||0);
+  while(m>10){m-=10;y++;}
+  while(m<1){m+=10;y--;}
+  if(y<0){y=0;m=1;}
+  CAL_VIEW={year:y,month:m};
+  paintCalendar();
+}
+function calGoToday(){
+  CAL_VIEW={year:CAL.today.year,month:CAL.today.month};
+  CAL_SEL=CAL.today.index;
+  paintCalendar();
+}
+function calPick(i){ CAL_SEL=i; paintCalendar(); }
+function calPickColor(c){ CAL_COLOR=c; paintCalendar(); }
+function calNoteHTML(n){
+  var mio=CAL.is_dm||n.user_id===CAL.user_id;
+  return '<div class="cal-note"><span class="cal-pin" style="background:'+esc(n.color||CAL_COLORS[0])+';margin-top:4px;flex:none"></span>'
+    +'<span class="txt">'+esc(n.texto)+(n.secreto?' <span class="who">(solo vos)</span>':'')
+    +'<br><span class="who">'+esc(n.username)+'</span></span>'
+    +(mio?'<button class="btn ghost sm" onclick="calEditNote('+n.id+')" title="Editar">✎</button>'
+         +'<button class="btn ghost sm" onclick="calDelNote('+n.id+')" title="Borrar">✕</button>':'')
+    +'</div>';
+}
+function calDayPanel(){
+  if(CAL_SEL==null) return '';
+  var f=calFrom(CAL_SEL), ns=calNotesOf(CAL_SEL);
+  var h='<div class="cal-day-h">'+calDayName(f.month,f.week,f.day)+(CAL_SEL===CAL.today.index?' <span class="who" style="color:var(--gold)">— hoy</span>':'')+'</div>'
+    +'<div class="cal-today" style="text-align:left">'+CAL_WD[f.day-1]+' de la semana '+calWeekName(f.month,f.week)+' · '+calFormal(f)+'</div>'
+    +(ns.length?ns.map(calNoteHTML).join(''):'<div class="cfg-hint">Sin notas en este día.</div>');
+  if(CAL.can_edit){
+    var colores=CAL_COLORS.map(function(c){
+      return '<span class="cal-color'+(c===CAL_COLOR?' on':'')+'" style="background:'+c+'" onclick="calPickColor(\''+c+'\')"></span>';}).join('');
+    h+='<div class="row" style="margin:8px 0 0;gap:6px;align-items:center;flex-wrap:wrap">'
+      +'<input class="fi" id="calNoteTxt" placeholder="Nota o pin para este día" style="flex:1;min-width:170px" onkeydown="if(event.key===\'Enter\')calAddNote()"/>'
+      +'<span class="cal-colors">'+colores+'</span>'
+      +(CAL.is_dm?'<label class="cfg-hint" style="display:flex;gap:4px;align-items:center;cursor:pointer"><input type="checkbox" id="calNoteSec"/> solo yo</label>':'')
+      +'<button class="btn accent sm" onclick="calAddNote()">Anotar</button></div>';
+  }
+  if(CAL.is_dm)
+    h+='<div class="form-actions" style="margin-top:12px"><button class="btn ghost sm" onclick="calSetToday()">Marcar este día como hoy</button></div>';
+  return h;
+}
+function paintCalendar(){
+  var v=CAL_VIEW, t=CAL.today;
+  // el modal se redibuja entero en cada toque: no perdemos la nota a medio escribir
+  var prev=document.getElementById('calNoteTxt');
+  var borrador=prev?prev.value:'', foco=!!prev&&document.activeElement===prev;
+  var filas='';
+  for(var w=1;w<=10;w++){
+    var tds='';
+    for(var d=1;d<=5;d++){
+      var idx=calIndex(v.year,v.month,w,d), cls='cal-cell';
+      if(idx===t.index) cls+=' today';
+      else if(idx<t.index) cls+=' past';
+      if(idx===CAL_SEL) cls+=' sel';
+      var pins=calNotesOf(idx).map(function(n){
+        return '<span class="cal-pin'+(n.secreto?' secreto':'')+'" style="background:'+esc(n.color||CAL_COLORS[0])+'" title="'+escA(n.texto)+'"></span>';}).join('');
+      tds+='<td class="'+cls+'" onclick="calPick('+idx+')" title="'+escA(calDayName(v.month,w,d))+'">'
+        +'<div class="cal-n">'+((w-1)*5+d)+'</div>'
+        +(pins?'<div class="cal-pins">'+pins+'</div>':'')+'</td>';
+    }
+    filas+='<tr><td class="cal-wk">'+calWeekName(v.month,w)+'</td>'+tds+'</tr>';
+  }
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cname" style="font-size:18px">📅 Calendario rosharano</div>'
+    +'<div class="cal-today">Hoy es <b>'+esc(t.day_name)+'</b> · '+esc(t.formal)+' — semana '+esc(t.week_name)+' del mes de '+esc(t.month_name)+'</div>'
+    +'<div class="cal-head">'
+      +'<button class="btn ghost sm" onclick="calNav(0,-1)" title="Año anterior">«</button>'
+      +'<button class="btn ghost sm" onclick="calNav(-1,0)" title="Mes anterior">‹</button>'
+      +'<span class="cal-month">'+esc(CAL_MONTHS[v.month-1])+' <span style="color:var(--text3);font-size:13px">'+v.year+'</span></span>'
+      +'<button class="btn ghost sm" onclick="calNav(1,0)" title="Mes siguiente">›</button>'
+      +'<button class="btn ghost sm" onclick="calNav(0,1)" title="Año siguiente">»</button>'
+      +'<button class="btn ghost sm" onclick="calGoToday()">Hoy</button>'
+    +'</div>'
+    +'<div class="cal-scroll"><table class="cal-grid" id="calGrid"><thead><tr><th></th>'
+      +CAL_WD.map(function(x){return '<th>'+x+'</th>';}).join('')+'</tr></thead><tbody>'+filas+'</tbody></table></div>'
+    +'<div style="margin-top:12px">'+calDayPanel()+'</div>';
+  var caja=document.getElementById('calNoteTxt');
+  if(caja&&borrador){ caja.value=borrador; if(foco){ caja.focus(); caja.setSelectionRange(borrador.length,borrador.length); } }
+}
+async function calAddNote(){
+  var el=document.getElementById('calNoteTxt'), t=(el&&el.value||'').trim();
+  if(!t){ if(el)el.focus(); return; }
+  var sec=document.getElementById('calNoteSec');
+  CAL=await api(API+'/calendar/notes','POST',
+                {day_index:CAL_SEL,texto:t,color:CAL_COLOR,secreto:!!(sec&&sec.checked)});
+  paintCalendar(); renderCalBar();
+}
+async function calEditNote(id){
+  var n=((CAL&&CAL.notes)||[]).filter(function(x){return x.id===id;})[0];
+  if(!n)return;
+  var t=prompt('Nota:',n.texto);
+  if(t===null||!t.trim())return;
+  CAL=await api(API+'/calendar/notes/'+id,'PUT',
+                {texto:t.trim(),color:n.color,secreto:n.secreto,day_index:n.day_index});
+  paintCalendar(); renderCalBar();
+}
+async function calDelNote(id){
+  if(!confirm('¿Borrar esta nota?'))return;
+  CAL=await api(API+'/calendar/notes/'+id,'DELETE');
+  paintCalendar(); renderCalBar();
+}
+async function calSetToday(){
+  var f=calFrom(CAL_SEL);
+  if(!confirm('¿Los jugadores pasan a estar en '+calDayName(f.month,f.week,f.day)+' ('+calFormal(f)+')?'))return;
+  CAL=await api(API+'/calendar','PUT',{day_index:CAL_SEL});
+  CAL_VIEW={year:CAL.today.year,month:CAL.today.month};
+  paintCalendar(); renderCalBar();
 }
 
 // ─── Ajustes de la campaña ───
@@ -952,7 +1167,11 @@ var CFG=null;
 // lo que el DM haya tocado: nada se pierde por moverse entre solapas.
 var CFG_CAMPOS=[
   ['cfg-mcat','modulo_catalogo','bool'], ['cfg-minv','modulo_inventario','bool'],
-  ['cfg-mstorm','modulo_tormentas','bool'],
+  ['cfg-mstorm','modulo_tormentas','bool'], ['cfg-mcal','modulo_calendario','bool'],
+  ['cfg-calvis','calendario_visible','bool'], ['cfg-caledit','calendario_editable','bool'],
+  ['cfg-salto','salto_dias','int'],
+  ['cfg-calyear','cal_year','int'], ['cfg-calmonth','cal_month','int'],
+  ['cfg-calweek','cal_week','int'], ['cfg-calday','cal_day','int'],
   ['cfg-ve-vida','ver_vida_enemigos','txt'], ['cfg-ve-focus','ver_focus_enemigos','txt'],
   ['cfg-ve-inv','ver_inv_enemigos','txt'], ['cfg-ve-est','ver_estados_enemigos','bool'],
   ['cfg-va-vida','ver_vida_aliados','txt'], ['cfg-va-focus','ver_focus_aliados','txt'],
@@ -993,7 +1212,31 @@ function paintConfig(){
       +cfgSwitch('Inventario','cfg-minv',cfg.modulo_inventario,
                  'Lo que lleva cada uno, los guardados y la capacidad de carga')
       +cfgSwitch('Tracker de altas tormentas','cfg-mstorm',cfg.modulo_tormentas,
-                 'La barra del ciclo y la descarga de marcos por día');
+                 'La barra del ciclo y la descarga de marcos por día')
+      +cfgSwitch('Calendario rosharano','cfg-mcal',cfg.modulo_calendario,
+                 'En qué día están, con notas y pines (se ajusta en la solapa Calendario)');
+  }else if(CFG_TAB==='calendario'){
+    var d=cfg.cal_date||{};
+    var meses=(cfg.cal_months||CAL_MONTHS).map(function(m,i){
+      return '<option value="'+(i+1)+'"'+((i+1)===cfg.cal_month?' selected':'')+'>'+(i+1)+' · '+esc(m)+'</option>';}).join('');
+    cuerpo='<div class="cfg-sec">Calendario rosharano</div>'
+      +'<div class="import-hint" style="margin-bottom:8px">10 meses de 10 semanas de 5 días: '
+        +'500 días por año. Avanza solo con cada <b>descanso largo</b> y con los botones de '
+        +'pasar días. Se prende y se apaga en la solapa <b>Módulos</b>.</div>'
+      +cfgSwitch('Los jugadores lo ven','cfg-calvis',cfg.calendario_visible,
+                 'Apagado, el calendario es solo tuyo')
+      +cfgSwitch('Los jugadores pueden anotar','cfg-caledit',cfg.calendario_editable,
+                 'Notas y pines en cualquier día; cada uno maneja los suyos')
+      +cfgRow('Días del botón de avance rápido','cfg-salto',cfg.salto_dias,
+              'Una semana rosharana son 5 días','min="1" max="500"')
+      +'<div class="cfg-sec">En qué día están</div>'
+      +'<label class="cfg-lrow"><span>Mes</span><select class="fi" id="cfg-calmonth" style="min-width:150px">'+meses+'</select></label>'
+      +cfgRow('Semana del mes','cfg-calweek',cfg.cal_week,'1 a 10','min="1" max="10"')
+      +cfgRow('Día de la semana','cfg-calday',cfg.cal_day,'1 a 5 (Jesel … Palahel)','min="1" max="5"')
+      +cfgRow('Año','cfg-calyear',cfg.cal_year,'','min="0" max="9999"')
+      +'<div class="import-hint" style="margin-top:10px">Ahora mismo es <b>'+esc(d.day_name||'')+'</b> · '
+        +esc(d.formal||'')+' — semana '+esc(d.week_name||'')+' del mes de '+esc(d.month_name||'')+'.<br>'
+        +'También podés tocar un día en el calendario y marcarlo como hoy.</div>';
   }else if(CFG_TAB==='carga'){
     // Capacidad = base del tamaño + Fuerza. Acá se toca la base de cada tamaño.
     cuerpo='<div class="cfg-sec">Capacidad de carga por tamaño</div>'
@@ -1042,7 +1285,8 @@ function paintConfig(){
       +'<label class="cfg-lrow"><span>Momento</span><select class="fi" id="cfg-smoment" style="min-width:150px">'+moments+'</select></label>';
   }
   var tabs=[['modulos','Módulos'],['carga','Capacidad de carga'],
-            ['ver','Qué ven los jugadores'],['tormentas','Tormentas y marcos']];
+            ['ver','Qué ven los jugadores'],['tormentas','Tormentas y marcos'],
+            ['calendario','Calendario']];
   document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
     +'<div class="cname" style="font-size:18px">⚙ Ajustes de la campaña</div>'
     +'<div class="cfg-tabs">'+tabs.map(function(t){
@@ -1081,6 +1325,7 @@ async function saveConfig(){
   closeModal();
   aplicarModulos(CFG);
   loadStorm();
+  loadCalendar();
   // las bases de carga cambian todas las barras: si estás mirándolas, refrescá
   if(document.getElementById('tab-comercio').style.display!=='none') loadInventories();
 }
@@ -1094,8 +1339,9 @@ function aplicarModulos(cfg){
     var m=el.dataset.mod;
     el.style.display=(m?on[m]:cosmere)?'':'none';
   });
-  var storm=document.getElementById('stormBar');
-  if(storm) storm.style.display=(cosmere&&cfg.modulo_tormentas!==false)?'':'none';
+  if(STORM) STORM.enabled=cfg.modulo_tormentas!==false;
+  if(CAL) CAL.enabled=!!cfg.modulo_calendario;
+  applyDayBar();
   // si estabas parado en una pestaña que se apagó, volvés al combate
   if((!on.catalogo&&document.getElementById('tab-objetos').style.display!=='none')
    ||(!on.inventario&&document.getElementById('tab-comercio').style.display!=='none'))
@@ -2732,7 +2978,7 @@ async function toggleCreateItems(uid){
 }
 
 // init
-loadCampaign().then(function(){ if(SYSTEM!=='dnd') loadStorm(); });
+loadCampaign().then(function(){ if(SYSTEM!=='dnd'){ loadStorm(); loadCalendar(); } });
 connectWS();
 renderCombatSetup();
 loadEnemies();

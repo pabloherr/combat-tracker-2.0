@@ -6,12 +6,14 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from .. import roshar
 from ..access import campaign_or_404, require_access, require_dm
 from ..auth import current_user
 from ..config import (CONFIG_DEFAULTS, VER_MODOS, coerce, get_config,
                       player_config, sane, save_config)
 from ..database import db
-from ..models import CampaignIn, ConfigIn, InviteIn, LongRestIn, MarcosChange
+from ..models import (CalendarNoteIn, CalendarSet, CampaignIn, ConfigIn, DaysIn,
+                      InviteIn, LongRestIn, MarcosChange)
 from ..state import mask_stats
 
 router = APIRouter(prefix="/api", tags=["campaigns"])
@@ -95,6 +97,97 @@ def _marcos_tick(conn, cid: int, stormed: bool, day: int):
         lost = sum(1 for _ in range(light) if random.random() < p)
         if lost:
             conn.execute("UPDATE characters SET marcos_light=? WHERE id=?", (light - lost, r["id"]))
+
+
+# ── Calendario rosharano ───────────────────────────────────
+
+MAX_SALTO = 500      # tope de días por avance (un año); evita saltos accidentales
+
+
+def _get_calendar(conn, cid: int):
+    row = conn.execute("SELECT * FROM campaign_calendar WHERE campaign_id=?",
+                       (cid,)).fetchone()
+    if not row:
+        conn.execute(
+            "INSERT INTO campaign_calendar (campaign_id, day_index) VALUES (?,?)",
+            (cid, roshar.DEFAULT_INDEX),
+        )
+        row = conn.execute("SELECT * FROM campaign_calendar WHERE campaign_id=?",
+                           (cid,)).fetchone()
+    return row
+
+
+def _set_calendar(conn, cid: int, idx: int) -> int:
+    idx = roshar.clamp_index(idx)
+    _get_calendar(conn, cid)
+    conn.execute("UPDATE campaign_calendar SET day_index=? WHERE campaign_id=?",
+                 (idx, cid))
+    return idx
+
+
+def _notes(conn, cid: int, is_dm: bool) -> list:
+    """Notas y pines del calendario. Las secretas son solo del DM."""
+    rows = conn.execute(
+        "SELECT n.*, u.username FROM calendar_notes n "
+        "LEFT JOIN users u ON u.id=n.user_id "
+        "WHERE n.campaign_id=? ORDER BY n.day_index, n.id", (cid,),
+    ).fetchall()
+    out = []
+    for r in rows:
+        if r["secreto"] and not is_dm:
+            continue
+        out.append({"id": r["id"], "day_index": r["day_index"],
+                    "texto": r["texto"], "color": r["color"] or "",
+                    "secreto": bool(r["secreto"]),
+                    "user_id": r["user_id"], "username": r["username"] or "—"})
+    return out
+
+
+def _calendar_view(conn, cid: int, cfg: dict, is_dm: bool, user_id: int) -> dict:
+    """Lo que ve del calendario quien lo pide.
+
+    `enabled` en false = el DM no usa el calendario en esta campaña. Un jugador
+    tampoco lo ve si el DM lo dejó solo para él (`calendario_visible`)."""
+    idx = _get_calendar(conn, cid)["day_index"]
+    visible = bool(cfg["modulo_calendario"]) and (is_dm or cfg["calendario_visible"])
+    # Si el DM se lo guarda para él, la fecha ni se manda: no hay nada que espiar.
+    return {
+        "enabled": bool(cfg["modulo_calendario"]),
+        "visible": visible,
+        "is_dm": is_dm,
+        "can_edit": visible and (is_dm or bool(cfg["calendario_editable"])),
+        "user_id": user_id,
+        "salto_dias": cfg["salto_dias"],
+        "today": roshar.describe(idx) if visible else None,
+        "notes": _notes(conn, cid, is_dm) if visible else [],
+    }
+
+
+def _cal_fields(conn, cid: int) -> dict:
+    """La fecha actual desarmada, para el modal de ajustes del DM."""
+    d = roshar.describe(_get_calendar(conn, cid)["day_index"])
+    return {"cal_year": d["year"], "cal_month": d["month"], "cal_week": d["week"],
+            "cal_day": d["day"], "cal_date": d,
+            "cal_months": roshar.MONTHS, "cal_weekdays": roshar.WEEKDAYS}
+
+
+def _pass_days(conn, cid: int, days: int = 1) -> dict:
+    """Pasan `days` días para toda la campaña: calendario, ciclo de tormentas y
+    descarga de marcos. Es el único lugar donde el tiempo avanza."""
+    days = max(1, min(MAX_SALTO, int(days or 1)))
+    storms = []
+    for _ in range(days):
+        st = _advance_storm(conn, cid)
+        _marcos_tick(conn, cid, st["stormed"], _get_storm(conn, cid)["day"])
+        if st["stormed"]:
+            storms.append(st)
+    idx = _set_calendar(conn, cid, _get_calendar(conn, cid)["day_index"] + days)
+    out = {"days": days, "storms": storms, "stormed": bool(storms),
+           "date": roshar.describe(idx)}
+    if storms:      # compatibilidad con el aviso de un solo día
+        out["storm_day"] = storms[-1]["storm_day"]
+        out["storm_moment"] = storms[-1]["storm_moment"]
+    return out
 
 
 # ── DM: campañas propias ───────────────────────────────────
@@ -475,9 +568,9 @@ def long_rest(cid: int, payload: LongRestIn, user=Depends(current_user)):
             conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(kept), ch["id"]))
         if is_dnd:
             return {"ok": True, "characters": done}
-        storm = _advance_storm(conn, cid)   # el día pasa para todos, con o sin descanso
-        _marcos_tick(conn, cid, storm["stormed"], _get_storm(conn, cid)["day"])
-    return {"ok": True, "characters": done, "storm": storm}
+        storm = _pass_days(conn, cid, 1)    # el día pasa para todos, con o sin descanso
+        state = _storm_view(_get_storm(conn, cid), True, _get_config(conn, cid))
+    return {"ok": True, "characters": done, "storm": storm, "state": state}
 
 
 @router.post("/campaigns/{cid}/short_rest")
@@ -530,15 +623,18 @@ def get_storm(cid: int, user=Depends(current_user)):
 
 
 @router.post("/campaigns/{cid}/storm/advance")
-def advance_storm(cid: int, user=Depends(current_user)):
-    """El DM adelanta un día suelto (viaje, etc.) sin descanso largo."""
+def advance_storm(cid: int, payload: DaysIn | None = None, user=Depends(current_user)):
+    """El DM adelanta días sueltos (viaje, etc.) sin descanso largo.
+
+    Sin cuerpo pasa un día; con `{"days": n}` pasa n de una (la semana rosharana
+    son 5, pero el número lo elige el DM en los ajustes)."""
+    days = payload.days if payload else 1
     with db() as conn:
         require_dm(conn, cid, user)
-        storm = _advance_storm(conn, cid)
-        row = _get_storm(conn, cid)
-        _marcos_tick(conn, cid, storm["stormed"], row["day"])
-        state = _storm_view(row, True, _get_config(conn, cid))
-    return {"ok": True, "storm": storm, "state": state}
+        cfg = _get_config(conn, cid)
+        storm = _pass_days(conn, cid, days)
+        state = _storm_view(_get_storm(conn, cid), True, cfg)
+    return {"ok": True, "storm": storm, "state": state, "date": storm["date"]}
 
 
 @router.post("/campaigns/{cid}/storm/reset")
@@ -556,6 +652,109 @@ def reset_storm(cid: int, user=Depends(current_user)):
     return {"ok": True, "state": _storm_view(row, True, cfg)}
 
 
+# ── Calendario: consulta, día actual y notas ───────────────
+
+def _calendar_or_403(conn, cid: int, user, need_edit: bool = False):
+    """Devuelve (cfg, is_dm) si quien pide puede ver (o editar) el calendario."""
+    _, is_dm = require_access(conn, cid, user)
+    cfg = _get_config(conn, cid)
+    if not cfg["modulo_calendario"]:
+        raise HTTPException(404, "El calendario no está activo en esta campaña")
+    if not is_dm and not cfg["calendario_visible"]:
+        raise HTTPException(403, "El DM no comparte el calendario")
+    if need_edit and not is_dm and not cfg["calendario_editable"]:
+        raise HTTPException(403, "El DM no deja anotar en el calendario")
+    return cfg, is_dm
+
+
+@router.get("/campaigns/{cid}/calendar")
+def get_calendar(cid: int, user=Depends(current_user)):
+    """Fecha en la que están los jugadores + notas. Si el calendario está
+    apagado (o el DM se lo guarda) vuelve `enabled`/`visible` en false y nada
+    más: el frontend no dibuja el botón y no hay nada que espiar."""
+    with db() as conn:
+        _, is_dm = require_access(conn, cid, user)
+        cfg = _get_config(conn, cid)
+        return _calendar_view(conn, cid, cfg, is_dm, user["id"])
+
+
+@router.put("/campaigns/{cid}/calendar")
+def set_calendar(cid: int, c: CalendarSet, user=Depends(current_user)):
+    """El DM fija en qué día están (desde el calendario o desde los ajustes)."""
+    with db() as conn:
+        require_dm(conn, cid, user)
+        cur = roshar.from_index(_get_calendar(conn, cid)["day_index"])
+        if c.day_index is not None:
+            idx = roshar.clamp_index(c.day_index)
+        else:
+            idx = roshar.to_index(
+                c.year if c.year is not None else cur["year"],
+                c.month if c.month is not None else cur["month"],
+                c.week if c.week is not None else cur["week"],
+                c.day if c.day is not None else cur["day"],
+            )
+        _set_calendar(conn, cid, idx)
+        cfg = _get_config(conn, cid)
+        return {"ok": True, **_calendar_view(conn, cid, cfg, True, user["id"])}
+
+
+@router.post("/campaigns/{cid}/calendar/notes")
+def add_calendar_note(cid: int, n: CalendarNoteIn, user=Depends(current_user)):
+    """Clava una nota (o pin) en un día. El DM siempre puede; los jugadores,
+    solo si el DM los dejó."""
+    with db() as conn:
+        cfg, is_dm = _calendar_or_403(conn, cid, user, need_edit=True)
+        texto = (n.texto or "").strip()
+        if not texto:
+            raise HTTPException(400, "Escribí algo en la nota")
+        idx = (roshar.clamp_index(n.day_index) if n.day_index is not None
+               else _get_calendar(conn, cid)["day_index"])
+        conn.execute(
+            "INSERT INTO calendar_notes (campaign_id, day_index, user_id, texto, color, secreto) "
+            "VALUES (?,?,?,?,?,?)",
+            (cid, idx, user["id"], texto[:500], (n.color or "")[:16],
+             1 if (n.secreto and is_dm) else 0),
+        )
+        return {"ok": True, **_calendar_view(conn, cid, cfg, is_dm, user["id"])}
+
+
+@router.put("/campaigns/{cid}/calendar/notes/{nid}")
+def edit_calendar_note(cid: int, nid: int, n: CalendarNoteIn, user=Depends(current_user)):
+    """Editar una nota: la suya cada jugador, cualquiera el DM."""
+    with db() as conn:
+        cfg, is_dm = _calendar_or_403(conn, cid, user, need_edit=True)
+        row = conn.execute("SELECT * FROM calendar_notes WHERE id=? AND campaign_id=?",
+                           (nid, cid)).fetchone()
+        if not row:
+            raise HTTPException(404, "Esa nota no existe")
+        if not is_dm and row["user_id"] != user["id"]:
+            raise HTTPException(403, "Esa nota no es tuya")
+        texto = (n.texto or "").strip()
+        if not texto:
+            raise HTTPException(400, "Escribí algo en la nota")
+        idx = roshar.clamp_index(n.day_index) if n.day_index is not None else row["day_index"]
+        conn.execute(
+            "UPDATE calendar_notes SET texto=?, color=?, secreto=?, day_index=? WHERE id=?",
+            (texto[:500], (n.color or "")[:16],
+             1 if (n.secreto and is_dm) else 0, idx, nid),
+        )
+        return {"ok": True, **_calendar_view(conn, cid, cfg, is_dm, user["id"])}
+
+
+@router.delete("/campaigns/{cid}/calendar/notes/{nid}")
+def del_calendar_note(cid: int, nid: int, user=Depends(current_user)):
+    with db() as conn:
+        cfg, is_dm = _calendar_or_403(conn, cid, user, need_edit=True)
+        row = conn.execute("SELECT * FROM calendar_notes WHERE id=? AND campaign_id=?",
+                           (nid, cid)).fetchone()
+        if not row:
+            raise HTTPException(404, "Esa nota no existe")
+        if not is_dm and row["user_id"] != user["id"]:
+            raise HTTPException(403, "Esa nota no es tuya")
+        conn.execute("DELETE FROM calendar_notes WHERE id=?", (nid,))
+        return {"ok": True, **_calendar_view(conn, cid, cfg, is_dm, user["id"])}
+
+
 # ── Parámetros ajustables por el DM ────────────────────────
 
 @router.get("/campaigns/{cid}/config")
@@ -568,6 +767,7 @@ def get_config(cid: int, user=Depends(current_user)):
         cfg.update({"storm_day": row["day"], "storm_target": row["target"],
                     "storm_moment": row["moment"], "moments": STORM_MOMENTS,
                     "modos": list(VER_MODOS)})
+        cfg.update(_cal_fields(conn, cid))
         return cfg
 
 
@@ -592,10 +792,20 @@ def put_config(cid: int, c: ConfigIn, user=Depends(current_user)):
             moment = row["moment"]
         conn.execute("UPDATE storm_tracker SET day=?, target=?, moment=? WHERE campaign_id=?",
                      (day, target, moment, cid))
+        # fecha actual del calendario (opcional, igual que la tormenta)
+        if any(v is not None for v in (c.cal_year, c.cal_month, c.cal_week, c.cal_day)):
+            cur = roshar.from_index(_get_calendar(conn, cid)["day_index"])
+            _set_calendar(conn, cid, roshar.to_index(
+                c.cal_year if c.cal_year is not None else cur["year"],
+                c.cal_month if c.cal_month is not None else cur["month"],
+                c.cal_week if c.cal_week is not None else cur["week"],
+                c.cal_day if c.cal_day is not None else cur["day"],
+            ))
         cfg = _get_config(conn, cid)
         row = _get_storm(conn, cid)
         cfg.update({"storm_day": row["day"], "storm_target": row["target"],
                     "storm_moment": row["moment"], "moments": STORM_MOMENTS})
+        cfg.update(_cal_fields(conn, cid))
     return {"ok": True, **cfg}
 
 

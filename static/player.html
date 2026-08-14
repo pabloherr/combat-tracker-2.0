@@ -154,6 +154,33 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
 .storm-cell.past{background:var(--gold,#e0bd7c);}
 .storm-cell.current{outline:1.5px solid var(--gold2,#f4d9a0);outline-offset:1px;}
 .storm-info{font-size:11px;color:var(--text3);font-style:italic;white-space:nowrap;}
+/* calendario rosharano */
+.cal-chip{cursor:pointer;font-style:normal;font-family:'Cinzel',serif;color:var(--gold2);letter-spacing:.03em;}
+.cal-chip:hover{color:var(--gold);}
+.cal-head{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;margin:10px 0 8px;}
+.cal-month{font-family:'Cinzel',serif;font-size:16px;color:var(--gold2);min-width:130px;text-align:center;}
+.cal-today{font-size:12px;color:var(--text3);font-style:italic;text-align:center;margin-bottom:4px;}
+.cal-scroll{overflow-x:auto;}
+.cal-grid{width:100%;border-collapse:collapse;font-size:12px;min-width:480px;}
+.cal-grid th{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);font-weight:400;padding:4px 5px;border-bottom:1px solid var(--border2);}
+.cal-wk{font-family:'Cinzel',serif;font-size:10px;color:var(--text3);text-align:right;padding-right:6px;white-space:nowrap;border-right:1px solid var(--border2);}
+.cal-cell{border:1px solid var(--border);height:40px;width:19%;vertical-align:top;padding:3px 4px;cursor:pointer;background:var(--bg3);}
+.cal-cell.past{opacity:.5;}
+.cal-cell.today{background:rgba(224,189,124,.14);outline:1.5px solid var(--gold,#e0bd7c);outline-offset:-1.5px;}
+.cal-cell.sel{outline:1.5px dashed var(--gold2,#f4d9a0);outline-offset:-1.5px;}
+.cal-n{font-family:'Cinzel',serif;font-size:10px;color:var(--text3);}
+.cal-cell.today .cal-n{color:var(--gold2);}
+.cal-pins{display:flex;flex-wrap:wrap;gap:2px;margin-top:3px;}
+.cal-pin{width:7px;height:7px;border-radius:50%;background:var(--gold,#e0bd7c);}
+.cal-day-h{font-family:'Cinzel',serif;font-size:15px;color:var(--gold2);margin-top:2px;}
+.cal-note{display:flex;align-items:flex-start;gap:8px;background:var(--bg3);border-left:2px solid var(--gold,#e0bd7c);border-radius:0 6px 6px 0;padding:6px 9px;margin-bottom:5px;font-size:13px;}
+.cal-note .who{font-size:10px;color:var(--text3);font-family:'Cinzel',serif;letter-spacing:.04em;}
+.cal-note .txt{flex:1;min-width:0;word-break:break-word;}
+.cal-colors{display:flex;gap:5px;align-items:center;}
+.cal-color{width:18px;height:18px;border-radius:50%;cursor:pointer;border:2px solid transparent;}
+.cal-color.on{border-color:var(--text2);}
+.cal-btn-sm{background:var(--bg3);border:1px solid var(--border);color:var(--gold2);border-radius:6px;padding:4px 10px;font-family:'Cinzel',serif;font-size:12px;cursor:pointer;}
+.cal-btn-sm:hover{border-color:var(--gold,#e0bd7c);}
 /* pestañas de la campaña */
 .tabbar{display:flex;gap:4px;margin-bottom:1.1rem;border-bottom:1px solid var(--border);}
 .tab{flex:1;font-family:'Cinzel',serif;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:11px 6px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text3);cursor:pointer;}
@@ -249,10 +276,14 @@ body{background:var(--bg);color:var(--text);font-family:'Crimson Pro',Georgia,se
     </div>
   </div>
 
+  <!-- El DM prende la tormenta y el calendario por separado: la barra aparece
+       si al menos uno de los dos está en juego. -->
   <div class="storm-bar" id="stormBar" style="display:none">
-    <span class="storm-lbl">⚡ Alta tormenta</span>
+    <span class="storm-lbl" id="stormLbl">⚡ Alta tormenta</span>
     <div class="storm-cells" id="stormCells"></div>
     <span class="storm-info" id="stormInfo"></span>
+    <span class="storm-info cal-chip" id="calInfo" style="display:none" onclick="openCalendar()" title="Abrir el calendario"></span>
+    <button class="cal-btn-sm" id="calBtn" style="display:none" onclick="openCalendar()" title="Calendario rosharano">📅</button>
   </div>
 
   <div class="tabbar">
@@ -761,8 +792,10 @@ async function loadRoster(){
   if(COMBAT&&COMBAT.active) renderMe(COMBAT);   // refresca el recuadro de marcos del combate
 }
 // tracker de altas tormentas: el jugador ve la barra pero NO el día/momento exactos
+var STORM=null;
 function renderStorm(s){
   if(!s)return;
+  STORM=s;
   var cells='';
   for(var i=1;i<=s.max;i++){
     var cls='storm-cell';
@@ -773,10 +806,164 @@ function renderStorm(s){
   }
   document.getElementById('stormCells').innerHTML=cells;
   document.getElementById('stormInfo').textContent='Día '+s.day;
-  // el DM puede apagar el tracker de tormentas en su campaña
-  document.getElementById('stormBar').style.display=(s.enabled===false)?'none':'';
+  applyDayBar();
+}
+// La barra la comparten la tormenta y el calendario; el DM puede apagar
+// cualquiera de los dos (o guardarse el calendario para él solo).
+function applyDayBar(){
+  var bar=document.getElementById('stormBar'); if(!bar)return;
+  var st=STORM&&STORM.enabled!==false;
+  var cl=CAL&&CAL.enabled&&CAL.visible;
+  bar.style.display=(st||cl)?'':'none';
+  ['stormLbl','stormCells','stormInfo'].forEach(function(id){
+    var e=document.getElementById(id); if(e) e.style.display=st?'':'none';
+  });
+  ['calBtn','calInfo'].forEach(function(id){
+    var e=document.getElementById(id); if(e) e.style.display=cl?'':'none';
+  });
 }
 async function loadStorm(){ try{ renderStorm(await api(API+'/storm')); }catch(e){} }
+
+// ─── Calendario rosharano ───────────────────────────────────
+// 10 meses × 10 semanas × 5 días = 500. Los nombres se arman por composición,
+// igual que en app/roshar.py: mes + sufijo de semana + sufijo de día.
+var CAL=null;        // estado del calendario que devuelve la API
+var CAL_VIEW=null;   // {year, month} del mes que se está mirando
+var CAL_SEL=null;    // día elegido (índice absoluto)
+var CAL_MONTHS=['Jes','Nan','Chach','Vev','Palah','Shash','Betab','Kak','Tanat','Ishi'];
+var CAL_WSUF=['es','an','ach','ev','ah','ash','ab','ak','at','ish'];
+var CAL_DSUF=['es','an','ach','ev','ah'];
+var CAL_WD=['Jesel','Nanel','Chachel','Vevel','Palahel'];
+var CAL_COLORS=['#e0bd7c','#6aaae8','#5aaa70','#e07070','#aa8aec','#e8a840'];
+var CAL_COLOR=CAL_COLORS[0];
+function calIndex(y,m,w,d){ return ((y*10+(m-1))*10+(w-1))*5+(d-1); }
+function calFrom(i){
+  var y=Math.floor(i/500), r=i%500, m=Math.floor(r/50);
+  r=r%50;
+  return {year:y,month:m+1,week:Math.floor(r/5)+1,day:r%5+1};
+}
+function calWeekName(m,w){ return CAL_MONTHS[m-1]+CAL_WSUF[w-1]; }
+function calDayName(m,w,d){ return calWeekName(m,w)+CAL_DSUF[d-1]; }
+function calFormal(f){ return f.year+'.'+f.month+'.'+f.week+'.'+f.day; }
+function calNotesOf(idx){
+  return ((CAL&&CAL.notes)||[]).filter(function(n){return n.day_index===idx;});
+}
+function renderCalBar(){
+  var chip=document.getElementById('calInfo');
+  if(chip&&CAL&&CAL.today) chip.textContent='📅 '+CAL.today.day_name+' · '+CAL.today.formal;
+  applyDayBar();
+}
+async function loadCalendar(){
+  try{ CAL=await api(API+'/calendar'); }catch(e){ return; }
+  renderCalBar();
+  if(document.getElementById('calGrid')) paintCalendar();   // el modal está abierto
+}
+async function openCalendar(){
+  try{ CAL=await api(API+'/calendar'); }catch(e){ return; }
+  renderCalBar();
+  if(!CAL.visible)return;
+  CAL_VIEW={year:CAL.today.year,month:CAL.today.month};
+  CAL_SEL=CAL.today.index;
+  paintCalendar();
+  document.getElementById('overlay').classList.add('on');
+}
+function calNav(dm,dy){
+  var m=CAL_VIEW.month+(dm||0), y=CAL_VIEW.year+(dy||0);
+  while(m>10){m-=10;y++;}
+  while(m<1){m+=10;y--;}
+  if(y<0){y=0;m=1;}
+  CAL_VIEW={year:y,month:m};
+  paintCalendar();
+}
+function calGoToday(){
+  CAL_VIEW={year:CAL.today.year,month:CAL.today.month};
+  CAL_SEL=CAL.today.index;
+  paintCalendar();
+}
+function calPick(i){ CAL_SEL=i; paintCalendar(); }
+function calPickColor(c){ CAL_COLOR=c; paintCalendar(); }
+function calNoteHTML(n){
+  var mio=n.user_id===CAL.user_id;
+  return '<div class="cal-note"><span class="cal-pin" style="background:'+esc(n.color||CAL_COLORS[0])+';margin-top:4px;flex:none"></span>'
+    +'<span class="txt">'+esc(n.texto)+'<br><span class="who">'+esc(n.username)+'</span></span>'
+    +(mio?'<button class="cal-btn-sm" onclick="calEditNote('+n.id+')" title="Editar">✎</button>'
+         +'<button class="cal-btn-sm" onclick="calDelNote('+n.id+')" title="Borrar">✕</button>':'')
+    +'</div>';
+}
+function calDayPanel(){
+  if(CAL_SEL==null) return '';
+  var f=calFrom(CAL_SEL), ns=calNotesOf(CAL_SEL);
+  var h='<div class="cal-day-h">'+calDayName(f.month,f.week,f.day)+(CAL_SEL===CAL.today.index?' <span class="who" style="color:var(--gold2)">— hoy</span>':'')+'</div>'
+    +'<div class="cal-today" style="text-align:left">'+CAL_WD[f.day-1]+' de la semana '+calWeekName(f.month,f.week)+' · '+calFormal(f)+'</div>'
+    +(ns.length?ns.map(calNoteHTML).join(''):'<div style="font-size:12px;color:var(--text3)">Sin notas en este día.</div>');
+  if(CAL.can_edit){
+    var colores=CAL_COLORS.map(function(c){
+      return '<span class="cal-color'+(c===CAL_COLOR?' on':'')+'" style="background:'+c+'" onclick="calPickColor(\''+c+'\')"></span>';}).join('');
+    h+='<div style="display:flex;margin-top:8px;gap:6px;align-items:center;flex-wrap:wrap">'
+      +'<input class="oc-fi" id="calNoteTxt" placeholder="Nota o pin para este día" style="flex:1;min-width:160px" onkeydown="if(event.key===\'Enter\')calAddNote()"/>'
+      +'<span class="cal-colors">'+colores+'</span>'
+      +'<button class="btn-sheet" onclick="calAddNote()">+ Anotar</button></div>';
+  }
+  return h;
+}
+function paintCalendar(){
+  var v=CAL_VIEW, t=CAL.today;
+  // el refresco de 5 s redibuja el modal: no le borramos la nota a medio escribir
+  var prev=document.getElementById('calNoteTxt');
+  var borrador=prev?prev.value:'', foco=!!prev&&document.activeElement===prev;
+  var filas='';
+  for(var w=1;w<=10;w++){
+    var tds='';
+    for(var d=1;d<=5;d++){
+      var idx=calIndex(v.year,v.month,w,d), cls='cal-cell';
+      if(idx===t.index) cls+=' today';
+      else if(idx<t.index) cls+=' past';
+      if(idx===CAL_SEL) cls+=' sel';
+      var pins=calNotesOf(idx).map(function(n){
+        return '<span class="cal-pin" style="background:'+esc(n.color||CAL_COLORS[0])+'" title="'+esc(n.texto).replace(/"/g,'&quot;')+'"></span>';}).join('');
+      tds+='<td class="'+cls+'" onclick="calPick('+idx+')" title="'+calDayName(v.month,w,d)+'">'
+        +'<div class="cal-n">'+((w-1)*5+d)+'</div>'
+        +(pins?'<div class="cal-pins">'+pins+'</div>':'')+'</td>';
+    }
+    filas+='<tr><td class="cal-wk">'+calWeekName(v.month,w)+'</td>'+tds+'</tr>';
+  }
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cal-day-h" style="font-size:17px">📅 Calendario rosharano</div>'
+    +'<div class="cal-today">Hoy es <b>'+esc(t.day_name)+'</b> · '+esc(t.formal)+' — semana '+esc(t.week_name)+' del mes de '+esc(t.month_name)+'</div>'
+    +'<div class="cal-head">'
+      +'<button class="cal-btn-sm" onclick="calNav(0,-1)" title="Año anterior">«</button>'
+      +'<button class="cal-btn-sm" onclick="calNav(-1,0)" title="Mes anterior">‹</button>'
+      +'<span class="cal-month">'+esc(CAL_MONTHS[v.month-1])+' <span style="color:var(--text3);font-size:13px">'+v.year+'</span></span>'
+      +'<button class="cal-btn-sm" onclick="calNav(1,0)" title="Mes siguiente">›</button>'
+      +'<button class="cal-btn-sm" onclick="calNav(0,1)" title="Año siguiente">»</button>'
+      +'<button class="cal-btn-sm" onclick="calGoToday()">Hoy</button>'
+    +'</div>'
+    +'<div class="cal-scroll"><table class="cal-grid" id="calGrid"><thead><tr><th></th>'
+      +CAL_WD.map(function(x){return '<th>'+x+'</th>';}).join('')+'</tr></thead><tbody>'+filas+'</tbody></table></div>'
+    +'<div style="margin-top:12px">'+calDayPanel()+'</div>';
+  var caja=document.getElementById('calNoteTxt');
+  if(caja&&borrador){ caja.value=borrador; if(foco){ caja.focus(); caja.setSelectionRange(borrador.length,borrador.length); } }
+}
+async function calAddNote(){
+  var el=document.getElementById('calNoteTxt'), t=(el&&el.value||'').trim();
+  if(!t){ if(el)el.focus(); return; }
+  CAL=await api(API+'/calendar/notes','POST',{day_index:CAL_SEL,texto:t,color:CAL_COLOR});
+  paintCalendar(); renderCalBar();
+}
+async function calEditNote(id){
+  var n=((CAL&&CAL.notes)||[]).filter(function(x){return x.id===id;})[0];
+  if(!n)return;
+  var t=prompt('Nota:',n.texto);
+  if(t===null||!t.trim())return;
+  CAL=await api(API+'/calendar/notes/'+id,'PUT',
+                {texto:t.trim(),color:n.color,day_index:n.day_index});
+  paintCalendar(); renderCalBar();
+}
+async function calDelNote(id){
+  if(!confirm('¿Borrar esta nota?'))return;
+  CAL=await api(API+'/calendar/notes/'+id,'DELETE');
+  paintCalendar(); renderCalBar();
+}
 // Las mascotas de todos cuelgan del personaje que las trajo, no del mío: para
 // manejarlas hay que pegarle a la URL de su dueño.
 var PET_CHAR={};
@@ -1920,18 +2107,18 @@ async function init(){
   setTab(TAB);
   connect();
   await loadRoster();               // fija SYSTEM antes de decidir si hay tormentas
-  if(SYSTEM!=='dnd') loadStorm();   // en D&D no hay altas tormentas
+  if(SYSTEM!=='dnd'){ loadStorm(); loadCalendar(); }   // en D&D no hay tormentas ni calendario
   // Al volver a la pestaña: en segundo plano los timers se frenan y el socket
   // puede haberse caído, así que reconectamos y resincronizamos en el acto.
   document.addEventListener('visibilitychange',function(){
     if(document.visibilityState!=='visible')return;
     if(!WS||WS.readyState>1) connect();
     loadRoster();
-    if(SYSTEM!=='dnd') loadStorm();
+    if(SYSTEM!=='dnd'){ loadStorm(); loadCalendar(); }
   });
-  // refresco periódico: la ficha del personaje / grupo y el tracker de tormentas
-  // (esos cambios no viajan por WS)
-  setInterval(function(){ if(SYSTEM!=='dnd') loadStorm(); loadRoster(); }, 5000);
+  // refresco periódico: la ficha del personaje / grupo, el tracker de tormentas
+  // y el calendario (esos cambios no viajan por WS)
+  setInterval(function(){ if(SYSTEM!=='dnd'){ loadStorm(); loadCalendar(); } loadRoster(); }, 5000);
 }
 init();
 </script>

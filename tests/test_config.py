@@ -68,7 +68,9 @@ def test_turning_both_off_and_back_on(make_client):
 def test_players_are_told_which_modules_are_on(make_client):
     dm, pl, cid, chid = party(make_client)
     assert pl.get(f"/api/campaigns/{cid}/roster").json()["config"] == {
-        "modulo_catalogo": True, "modulo_inventario": True, "modulo_tormentas": True}
+        "modulo_catalogo": True, "modulo_inventario": True, "modulo_tormentas": True,
+        "modulo_calendario": False,          # el calendario lo prende el DM
+        "calendario_visible": True, "calendario_editable": True}
     _cfg(dm, cid, modulo_catalogo=False)
     cfg = pl.get(f"/api/campaigns/{cid}/roster").json()["config"]
     assert cfg["modulo_catalogo"] is False and cfg["modulo_inventario"] is True

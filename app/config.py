@@ -30,6 +30,12 @@ CONFIG_DEFAULTS = {
     "modulo_catalogo": True,    # el catálogo de objetos del DM y el que ven ellos
     "modulo_inventario": True,  # inventario, guardados y capacidad de carga
     "modulo_tormentas": True,   # tracker de altas tormentas
+    "modulo_calendario": False,  # calendario rosharano (lo prende el DM si lo quiere)
+
+    # ── Calendario: quién lo ve y quién lo anota ──
+    "calendario_visible": True,   # False = solo lo ve el DM
+    "calendario_editable": True,  # False = solo el DM agrega notas y pines
+    "salto_dias": 5,              # días del botón de avance rápido (1 semana = 5)
 
     # ── Capacidad de carga: base por tamaño (la fuerza se suma aparte) ──
     "carga_pequeno": 4,
@@ -56,15 +62,17 @@ CARGA_BASE = {"Pequeño": "carga_pequeno", "Mediano": "carga_mediano",
               "Grande": "carga_grande", "Enorme": "carga_enorme",
               "Gargantuesco": "carga_gargantuesco"}
 
-INT_KEYS = {"storm_min", "storm_max", "discharge_start", "discharge_full"} \
-    | set(CARGA_BASE.values())
+INT_KEYS = {"storm_min", "storm_max", "discharge_start", "discharge_full",
+            "salto_dias"} | set(CARGA_BASE.values())
 FLOAT_KEYS = {"discharge_curve"}
 BOOL_KEYS = {"modulo_catalogo", "modulo_inventario", "modulo_tormentas",
+             "modulo_calendario", "calendario_visible", "calendario_editable",
              "ver_estados_enemigos", "ver_estados_aliados"}
 MODO_KEYS = {k for k in CONFIG_DEFAULTS if k.startswith("ver_") and k not in BOOL_KEYS}
 
 # Claves que los jugadores necesitan saber (el resto es cosa del DM).
-PLAYER_KEYS = ("modulo_catalogo", "modulo_inventario", "modulo_tormentas")
+PLAYER_KEYS = ("modulo_catalogo", "modulo_inventario", "modulo_tormentas",
+               "modulo_calendario", "calendario_visible", "calendario_editable")
 
 
 def coerce(key: str, value):
@@ -91,6 +99,7 @@ def sane(cfg: dict) -> dict:
     cfg["discharge_start"] = max(1, cfg["discharge_start"])
     cfg["discharge_full"] = max(cfg["discharge_start"] + 1, cfg["discharge_full"])
     cfg["discharge_curve"] = max(0.1, min(8.0, cfg["discharge_curve"]))
+    cfg["salto_dias"] = max(1, min(500, cfg["salto_dias"]))
     for k in CARGA_BASE.values():
         cfg[k] = max(0, min(99, cfg[k]))
     return cfg

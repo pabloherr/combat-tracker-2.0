@@ -367,6 +367,31 @@ def init_db():
             if col not in vcols:
                 conn.execute(f"ALTER TABLE inventory ADD COLUMN {col} {ddl}")
 
+        # ── Calendario rosharano (por campaña) ─────────────────────────────
+        # `day_index` es el día absoluto (año*500 + mes*50 + semana*5 + día):
+        # pasar días es sumar, y la fecha se descompone al mostrarla.
+        # Las notas y pines cuelgan de un día; `secreto` = solo las ve el DM.
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS campaign_calendar (
+            campaign_id INTEGER PRIMARY KEY REFERENCES campaigns(id) ON DELETE CASCADE,
+            day_index INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS calendar_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+            day_index INTEGER NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            texto TEXT NOT NULL DEFAULT '',
+            color TEXT DEFAULT '',
+            secreto INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_calnotes_camp
+            ON calendar_notes(campaign_id, day_index);
+        """)
+
         # Backfill: las entradas viejas son de un personaje; les completamos la
         # campaña para que las consultas por campaña las vean.
         conn.execute(

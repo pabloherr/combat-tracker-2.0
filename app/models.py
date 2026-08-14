@@ -50,6 +50,29 @@ class LongRestIn(BaseModel):
     exclude: list[int] = []      # user_ids que NO reciben el descanso
 
 
+class DaysIn(BaseModel):
+    days: int = 1                # cuántos días pasan de una (1 = el botón de siempre)
+
+
+class CalendarSet(BaseModel):
+    """Fijar el día en que están los jugadores (DM).
+
+    Se puede mandar la fecha desarmada o el índice absoluto; si vienen las dos,
+    manda el índice."""
+    year: int | None = None
+    month: int | None = None
+    week: int | None = None
+    day: int | None = None
+    day_index: int | None = None
+
+
+class CalendarNoteIn(BaseModel):
+    day_index: int | None = None   # día al que se pega la nota (None = hoy)
+    texto: str = ""
+    color: str = ""                # color del pin (hex); vacío = el de por defecto
+    secreto: bool = False          # solo del DM: los jugadores no la ven
+
+
 class ConfigIn(BaseModel):
     # Parámetros ajustables por el DM. Todos opcionales: se aplica lo que venga.
     storm_min: int | None = None        # mínimo de días entre tormentas
@@ -64,6 +87,16 @@ class ConfigIn(BaseModel):
     modulo_catalogo: bool | None = None     # el catálogo de objetos
     modulo_inventario: bool | None = None   # inventario, guardados y carga
     modulo_tormentas: bool | None = None    # tracker de altas tormentas
+    modulo_calendario: bool | None = None   # calendario rosharano
+    # Calendario: quién lo ve, quién lo anota y cuántos días salta el botón
+    calendario_visible: bool | None = None
+    calendario_editable: bool | None = None
+    salto_dias: int | None = None
+    # Estado actual del calendario (opcional, como el de la tormenta)
+    cal_year: int | None = None
+    cal_month: int | None = None
+    cal_week: int | None = None
+    cal_day: int | None = None
     # Capacidad de carga: base por tamaño (después se le suma la Fuerza)
     carga_pequeno: int | None = None
     carga_mediano: int | None = None

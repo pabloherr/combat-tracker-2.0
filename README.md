@@ -487,10 +487,48 @@ Probabilidad por marco un día dado (sin tormenta):
 Con los valores por defecto (inicio 5, apagado 15, curva 2) casi no se pierde luz al
 principio y todo llega a 0 en el día 15 si no hubo tormenta.
 
+### Calendario rosharano
+
+El DM puede llevar la cuenta de **en qué día están** los jugadores, con el calendario de
+Roshar: **10 meses de 10 semanas de 5 días** (500 días por año). Los nombres se arman por
+composición, como en el manual: el mes **Jes** tiene la semana **Jesach** (3ª), y su 4º
+día es **Jesachev**. Las columnas de la grilla son *Jesel, Nanel, Chachel, Vevel,
+Palahel*, y la fecha formal se escribe **año.mes.semana.día** (`1173.1.3.4`).
+
+Viene **apagado**: se prende en *⚙ Ajustes → Módulos → Calendario rosharano*. Cuando está
+encendido aparecen, en la barra del paso del tiempo, la **fecha de hoy** y el botón
+**📅 Calendario**.
+
+- **El día avanza solo** con el **Descanso largo** y con los botones de pasar días: nunca
+  se mueve por su cuenta.
+- **📅 Calendario** abre la grilla del mes, con **hoy** marcado, los días pasados en gris
+  y los **pines** de cada día. Se navega por mes (`‹ ›`) y por año (`« »`), y **Hoy**
+  vuelve al día en curso.
+- Al **tocar un día** se ven sus notas y se puede **anotar** (con color de pin). El **DM**
+  además puede **marcar ese día como hoy**, para saltar a donde quiera sin pasar días
+  uno por uno.
+- Cada uno **edita y borra lo suyo**; el DM puede tocar cualquier nota y marcar las suyas
+  como **solo yo** (los jugadores no las ven ni les llegan).
+
+En *⚙ Ajustes → Calendario* el DM decide **si los jugadores lo ven**, **si pueden anotar**
+y en **qué día están** (mes, semana, día y año). Si lo deja para él solo, a los jugadores
+no les aparece el botón y **la fecha ni siquiera les viaja**.
+
+### Pasar varios días de una
+
+Al lado de **+1 día** hay un botón de **avance rápido** que pasa varios días de un saque:
+por defecto **5** (una semana rosharana), y el número lo elige el DM en
+*⚙ Ajustes → Calendario → Días del botón de avance rápido* (1 a 500). El botón muestra
+siempre cuántos días salta (**+5 días**).
+
+Saltar días es exactamente igual que apretar *+1 día* muchas veces: se mueve el
+calendario, corre el ciclo de tormentas **día por día** (si en el medio cae una o varias
+altas tormentas, se avisa cuántas) y se aplica la descarga de marcos de cada día.
+
 ### Panel de ajustes del DM (⚙ Ajustes)
 
 En la vista del DM, el botón **⚙ Ajustes** (arriba a la derecha, al lado de *← Inicio*)
-abre el panel de configuración de la campaña, con cuatro solapas. Podés moverte entre
+abre el panel de configuración de la campaña, con cinco solapas. Podés moverte entre
 ellas sin perder lo que tocaste; se guarda todo junto con **Guardar**.
 
 **Módulos** — qué se usa en esta campaña. Lo que apagues desaparece para todos, y el
@@ -501,6 +539,7 @@ backend lo rechaza (no es solo esconder botones):
 | **Catálogo de objetos** | tu pestaña *Objetos* y la pestaña *Catálogo* de ellos |
 | **Inventario** | lo que lleva cada uno, los guardados, la capacidad de carga y tu pestaña *Inventarios* |
 | **Tracker de altas tormentas** | la barra del ciclo y la descarga de marcos por día |
+| **Calendario rosharano** | la fecha en la barra, el botón *📅 Calendario* y sus notas (viene apagado) |
 
 El catálogo y el inventario son **independientes**, así que las cuatro combinaciones
 sirven:
@@ -541,8 +580,14 @@ del ciclo (día, día objetivo y momento). Incluye un **preview en vivo**: una m
 del **% de marcos con luz por día** que se recalcula al mover cualquier valor (es el
 esperado; la descarga real es al azar).
 
+**Calendario** — si los jugadores **ven** el calendario, si pueden **anotar** en él,
+cuántos **días salta** el botón de avance rápido y **en qué día están** (mes, semana, día
+y año), con la fecha de hoy escrita al pie. El interruptor de encendido está en
+*Módulos*.
+
 Por defecto: tormenta cada **8–12** días, descarga del día **5** al **15**, curva **2.0**,
-todos los módulos encendidos y todo en **solo el color**. Una campaña sin ajustes
+salto rápido de **5** días, calendario **apagado** (y arrancando en **1173.1.1.1**), el
+resto de los módulos encendidos y todo en **solo el color**. Una campaña sin ajustes
 guardados toma estos valores.
 
 ### Vista de jugadores del DM

@@ -88,7 +88,7 @@ routers/*.py        ← endpoints por dominio (validan, orquestan)
 | Router | Prefijo | Qué maneja |
 |---|---|---|
 | `auth` | `/api/auth` | registro, login, logout, reset, cuenta |
-| `campaigns` | `/api/campaigns` | campañas, miembros, invitaciones, config, tormenta, marcos del DM, opciones de mascota |
+| `campaigns` | `/api/campaigns` | campañas, miembros, invitaciones, config, tormenta, calendario, marcos del DM, opciones de mascota |
 | `characters` | `/api/characters` | personajes, PDF, imagen, mascotas, stats en vivo, heridas, marcos, recursos D&D |
 | `enemies` | `/api/campaigns/{cid}/enemies` | bestiario (por DM + sistema): import, bulk, export |
 | `items` | `/api/campaigns/{cid}/items` | catálogo de objetos (por DM), `/catalog` para jugadores y `/inventories` (vista del DM) |
@@ -128,6 +128,7 @@ combat-tracker-2.0/
     cosmere_import.py      ← statblocks Cosmere (import/export)
     dnd_import.py          ← statblocks D&D (import/export)
     state.py               ← estado del combate (cache + persistencia)
+    roshar.py              ← calendario rosharano (índice de día ↔ fecha y nombres)
     ws.py                  ← WebSockets por campaña
     routers/               ← auth, campaigns, characters, enemies,
                              encounters, combat, frontend
@@ -162,6 +163,8 @@ erDiagram
     campaigns ||--o{ encounters : "tiene"
     campaigns ||--|| combats : "estado de combate"
     campaigns ||--|| storm_tracker : "ciclo de tormenta"
+    campaigns ||--|| campaign_calendar : "fecha rosharana"
+    campaigns ||--o{ calendar_notes : "notas del calendario"
     campaigns ||--o{ campaign_pet_options : "mascotas habilitadas"
 
     characters ||--o| character_pdfs : "ficha PDF"
@@ -366,6 +369,27 @@ lee **una sola vez** por armado de inventario y se pasa a cada personaje y masco
 | `target` | INTEGER | día en que cae la tormenta |
 | `moment` | TEXT | momento del día (aleatorio) |
 
+#### `campaign_calendar` — fecha rosharana (1 por campaña)
+| Columna | Tipo | Notas |
+|---|---|---|
+| `campaign_id` | INTEGER PK/FK | |
+| `day_index` | INTEGER | día **absoluto**: `año*500 + mes*50 + semana*5 + día` |
+
+Se guarda un solo número y la fecha se descompone al mostrarla
+([`app/roshar.py`](../app/roshar.py)): pasar días es una suma y no hay que arrastrar el
+acarreo de semanas, meses y años. Arranca en `1173.1.1.1`.
+
+#### `calendar_notes` — notas y pines del calendario
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `campaign_id` | INTEGER FK→campaigns | cascade |
+| `day_index` | INTEGER | día al que está clavada (índice absoluto) |
+| `user_id` | INTEGER FK→users | quién la escribió (SET NULL) |
+| `texto` | TEXT | |
+| `color` | TEXT | color del pin |
+| `secreto` | INTEGER | 1 = solo la ve el DM |
+
 ---
 
 ## 5. Decisiones de diseño a tener en cuenta
@@ -387,6 +411,15 @@ lee **una sola vez** por armado de inventario y se pasa a cada personaje y masco
   porcentaje redondeado de a 5, así que el número exacto no se puede deducir mirando la
   red. Cuesta armar una vista por usuario en cada broadcast, pero las salas son de pocas
   personas y se cachea por `user_id` dentro del envío.
+- **El tiempo pasa en un solo lugar**: `_pass_days(conn, cid, n)` (router de campañas) es
+  el único que mueve el reloj. Corre el ciclo de tormentas y la descarga de marcos **día
+  por día** (el resultado depende del camino, no solo del total) y le suma `n` al
+  calendario. Lo usan el descanso largo y los botones de pasar días, así que no hay dos
+  formas distintas de que avance el tiempo.
+- **Calendario como número, no como fecha**: `campaign_calendar.day_index` es un entero
+  absoluto; `app/roshar.py` traduce a año/mes/semana/día y arma los nombres por
+  composición. El frontend repite esa aritmética (cuatro líneas) para dibujar la grilla
+  sin pedirle 50 fechas al servidor.
 - **Modo fijo por sesión**: el rol `dm`/`player` se elige al entrar y no se cambia sin
   volver a loguear; el router `frontend` redirige si intentás entrar al panel del otro
   rol.
