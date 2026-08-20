@@ -138,6 +138,24 @@ class PetName(BaseModel):
     name: str                  # la mascota es tuya: ponele el nombre que quieras
 
 
+class PetSheet(BaseModel):
+    """Ficha completa de la mascota, editada por quien la trajo.
+
+    Entra como copia del bestiario, pero el axehound de la mesa evoluciona: el
+    jugador le cambia los números, los rasgos y las acciones sin tocar al
+    enemigo original ni a las mascotas de los demás."""
+    name: str
+    vida_max: int = 10
+    focus_max: int = 0
+    inv_max: int = 0
+    acciones: list = []
+    stats: dict = {}
+    # Valores actuales (opcionales). Si no vienen, se recortan al nuevo máximo.
+    vida: int | None = None
+    focus: int | None = None
+    inv: int | None = None
+
+
 class LiveStat(BaseModel):
     stat: str                  # vida | focus | inv
     delta: int

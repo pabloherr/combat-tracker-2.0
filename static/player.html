@@ -118,6 +118,31 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .overlay.on{display:flex;}
 .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:1.3rem;max-width:560px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.5);}
 .modal-close{float:right;background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;}
+/* editor de la ficha de la mascota: mismo formulario que usa el DM con los enemigos */
+.modal.wide{max-width:860px;}
+.fl{font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px;}
+.fi{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-family:var(--font-b);font-size:14px;outline:none;}
+.fi:focus{border-color:var(--gold);}
+.form-actions{display:flex;gap:8px;justify-content:flex-end;}
+.ed-sec{font-family:var(--font-h);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);margin:16px 0 8px;border-top:.5px solid var(--border);padding-top:12px;}
+.ed-row{display:grid;gap:8px;margin-bottom:8px;}
+.ed-attrs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.ed-attrs .sh-col-h{margin-bottom:4px;}
+.ed-attrs .fl{font-size:10px;}
+.ed-entry{background:var(--bg3);border:.5px solid var(--border);padding:8px;border-radius:var(--r);margin-bottom:8px;}
+.ed-en-top{display:flex;gap:6px;margin-bottom:6px;}
+.ed-en-top .ed-en-name{flex:1;}
+.ed-en-desc{width:100%;min-height:46px;resize:vertical;font-family:inherit;font-size:13px;}
+.ed-add{font-size:10px;padding:5px 10px;}
+.ed-del{background:transparent;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:2px 6px;}
+.ed-del:hover{color:var(--red);}
+.ed-hint{font-size:12px;color:var(--text3);margin-bottom:8px;font-style:italic;}
+/* En el teléfono las filas del editor se apilan: si no, los pares actual/máx
+   se salen del modal. El !important pisa el grid-template que va inline. */
+@media(max-width:620px){
+  .ed-row{grid-template-columns:1fr !important;}
+  .ed-attrs{grid-template-columns:repeat(3,1fr) !important;}
+}
 .sh-name{font-family:var(--font-h);font-size:18px;color:var(--gold2);}
 .sh-meta{font-size:13px;color:var(--text3);margin-top:2px;}
 .sh-attrs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0;}
@@ -518,7 +543,10 @@ function md(s){return esc(s).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');}
 function shAt(l,v){return '<div class="sh-attr"><span class="l">'+l+'</span><span>'+(v==null?'—':v)+'</span></div>';}
 function shLn(l,v){return (v&&v!=='-')?'<div class="sh-line"><span class="l">'+l+':</span> '+esc(v)+'</div>':'';}
 function shItem(x,cls){return '<div class="sh-item'+(cls?' '+cls:'')+'"><span class="n">'+esc(x.name)+'</span>'+(x.desc?'<div>'+md(x.desc)+'</div>':'')+'</div>';}
-function closeModal(){document.getElementById('overlay').classList.remove('on');}
+function closeModal(){
+  document.getElementById('overlay').classList.remove('on');
+  document.getElementById('modal').classList.remove('wide');
+}
 function openSheet(uid){
   if(!COMBAT)return;
   var p=COMBAT.participants.find(function(x){return x.uid===uid;});
@@ -602,6 +630,7 @@ function charSheetHTML(c){
 }
 // ficha de mascota (formato statblock, como los enemigos)
 function petSheetHTML(p){
+  if((p.stats||{}).dnd) return petDndSheetHTML(p);
   var s=p.stats||{},ph=s.physical||{},cg=s.cognitive||{},sp=s.spiritual||{};
   var h='<div class="sh-name">'+esc(p.name)+'</div>';
   if(s.tier) h+='<div class="sh-meta">'+esc(s.tier)+'</div>';
@@ -620,6 +649,28 @@ function petSheetHTML(p){
   if((s.traits||[]).length) h+='<div class="sh-h">Rasgos</div>'+s.traits.map(function(t){return shItem(t,'');}).join('');
   if(p.acciones&&p.acciones.length) h+='<div class="sh-h">Acciones</div>'+p.acciones.map(function(a){return '<div class="sh-item"><span class="n">'+esc(a.nombre)+(a.coste?' <b>['+esc(a.coste)+']</b>':'')+'</span>'+(a.descripcion?'<div>'+md(a.descripcion)+'</div>':'')+'</div>';}).join('');
   if((s.opportunities||[]).length) h+='<div class="sh-h">Oportunidades</div>'+s.opportunities.map(function(o){return shItem(o,'opp');}).join('');
+  return h;
+}
+
+// Mascota sacada de un enemigo de D&D 5e: mismos campos que el statblock del DM.
+function petDndSheetHTML(p){
+  var s=p.stats||{},ab=s.abilities||{};
+  function mod(v){ if(v==null||v==='')return ''; var m=Math.floor((parseInt(v)-10)/2); return ' ('+(m>=0?'+':'')+m+')'; }
+  var h='<div class="sh-name">'+esc(p.name)+'</div>';
+  if(s.tier) h+='<div class="sh-meta">'+esc(s.tier)+'</div>';
+  h+=shLn('Clase de armadura',s.ac)+shLn('Puntos de golpe',p.vida_max)+shLn('Velocidad',s.speed);
+  h+='<div class="sh-attrs" style="grid-template-columns:repeat(6,1fr)">'
+    +['STR','DEX','CON','INT','WIS','CHA'].map(function(k){
+      return '<div class="sh-col"><div class="sh-col-h">'+k+'</div>'
+        +'<div style="text-align:center;font-size:13px">'+(ab[k]==null||ab[k]===''?'—':esc(ab[k])+mod(ab[k]))+'</div></div>';
+    }).join('')+'</div>';
+  h+=shLn('Salvaciones',s.saves)+shLn('Habilidades',s.skills_text)
+    +shLn('Vulnerabilidades',s.vulnerabilities)+shLn('Resistencias',s.resistances)
+    +shLn('Inmunidades a daño',s.immunities)+shLn('Inmunidades a estados',s.cond_immunities)
+    +shLn('Sentidos',s.senses)+shLn('Idiomas',s.languages)+shLn('Desafío (CR)',s.cr);
+  if((s.traits||[]).length) h+='<div class="sh-h">Rasgos</div>'+s.traits.map(function(t){return shItem(t,'');}).join('');
+  if((s.actions||[]).length) h+='<div class="sh-h">Acciones</div>'+s.actions.map(function(t){return shItem(t,'');}).join('');
+  if((s.legendary||[]).length) h+='<div class="sh-h">Acciones legendarias</div>'+s.legendary.map(function(t){return shItem(t,'opp');}).join('');
   return h;
 }
 
@@ -1285,6 +1336,7 @@ function petCard(p,mia){
   var dueno=(!mia&&p.dueno)?' <span style="font-size:12px;color:var(--text3)">de '+esc(p.dueno)+'</span>':'';
   var acciones=mia
     ? '<span class="pet-acciones">'
+      +'<button class="me-change" onclick="openPetEditor('+p.id+')" title="Editar la ficha: números, rasgos y acciones">✎ Ficha</button>'
       +'<button class="me-change" onclick="togglePetShared('+p.id+')" title="'
         +(p.compartida?'Volvés a ser el único que la maneja':'Cualquiera de la mesa va a poder manejarla')+'">'
         +(p.compartida?'Hacerla mía' :'Hacerla de todos')+'</button>'
@@ -1478,6 +1530,7 @@ async function loadPetsInto(){
       +petNombreHTML(p.id,p.name,p.compartida?'<span class="pet-tag all">De todos</span>':'')+'</b>'
       +' <span style="color:var(--text3);font-size:12px">Vida '+p.vida_max+' · Focus '+p.focus_max+(p.inv_max?' · Inv '+p.inv_max:'')+'</span></span>'
       +'<div style="flex:1"></div>'
+      +'<button class="btn-sheet" onclick="openPetEditor('+p.id+')" title="Editar la ficha completa">✎ Ficha</button>'
       +'<button class="btn-sheet" onclick="togglePetShared('+p.id+').then(loadPetsInto)" title="'
         +(p.compartida?'Volvés a ser el único que la maneja':'Cualquiera de la mesa va a poder manejarla')+'">'
         +(p.compartida?'Hacerla mía':'Hacerla de todos')+'</button>'
@@ -1506,6 +1559,249 @@ async function delPet(petId){
   await api('/api/characters/'+MYCHAR+'/pets/'+petId,'DELETE');
   if(document.getElementById('petsList')) loadPetsInto();
   loadRoster();
+}
+
+// ─── Editor de la ficha de la mascota ───────────────────────
+// La mascota entra como copia de un enemigo del bestiario; acá el jugador la
+// hace suya: le cambia los números, los rasgos y las acciones sin tocar al
+// enemigo original ni a las mascotas que hayan sacado los demás del mismo bicho.
+// Es el mismo formulario que usa el DM, sin la clase (minion/rival/boss) ni el
+// color de facción: esos los decide el DM.
+// La ficha es de quien la trajo: una mascota "de todos" la maneja cualquiera de
+// la mesa, pero solo el dueño (y el DM) le reescribe la ficha.
+var PET_ED=null;   // {pid, stats} — conserva las claves que el formulario no muestra
+
+function escA(s){return esc(s).replace(/"/g,'&quot;');}
+function edVal(id){var e=document.getElementById(id);return e?e.value.trim():'';}
+function edNum(id){var v=edVal(id);return v===''?null:(parseInt(v)||0);}
+function edFld(lbl,inner){return '<div>'+(lbl?'<div class="fl">'+lbl+'</div>':'')+inner+'</div>';}
+function edInp(iid,val,ph,type){
+  return '<input class="fi" id="'+iid+'"'+(type?' type="'+type+'"':'')
+    +' value="'+escA(val==null?'':val)+'"'+(ph?' placeholder="'+escA(ph)+'"':'')+'/>';
+}
+// Filas de rasgos / acciones / oportunidades: nombre + descripción, y se agregan
+// y se quitan sueltas.
+function edEntryRow(en){
+  en=en||{name:'',desc:''};
+  return '<div class="ed-entry"><div class="ed-en-top">'
+    +'<input class="fi ed-en-name" placeholder="Nombre" value="'+escA(en.name)+'"/>'
+    +'<button class="ed-del" onclick="this.closest(\'.ed-entry\').remove()" title="Quitar">✕</button></div>'
+    +'<textarea class="fi ed-en-desc" placeholder="Descripción">'+esc(en.desc)+'</textarea></div>';
+}
+function renderEntryRows(cid,list){
+  var el=document.getElementById(cid); if(!el)return;
+  el.innerHTML=(list||[]).map(edEntryRow).join('');
+}
+function addEntryRow(cid){
+  var el=document.getElementById(cid); if(!el)return;
+  el.insertAdjacentHTML('beforeend',edEntryRow());
+}
+function readEntries(cid){
+  var out=[];
+  document.querySelectorAll('#'+cid+' .ed-entry').forEach(function(row){
+    var n=row.querySelector('.ed-en-name').value.trim();
+    var d=row.querySelector('.ed-en-desc').value.trim();
+    if(n||d) out.push({name:n,desc:d});
+  });
+  return out;
+}
+// Vida / focus / investidura, actual y máximo, como en el editor del personaje.
+function edRes(p,soloVida){
+  function par(lbl,id,cur,mx){
+    return edFld(lbl,'<div style="display:flex;align-items:center;gap:6px">'
+      +'<input class="fi" type="number" id="ed'+id+'" value="'+(cur==null?'':cur)+'" style="width:70px"/>'
+      +'<span style="color:var(--text3)">/</span>'
+      +'<input class="fi" type="number" id="ed'+id+'M" value="'+(mx==null?'':mx)+'" style="width:70px"/></div>');
+  }
+  var h=par('Vida (actual / máx)','Vida',p.vida,p.vida_max);
+  if(!soloVida) h+=par('Focus (actual / máx)','Focus',p.focus,p.focus_max)
+    +par('Investidura (actual / máx)','Inv',p.inv,p.inv_max);
+  return h;
+}
+
+function petCosmereEditorHTML(p){
+  var s=PET_ED.stats,ph=s.physical||{},cg=s.cognitive||{},sp=s.spiritual||{},sk=s.skills||{};
+  function attrCol(title,rows){
+    return '<div class="sh-col"><div class="sh-col-h">'+title+'</div>'
+      +rows.map(function(r){
+        return '<div style="display:flex;align-items:center;gap:6px;margin:3px 4px">'
+          +'<span class="fl" style="width:32px;margin:0">'+r[0]+'</span>'
+          +'<input class="fi" type="number" id="'+r[1]+'" value="'+(r[2]==null?'':r[2])+'" style="padding:4px 6px"/></div>';
+      }).join('')+'</div>';
+  }
+  return '<div class="ed-row" style="grid-template-columns:2fr 3fr">'
+      +edFld('Nombre',edInp('edName',p.name))
+      +edFld('Tier (línea que se muestra en la ficha)',edInp('edTier',s.tier,'Tier 1 Minion – Medium Animal'))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr">'+edRes(p,false)+'</div>'
+    +'<div class="ed-sec">Atributos <span style="text-transform:none;letter-spacing:0;color:var(--text3);font-family:inherit;font-size:11px">(dejalos vacíos si la mascota no tiene ficha completa)</span></div>'
+    +'<div class="ed-attrs">'
+      +attrCol('Físico',[['STR','edStr',ph.str],['DEF','edPdef',ph.def],['SPD','edSpd',ph.spd]])
+      +attrCol('Cognitivo',[['INT','edInt',cg.int],['DEF','edCdef',cg.def],['WIL','edWil',cg.wil]])
+      +attrCol('Espiritual',[['AWA','edAwa',sp.awa],['DEF','edSdef',sp.def],['PRE','edPre',sp.pre]])
+    +'</div>'
+    +'<div class="ed-sec">Ficha</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr">'
+      +edFld('Movimiento',edInp('edMove',s.movement,'25 ft.'))
+      +edFld('Sentidos',edInp('edSenses',s.senses,'10 ft. (sight)'))
+      +edFld('Deflect',edInp('edDeflect',s.deflect,'1 (leather)'))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr">'
+      +edFld('Inmunidades',edInp('edImmun',s.immunities,'Stunned, Prone'))
+      +edFld('Resistencias',edInp('edResist',s.resistances))
+      +edFld('Debilidades',edInp('edWeak',s.weaknesses))+'</div>'
+    +'<div class="ed-row">'+edFld('Idiomas',edInp('edLang',s.languages))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr">'
+      +edFld('Habilidades físicas',edInp('edSkP',sk.physical))
+      +edFld('Cognitivas',edInp('edSkC',sk.cognitive))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr">'
+      +edFld('Espirituales',edInp('edSkS',sk.spiritual))
+      +edFld('Surgebinding',edInp('edSkSurge',sk.surge))+'</div>'
+    +'<div class="ed-sec">Rasgos</div><div id="edTraits"></div>'
+    +'<button class="btn-sheet ed-add" onclick="addEntryRow(\'edTraits\')">+ Agregar rasgo</button>'
+    +'<div class="ed-sec">Acciones</div>'
+    +'<div class="ed-hint">El símbolo de coste va al principio del nombre: ▶ una acción, ▶▶ / ▶▶▶ varias, ▷ acción libre, ↻ reacción, ∞ pasiva, ★ oportunidad.</div>'
+    +'<div id="edActions"></div>'
+    +'<button class="btn-sheet ed-add" onclick="addEntryRow(\'edActions\')">+ Agregar acción</button>'
+    +'<div class="ed-sec">Oportunidades</div><div id="edOpps"></div>'
+    +'<button class="btn-sheet ed-add" onclick="addEntryRow(\'edOpps\')">+ Agregar oportunidad</button>';
+}
+
+function petDndEditorHTML(p){
+  var s=PET_ED.stats,ab=s.abilities||{};
+  var ablRow='<div class="ed-attrs" style="grid-template-columns:repeat(6,1fr)">'
+    +['STR','DEX','CON','INT','WIS','CHA'].map(function(k){
+      return '<div class="sh-col" style="padding:6px"><div class="sh-col-h">'+k+'</div>'
+        +'<input class="fi" type="number" id="edAb'+k+'" value="'+(ab[k]==null?'':ab[k])+'" style="padding:4px 6px;text-align:center"/></div>';
+    }).join('')+'</div>';
+  return '<div class="ed-row" style="grid-template-columns:2fr 3fr">'
+      +edFld('Nombre',edInp('edName',p.name))
+      +edFld('Tipo (línea que se muestra en la ficha)',edInp('edTier',s.tier,'Medium Beast, Unaligned'))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr 1fr">'
+      +edRes(p,true)
+      +edFld('CA',edInp('edAC',s.ac,'13'))
+      +edFld('Velocidad',edInp('edSpeed',s.speed,'40 ft.'))
+      +edFld('CR (desafío)',edInp('edCR',s.cr,'1/4 (50 XP)'))+'</div>'
+    +'<div class="ed-sec">Características</div>'+ablRow
+    +'<div class="ed-hint">La iniciativa de la mascota se tira sola en combate: d20 + modificador de DEX.</div>'
+    +'<div class="ed-sec">Ficha</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr">'
+      +edFld('Tiradas de salvación',edInp('edSaves',s.saves,'CON +4, WIS +3'))
+      +edFld('Habilidades',edInp('edSkills',s.skills_text,'Perception +5, Stealth +4'))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr">'
+      +edFld('Vulnerabilidades a daño',edInp('edVuln',s.vulnerabilities))
+      +edFld('Resistencias a daño',edInp('edResist',s.resistances))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr">'
+      +edFld('Inmunidades a daño',edInp('edImmun',s.immunities))
+      +edFld('Inmunidades a estados',edInp('edCondImmun',s.cond_immunities))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr">'
+      +edFld('Sentidos',edInp('edSenses',s.senses,'Darkvision 60 ft., Passive Perception 15'))
+      +edFld('Idiomas',edInp('edLang',s.languages))+'</div>'
+    +'<div class="ed-sec">Rasgos</div><div id="edTraits"></div>'
+    +'<button class="btn-sheet ed-add" onclick="addEntryRow(\'edTraits\')">+ Agregar rasgo</button>'
+    +'<div class="ed-sec">Acciones</div><div id="edActions"></div>'
+    +'<button class="btn-sheet ed-add" onclick="addEntryRow(\'edActions\')">+ Agregar acción</button>'
+    +'<div class="ed-sec">Acciones legendarias</div><div id="edLegendary"></div>'
+    +'<button class="btn-sheet ed-add" onclick="addEntryRow(\'edLegendary\')">+ Agregar acción legendaria</button>';
+}
+
+async function openPetEditor(pid){
+  var pets;
+  try{ pets=await api('/api/characters/'+MYCHAR+'/pets'); }
+  catch(e){ alert('No se pudo abrir la ficha.'); return; }
+  var p=pets.find(function(x){return x.id===pid;});
+  // Las mascotas de todos que trajo otro jugador se manejan pero no se editan.
+  if(!p){ alert('Esa mascota la trajo otro jugador: podés manejarla, pero la ficha la edita su dueño.'); return; }
+  // Si venía del panel "🐾 Mascotas", el editor le pisa el contenido al modal:
+  // se anota para volver ahí al guardar o al cancelar.
+  PET_ED={pid:pid,stats:JSON.parse(JSON.stringify(p.stats||{})),
+          volver:!!document.getElementById('petsList')};
+  var s=PET_ED.stats;
+  var modal=document.getElementById('modal');
+  modal.classList.add('wide');
+  modal.innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">✎ Editar ficha de '+esc(p.name)+'</div>'
+    +'<div class="sh-meta" style="margin-bottom:10px">Es tu copia: no toca al enemigo del bestiario ni a las mascotas de los demás.</div>'
+    +(s.dnd?petDndEditorHTML(p):petCosmereEditorHTML(p))
+    +'<div class="form-actions" style="margin-top:16px">'
+      +'<button class="btn-sheet" onclick="cerrarPetEditor()">Cancelar</button>'
+      +'<button class="btn-sheet" style="background:var(--gold);color:var(--onacc);border-color:var(--gold)" onclick="savePetSheet()">Guardar</button></div>';
+  renderEntryRows('edTraits',s.traits||[]);
+  if(s.dnd){
+    renderEntryRows('edActions',s.actions||[]);
+    renderEntryRows('edLegendary',s.legendary||[]);
+  }else{
+    // Una mascota recién sacada del bestiario puede tener las acciones solo en
+    // formato de combate: se convierten para poder editarlas.
+    var actsInit=(s.actions&&s.actions.length)?s.actions
+      :(p.acciones||[]).map(function(a){return {name:a.nombre,desc:a.descripcion};});
+    renderEntryRows('edActions',actsInit);
+    renderEntryRows('edOpps',s.opportunities||[]);
+  }
+  document.getElementById('overlay').classList.add('on');
+}
+
+async function savePetSheet(){
+  if(!PET_ED)return;
+  var name=edVal('edName');
+  if(!name){ alert('Poné un nombre a la mascota.'); return; }
+  var vidaM=edNum('edVidaM')||0;
+  if(vidaM<1){ alert('La vida máxima tiene que ser al menos 1.'); return; }
+  var s=Object.assign({},PET_ED.stats||{});
+  var dnd=!!s.dnd;
+  s.tier=edVal('edTier');
+  if(dnd){
+    s.ac=edVal('edAC'); s.speed=edVal('edSpeed'); s.cr=edVal('edCR');
+    var ab={};
+    ['STR','DEX','CON','INT','WIS','CHA'].forEach(function(k){
+      var v=edNum('edAb'+k); if(v!=null) ab[k]=v;
+    });
+    s.abilities=ab;
+    s.saves=edVal('edSaves'); s.skills_text=edVal('edSkills');
+    s.vulnerabilities=edVal('edVuln'); s.resistances=edVal('edResist');
+    s.immunities=edVal('edImmun'); s.cond_immunities=edVal('edCondImmun');
+    s.senses=edVal('edSenses'); s.languages=edVal('edLang');
+    s.traits=readEntries('edTraits');
+    s.actions=readEntries('edActions');
+    s.legendary=readEntries('edLegendary');
+  }else{
+    var A=['edStr','edPdef','edSpd','edInt','edCdef','edWil','edAwa','edSdef','edPre'].map(edNum);
+    if(A.some(function(v){return v!=null;})){
+      s.physical={str:A[0]||0,def:A[1]||0,spd:A[2]||0};
+      s.cognitive={int:A[3]||0,def:A[4]||0,wil:A[5]||0};
+      s.spiritual={awa:A[6]||0,def:A[7]||0,pre:A[8]||0};
+    }else{ delete s.physical; delete s.cognitive; delete s.spiritual; }
+    s.movement=edVal('edMove'); s.senses=edVal('edSenses'); s.deflect=edVal('edDeflect');
+    s.immunities=edVal('edImmun'); s.resistances=edVal('edResist'); s.weaknesses=edVal('edWeak');
+    s.languages=edVal('edLang');
+    s.skills={physical:edVal('edSkP'),cognitive:edVal('edSkC'),
+              spiritual:edVal('edSkS'),surge:edVal('edSkSurge')};
+    s.traits=readEntries('edTraits');
+    s.actions=readEntries('edActions');
+    s.opportunities=readEntries('edOpps');
+  }
+  // "Ver acciones" de la tarjeta de combate lee p.acciones, no stats.actions.
+  var acciones=(s.actions||[]).map(function(a){return {nombre:a.name,coste:'',descripcion:a.desc};});
+  if(dnd) acciones=acciones.concat((s.legendary||[]).map(function(a){
+    return {nombre:a.name,coste:'Legendaria',descripcion:a.desc};}));
+  try{
+    await api('/api/characters/'+MYCHAR+'/pets/'+PET_ED.pid+'/sheet','PUT',{
+      name:name,
+      vida_max:vidaM,
+      focus_max:dnd?0:(edNum('edFocusM')||0),
+      inv_max:dnd?0:(edNum('edInvM')||0),
+      vida:edNum('edVida'), focus:dnd?0:edNum('edFocus'), inv:dnd?0:edNum('edInv'),
+      acciones:acciones, stats:s
+    });
+  }catch(e){ alert('No se pudo guardar la ficha de la mascota.'); return; }
+  cerrarPetEditor();
+  loadRoster();
+}
+
+// Cierra el editor: si se había abierto desde el panel "🐾 Mascotas", vuelve ahí.
+function cerrarPetEditor(){
+  var volver=PET_ED&&PET_ED.volver;
+  PET_ED=null;
+  closeModal();
+  if(volver) openPets();
 }
 
 // ─── WebSocket con heartbeat y reconexión ───
