@@ -1,0 +1,250 @@
+/* ═══════════════════════════════════════════════════════════════
+   Cosmere Combat Tracker — themes
+   Se enlaza en login.html, home.html, dm.html y player.html:
+       <link rel="stylesheet" href="/static/theme.css"/>
+   y el theme activo se elige con un atributo en <html>:
+       <html lang="es" data-theme="oscuro">
+   theme.js se encarga de ponerlo y de recordarlo por navegador.
+
+   Importante: los bloques :root de los 4 HTML se borran. Los valores
+   de --r, --rl (que cambian por archivo) quedan en cada archivo.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Nota: --font-h, --font-b, --r, --rl y --pill ahora los define cada theme.
+   En los 4 HTML hay que reemplazar:
+       'Cinzel',serif            → var(--font-h)
+       'Crimson Pro',Georgia,serif → var(--font-b)
+       'Crimson Pro',serif       → var(--font-b)
+       border-radius:20px|24px|30px → border-radius:var(--pill)
+   y borrar los --r / --rl de cada :root. Ver COMO-APLICAR-THEMES.md. */
+
+/* ══ 1 · PERGAMINO OSCURO (el original) ══════════════════════ */
+:root,
+html[data-theme="oscuro"]{
+  --font-h:'Cinzel',serif;--font-b:'Crimson Pro',Georgia,serif;
+  --r:10px;--rl:14px;--pill:99px;
+  --bg:#211f1c;--bg2:#2c2924;--bg3:#353129;--bg4:#413c33;
+  --border:rgba(224,189,124,.14);--border2:rgba(224,189,124,.28);
+  --gold:#e0bd7c;--gold2:#f4d9a0;
+  --onacc:#1c1915;                /* texto sobre un botón .accent */
+  --accsoft:rgba(224,189,124,.12);/* fondo de hover / estado activo */
+  --text:#efece4;--text2:#c1baa9;--text3:#948d7b;
+  --shadow:0 2px 10px rgba(0,0,0,.28);
+  --shadow2:0 8px 40px rgba(0,0,0,.5);
+  --glow:radial-gradient(120% 55% at 50% -8%, rgba(224,189,124,.05), transparent 60%);
+  /* colores semánticos (antes hardcodeados en el CSS y en el JS) */
+  --red:#e05050;--green:#5aaa70;--blue:#6aaae8;--blue2:#4a8ac8;
+  --purple:#aa8aec;--orange:#c87830;--orange2:#e8a860;--yellow:#e8c840;
+  --err:#e88;--ok:#8ac88c;
+  /* colores de enemigo (COMMON_COLORS en dm.html) */
+  --e-rojo:#e05050;--e-naranja:#e0842e;--e-amarillo:#e8c840;--e-verde:#5aaa70;
+  --e-turquesa:#3aa89a;--e-azul:#4a8ac8;--e-morado:#a06ad0;--e-rosa:#d060a0;
+  --e-gris:#8a8a8a;--e-blanco:#e8dcc8;
+}
+
+/* ══ 2 · PERGAMINO CLARO ═════════════════════════════════════ */
+html[data-theme="claro"]{
+  --bg:#f2ece0;--bg2:#fbf8f1;--bg3:#efe7d8;--bg4:#e0d5c0;
+  --border:rgba(120,92,44,.20);--border2:rgba(120,92,44,.40);
+  --gold:#8a6314;--gold2:#5e4310;
+  --onacc:#fbf8f1;
+  --accsoft:rgba(138,99,20,.10);
+  --text:#26211a;--text2:#4d453a;--text3:#7a7061;
+  --shadow:0 1px 3px rgba(60,45,20,.13);
+  --shadow2:0 8px 32px rgba(60,45,20,.22);
+  --glow:radial-gradient(120% 55% at 50% -8%, rgba(180,140,70,.10), transparent 60%);
+  --red:#b3271f;--green:#2f7a45;--blue:#1e5f9e;--blue2:#1e5f9e;
+  --purple:#6b3fbd;--orange:#96520d;--orange2:#7d430a;--yellow:#8a6a00;
+  --err:#a02018;--ok:#2f7a45;
+  --e-rojo:#c02a22;--e-naranja:#a85c0c;--e-amarillo:#8a6a00;--e-verde:#2b6b3d;
+  --e-turquesa:#0f6f68;--e-azul:#1b4f8f;--e-morado:#6b34a8;--e-rosa:#a3266e;
+  --e-gris:#5a5a5a;--e-blanco:#8a7d66;
+}
+
+/* ══ 3 · ALTO CONTRASTE OSCURO ═══════════════════════════════ */
+html[data-theme="ac-oscuro"]{
+  --bg:#000;--bg2:#0b0b0b;--bg3:#161616;--bg4:#2b2b2b;
+  --border:#7a7a7a;--border2:#d6d6d6;
+  --gold:#ffd429;--gold2:#ffe98a;
+  --onacc:#000;
+  --accsoft:rgba(255,212,41,.18);
+  --text:#fff;--text2:#ededed;--text3:#c4c4c4;
+  --shadow:none;
+  --shadow2:0 0 0 1px #d6d6d6;
+  --glow:none;
+  --red:#ff6161;--green:#4ce07a;--blue:#6ec2ff;--blue2:#6ec2ff;
+  --purple:#cba3ff;--orange:#ffa245;--orange2:#ffc07a;--yellow:#ffe14a;
+  --err:#ff8080;--ok:#4ce07a;
+  --e-rojo:#ff6161;--e-naranja:#ffa245;--e-amarillo:#ffe14a;--e-verde:#4ce07a;
+  --e-turquesa:#3fe0d0;--e-azul:#6ec2ff;--e-morado:#cba3ff;--e-rosa:#ff8ac8;
+  --e-gris:#c4c4c4;--e-blanco:#fff;
+}
+
+/* ══ 4 · ALTO CONTRASTE CLARO ════════════════════════════════ */
+html[data-theme="ac-claro"]{
+  --bg:#fff;--bg2:#fff;--bg3:#f0f0f0;--bg4:#d4d4d4;
+  --border:#6e6e6e;--border2:#141414;
+  --gold:#7a3d00;--gold2:#4a2500;
+  --onacc:#fff;
+  --accsoft:rgba(122,61,0,.12);
+  --text:#000;--text2:#1c1c1c;--text3:#424242;
+  --shadow:none;
+  --shadow2:0 0 0 1px #141414;
+  --glow:none;
+  --red:#ab0000;--green:#06642a;--blue:#00429c;--blue2:#00429c;
+  --purple:#560ea3;--orange:#8a3d00;--orange2:#6b2f00;--yellow:#6b5200;
+  --err:#ab0000;--ok:#06642a;
+  --e-rojo:#ab0000;--e-naranja:#8a3d00;--e-amarillo:#6b5200;--e-verde:#06642a;
+  --e-turquesa:#005a52;--e-azul:#00429c;--e-morado:#560ea3;--e-rosa:#94005e;
+  --e-gris:#424242;--e-blanco:#6b6b6b;
+}
+
+/* ══ 5 · NOCTURNO (mesa a oscuras) ═══════════════════════════ */
+html[data-theme="nocturno"]{
+  --bg:#0d0b0a;--bg2:#151210;--bg3:#1c1815;--bg4:#272119;
+  --border:rgba(224,150,80,.13);--border2:rgba(224,150,80,.26);
+  --gold:#c9843c;--gold2:#e0a45e;
+  --onacc:#140f0a;
+  --accsoft:rgba(201,132,60,.12);
+  --text:#cbb9a4;--text2:#9c8c7b;--text3:#6e6357;
+  --shadow:0 2px 8px rgba(0,0,0,.55);
+  --shadow2:0 8px 34px rgba(0,0,0,.7);
+  --glow:radial-gradient(120% 55% at 50% -8%, rgba(201,132,60,.05), transparent 60%);
+  --red:#c25a4e;--green:#6f9a63;--blue:#6f8cb0;--blue2:#5b779b;
+  --purple:#9a7fad;--orange:#bb7c3c;--orange2:#cf9553;--yellow:#b9973c;
+  --err:#c25a4e;--ok:#6f9a63;
+  --e-rojo:#c25a4e;--e-naranja:#bb7c3c;--e-amarillo:#b9973c;--e-verde:#6f9a63;
+  --e-turquesa:#4f9088;--e-azul:#6f8cb0;--e-morado:#9a7fad;--e-rosa:#b06e93;
+  --e-gris:#8a8177;--e-blanco:#cbb9a4;
+}
+
+/* ══ 6 · STORMLIGHT (cian) ═══════════════════════════════════ */
+html[data-theme="stormlight"]{
+  --bg:#101820;--bg2:#16202b;--bg3:#1c2836;--bg4:#273746;
+  --border:rgba(122,214,224,.14);--border2:rgba(122,214,224,.30);
+  --gold:#62c8d8;--gold2:#a8e8f0;
+  --onacc:#08151c;
+  --accsoft:rgba(98,200,216,.13);
+  --text:#e7f0f3;--text2:#b0c3cc;--text3:#7d919b;
+  --shadow:0 2px 10px rgba(0,10,20,.45);
+  --shadow2:0 8px 40px rgba(0,8,16,.6);
+  --glow:radial-gradient(120% 55% at 50% -8%, rgba(98,200,216,.07), transparent 60%);
+  --red:#e3625c;--green:#4fb98a;--blue:#5f9ee8;--blue2:#4f86cc;
+  --purple:#a77ce8;--orange:#e0a04a;--orange2:#eebd74;--yellow:#e3cf5a;
+  --err:#e3625c;--ok:#4fb98a;
+  --e-rojo:#e3625c;--e-naranja:#e0a04a;--e-amarillo:#e3cf5a;--e-verde:#4fb98a;
+  --e-turquesa:#3ab8b0;--e-azul:#5f9ee8;--e-morado:#a77ce8;--e-rosa:#dd6fb0;
+  --e-gris:#8fa2ac;--e-blanco:#e7f0f3;
+}
+
+
+/* ══ 7 · BRUTALISTA ══════════════════════════════════════════
+   Archivo + IBM Plex Mono. Esquinas a cero, bordes negros,
+   sombra dura desplazada. Los números quedan monoespaciados. */
+html[data-theme="brutalista"]{
+  --font-h:'Archivo',sans-serif;--font-b:'IBM Plex Mono',monospace;
+  --r:0;--rl:0;--pill:0;
+  --bg:#e9e7e1;--bg2:#f4f2ed;--bg3:#dedbd3;--bg4:#c6c2b7;
+  --border:#1a1a1a;--border2:#1a1a1a;
+  --gold:#cf2f18;--gold2:#8f1e0d;
+  --onacc:#f4f2ed;--accsoft:rgba(207,47,24,.12);
+  --text:#111;--text2:#333;--text3:#5c5c5c;
+  --shadow:none;--shadow2:5px 5px 0 #1a1a1a;--glow:none;
+  --red:#cf2f18;--green:#1c6b33;--blue:#17418f;--blue2:#17418f;
+  --purple:#5a1f9e;--orange:#8f4a00;--orange2:#6d3800;--yellow:#6b5200;
+  --err:#cf2f18;--ok:#1c6b33;
+  --e-rojo:#c02a22;--e-naranja:#a85c0c;--e-amarillo:#8a6a00;--e-verde:#2b6b3d;
+  --e-turquesa:#0f6f68;--e-azul:#1b4f8f;--e-morado:#6b34a8;--e-rosa:#a3266e;
+  --e-gris:#5a5a5a;--e-blanco:#8a7d66;
+}
+
+/* ══ 8 · EDITORIAL ═══════════════════════════════════════════
+   Playfair Display + Work Sans, acento verde inglés.
+   Radios grandes, sombra suave. El más cómodo de día. */
+html[data-theme="editorial"]{
+  --font-h:'Playfair Display',serif;--font-b:'Work Sans',system-ui,sans-serif;
+  --r:12px;--rl:18px;--pill:99px;
+  --bg:#f6f4f0;--bg2:#fffefb;--bg3:#efece5;--bg4:#ded9cf;
+  --border:rgba(30,50,48,.14);--border2:rgba(30,50,48,.30);
+  --gold:#0f5c53;--gold2:#0a423b;
+  --onacc:#fffefb;--accsoft:rgba(15,92,83,.10);
+  --text:#1c1c1a;--text2:#4a4a45;--text3:#78766f;
+  --shadow:0 2px 12px rgba(30,40,38,.09);--shadow2:0 12px 40px rgba(30,40,38,.16);
+  --glow:radial-gradient(120% 55% at 50% -8%, rgba(15,92,83,.06), transparent 60%);
+  --red:#a92a20;--green:#1c6b40;--blue:#1d4f96;--blue2:#1d4f96;
+  --purple:#5b3391;--orange:#8c5210;--orange2:#6f3f0a;--yellow:#7a5f00;
+  --err:#a92a20;--ok:#1c6b40;
+  --e-rojo:#c02a22;--e-naranja:#a85c0c;--e-amarillo:#8a6a00;--e-verde:#2b6b3d;
+  --e-turquesa:#0f6f68;--e-azul:#1b4f8f;--e-morado:#6b34a8;--e-rosa:#a3266e;
+  --e-gris:#5a5a5a;--e-blanco:#8a7d66;
+}
+
+/* ══ 9 · TERMINAL ════════════════════════════════════════════
+   JetBrains Mono en todo, verde de fósforo sobre negro.
+   Esquinas casi rectas, sin sombras. */
+html[data-theme="terminal"]{
+  --font-h:'JetBrains Mono',monospace;--font-b:'JetBrains Mono',monospace;
+  --r:2px;--rl:2px;--pill:2px;
+  --bg:#07090a;--bg2:#0d1113;--bg3:#12171a;--bg4:#1d2529;
+  --border:rgba(126,231,135,.16);--border2:rgba(126,231,135,.34);
+  --gold:#7ee787;--gold2:#b6f5bb;
+  --onacc:#07090a;--accsoft:rgba(126,231,135,.12);
+  --text:#d7e6da;--text2:#9db3a2;--text3:#6c8073;
+  --shadow:none;--shadow2:0 0 0 1px rgba(126,231,135,.3);--glow:none;
+  --red:#ff7b72;--green:#7ee787;--blue:#79c0ff;--blue2:#58a6ff;
+  --purple:#d2a8ff;--orange:#ffa657;--orange2:#ffc680;--yellow:#e3d24a;
+  --err:#ff7b72;--ok:#7ee787;
+  --e-rojo:#ff7b72;--e-naranja:#ffa657;--e-amarillo:#e3d24a;--e-verde:#7ee787;
+  --e-turquesa:#3fe0d0;--e-azul:#79c0ff;--e-morado:#d2a8ff;--e-rosa:#ff8ac8;
+  --e-gris:#9db3a2;--e-blanco:#d7e6da;
+}
+
+/* ══ 10 · ARCANO ═════════════════════════════════════════════
+   Cormorant Garamond + Lato, violeta profundo y orquídea.
+   Fantástico como el original, pero sin dorado. */
+html[data-theme="arcano"]{
+  --font-h:'Cormorant Garamond',serif;--font-b:'Lato',system-ui,sans-serif;
+  --r:14px;--rl:20px;--pill:99px;
+  --bg:#14101f;--bg2:#1b1630;--bg3:#221c3c;--bg4:#2e2650;
+  --border:rgba(196,168,255,.14);--border2:rgba(196,168,255,.30);
+  --gold:#c4a8ff;--gold2:#e2d4ff;
+  --onacc:#14101f;--accsoft:rgba(196,168,255,.13);
+  --text:#ece7f7;--text2:#b8aed0;--text3:#857ba0;
+  --shadow:0 3px 14px rgba(5,0,20,.5);--shadow2:0 14px 48px rgba(5,0,20,.65);
+  --glow:radial-gradient(120% 55% at 50% -8%, rgba(196,168,255,.09), transparent 60%);
+  --red:#ef6a76;--green:#5fc79a;--blue:#79a8f0;--blue2:#6690dd;
+  --purple:#c48aff;--orange:#e8a45c;--orange2:#f2bd82;--yellow:#e8d266;
+  --err:#ef6a76;--ok:#5fc79a;
+  --e-rojo:#ef6a76;--e-naranja:#e8a45c;--e-amarillo:#e8d266;--e-verde:#5fc79a;
+  --e-turquesa:#4fc7bd;--e-azul:#79a8f0;--e-morado:#c48aff;--e-rosa:#e57ab8;
+  --e-gris:#a49cbd;--e-blanco:#ece7f7;
+}
+
+/* ══ 11 · ARENA ══════════════════════════════════════════════
+   Spectral en títulos y cuerpo, arena cálida y siena quemada.
+   El claro más suave: contraste alto en texto, bajo en fondos. */
+html[data-theme="arena"]{
+  --font-h:'Spectral',serif;--font-b:'Spectral',Georgia,serif;
+  --r:10px;--rl:16px;--pill:99px;
+  --bg:#efe6d8;--bg2:#f8f2e7;--bg3:#e6dbc9;--bg4:#d5c7ae;
+  --border:rgba(105,80,50,.18);--border2:rgba(105,80,50,.34);
+  --gold:#a34a20;--gold2:#74300f;
+  --onacc:#f8f2e7;--accsoft:rgba(163,74,32,.10);
+  --text:#2b241c;--text2:#55493c;--text3:#837563;
+  --shadow:0 2px 8px rgba(90,70,40,.12);--shadow2:0 10px 34px rgba(90,70,40,.2);
+  --glow:radial-gradient(120% 55% at 50% -8%, rgba(163,74,32,.07), transparent 60%);
+  --red:#a8291f;--green:#38702f;--blue:#1f5580;--blue2:#1f5580;
+  --purple:#6a3688;--orange:#9a5410;--orange2:#7d4009;--yellow:#7d6000;
+  --err:#a8291f;--ok:#38702f;
+  --e-rojo:#c02a22;--e-naranja:#a85c0c;--e-amarillo:#8a6a00;--e-verde:#2b6b3d;
+  --e-turquesa:#0f6f68;--e-azul:#1b4f8f;--e-morado:#6b34a8;--e-rosa:#a3266e;
+  --e-gris:#5a5a5a;--e-blanco:#8a7d66;
+}
+
+/* ── El selector de theme (se inyecta desde theme.js) ───────── */
+.theme-pick{
+  background:var(--bg3);border:1px solid var(--border);border-radius:var(--r,8px);
+  padding:5px 9px;color:var(--text);font-family:var(--font-h);max-width:200px;
+  font-size:11px;letter-spacing:.05em;cursor:pointer;outline:none;
+}
+.theme-pick:focus{border-color:var(--gold);}

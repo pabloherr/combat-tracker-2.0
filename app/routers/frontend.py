@@ -17,8 +17,8 @@ _NO_CACHE = {"Cache-Control": "no-cache"}
 # agreguen después) y para publicar una versión nueva solo se toca version.py.
 _VERSION_TAG = (
     '<div class="app-version" style="position:fixed;right:8px;bottom:6px;z-index:60;'
-    "font-family:'Cinzel',serif;font-size:10px;letter-spacing:.08em;"
-    'color:#6b6255;opacity:.75;pointer-events:none;user-select:none">'
+    "font-family:var(--font-h);font-size:10px;letter-spacing:.08em;"
+    'color:var(--text3);opacity:.75;pointer-events:none;user-select:none">'
     f"v{VERSION}</div>"
 )
 
