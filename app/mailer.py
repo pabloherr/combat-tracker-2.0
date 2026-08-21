@@ -13,6 +13,7 @@ Todo lo que sale queda en la tabla `mail_log`, que es lo que muestra el panel
 de administración.
 """
 
+import os
 import re
 import smtplib
 import ssl
@@ -166,6 +167,12 @@ def status() -> dict:
         "from_name": settings.mail_from_name(),
         "base_url": settings.base_url(),
         "outbox": str(settings.OUTBOX),
+        # De dónde salió (o no salió) la configuración: es lo primero que se
+        # mira cuando "puse la contraseña y sigue en modo outbox".
+        "env_file": str(settings.ENV_FILE),
+        "env_file_ok": settings.ENV_FILE.exists(),
+        "env_keys": settings.env_keys(),
+        "password_desde_entorno": bool(os.environ.get("MAIL_PASSWORD")),
     }
 
 

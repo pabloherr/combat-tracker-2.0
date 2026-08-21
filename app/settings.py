@@ -60,6 +60,14 @@ def env(key: str, default: str = "") -> str:
     return _env_cache.get(key.upper(), default)
 
 
+def env_keys() -> list[str]:
+    """Qué claves trae el `.env`, sin sus valores. Para que el panel pueda
+    decir "el archivo está pero le falta MAIL_PASSWORD" sin mostrar nada."""
+    if _env_cache is None:
+        _load_env_file()
+    return sorted(_load_env_file().keys())
+
+
 def reload_env():
     """Vuelve a leer el `.env` (lo usa el panel tras cambiar la configuración)."""
     global _env_cache
