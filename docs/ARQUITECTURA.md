@@ -43,10 +43,6 @@ routers/*.py        ← endpoints por dominio (validan, orquestan)
       │
       ├── access.py      ← ¿es DM? ¿es miembro? (autorización por campaña)
       ├── auth.py        ← sesiones por cookie, hashing, usuario actual
-      ├── admin.py       ← ¿es administrador? (email de la app o marca en la cuenta)
-      ├── recovery.py    ← tokens/códigos de recuperación y confirmación
-      ├── mailer.py      ← correo saliente (SMTP en hilo, o carpeta outbox/)
-      ├── telemetry.py   ← eventos + buffer de peticiones (lo lee el panel)
       ├── models.py      ← modelos Pydantic (forma de los request bodies)
       ├── *_import.py / *_pdf.py  ← parsers de fichas y statblocks
       ├── state.py       ← estado del combate (cache en memoria + persistencia)
@@ -91,8 +87,7 @@ routers/*.py        ← endpoints por dominio (validan, orquestan)
 
 | Router | Prefijo | Qué maneja |
 |---|---|---|
-| `auth` | `/api/auth` | registro, login (usuario o email), logout, recuperación por correo (`/forgot`, `/reset`), confirmación de cambio (`/confirm-change`), cuenta |
-| `admin` | `/api/admin` | panel: telemetría, cuentas, campañas, correo y mantenimiento (exige cuenta admin) |
+| `auth` | `/api/auth` | registro, login, logout, reset, cuenta |
 | `campaigns` | `/api/campaigns` | campañas, miembros, invitaciones, config, tormenta, calendario, marcos del DM, opciones de mascota |
 | `characters` | `/api/characters` | personajes, PDF, imagen, mascotas, stats en vivo, heridas, marcos, recursos D&D |
 | `enemies` | `/api/campaigns/{cid}/enemies` | bestiario (por DM + sistema): import, bulk, export |
@@ -126,11 +121,6 @@ combat-tracker-2.0/
   app/
     database.py            ← conexión SQLite + esquema + migraciones
     auth.py                ← sesiones por cookie, hashing, rol
-    admin.py               ← identificación del administrador
-    recovery.py            ← tokens y códigos de recuperación
-    mailer.py              ← correo saliente y plantillas
-    telemetry.py           ← eventos y métricas
-    settings.py            ← config del server (.env: correo, admins, URL)
     access.py              ← autorización por campaña (DM / miembro)
     models.py              ← modelos Pydantic
     pdf_import.py          ← ficha PDF Cosmere + retrato
@@ -140,12 +130,10 @@ combat-tracker-2.0/
     state.py               ← estado del combate (cache + persistencia)
     roshar.py              ← calendario rosharano (índice de día ↔ fecha y nombres)
     ws.py                  ← WebSockets por campaña
-    routers/               ← auth, admin, campaigns, characters, enemies,
+    routers/               ← auth, campaigns, characters, enemies,
                              encounters, combat, frontend
-  .env / .env.example      ← config local (correo, admins). El .env no va al repo
-  outbox/                  ← correos en disco cuando no hay SMTP (no va al repo)
   static/
-    login.html  admin.html  home.html  dm.html  player.html
+    login.html  home.html  dm.html  player.html
     cosmere_sheet.pdf  5e_sheet.pdf   ← fichas rellenables para descargar
   tests/                   ← suite pytest (corre contra DB temporal)
   cosmere.db               ← la base (se crea sola; no va al repo)
@@ -165,7 +153,6 @@ escriben enteros.
 ```mermaid
 erDiagram
     users ||--o{ sessions : "abre"
-    users ||--o{ auth_tokens : "pide recuperar contraseña"
     users ||--o{ campaigns : "dirige (dm_id)"
     users ||--o{ characters : "posee (owner_id)"
     users ||--o{ enemies : "posee bestiario (owner_id)"
@@ -197,10 +184,6 @@ erDiagram
     inventory ||--o{ inventory : "contenedor (parent_id)"
 ```
 
-`telemetry_events`, `telemetry_requests` y `mail_log` quedan fuera del diagrama a
-propósito: guardan `user_id` sin clave foránea (y el `username` en texto plano) para que
-el registro sobreviva al borrado de la cuenta. Son planos y se purgan por antigüedad.
-
 ### Convenciones
 
 - **Claves foráneas con `ON DELETE CASCADE`**: borrar un usuario, campaña o personaje
@@ -221,12 +204,8 @@ el registro sobreviva al borrado de la cuenta. Son planos y se purgan por antig�
 |---|---|---|
 | `id` | INTEGER PK | |
 | `username` | TEXT | único |
-| `email` | TEXT | para recuperar contraseña; único al crearlo o cambiarlo |
+| `email` | TEXT | para recuperar contraseña |
 | `pass_hash`, `salt` | TEXT | PBKDF2 |
-| `last_login` | TEXT | última entrada |
-| `login_count` | INTEGER | cuántas veces entró |
-| `blocked` | INTEGER | 1 = cuenta bloqueada desde el panel (echa sus sesiones) |
-| `is_admin` | INTEGER | permiso de panel dado a mano (además de `ADMIN_EMAILS`) |
 | `created_at` | TEXT | |
 
 #### `sessions` — sesiones activas
@@ -235,52 +214,7 @@ el registro sobreviva al borrado de la cuenta. Son planos y se purgan por antig�
 | `token` | TEXT PK | valor de la cookie `sid` |
 | `user_id` | INTEGER FK→users | cascade |
 | `role` | TEXT | `dm` \| `player`, fijado al entrar |
-| `ip`, `user_agent` | TEXT | de dónde salió la sesión |
-| `last_seen` | TEXT | se refresca como mucho cada 2 min (no en cada request) |
 | `created_at` | TEXT | |
-
-#### `auth_tokens` — recuperación y confirmación de contraseña
-| Columna | Tipo | Notas |
-|---|---|---|
-| `id` | INTEGER PK | |
-| `user_id` | INTEGER FK→users | cascade |
-| `kind` | TEXT | `reset` (olvidé la contraseña) \| `change` (cambio desde la cuenta) |
-| `token` | TEXT | único; viaja en el enlace del correo |
-| `code` | TEXT | 6 dígitos, para tipear a mano |
-| `payload` | TEXT (JSON) | en `change`, el `pass_hash`/`salt` nuevo que se aplica al confirmar |
-| `ip` | TEXT | quién lo pidió (para el tope por IP) |
-| `attempts` | INTEGER | intentos de código fallidos |
-| `created_at`, `expires_at`, `used_at` | TEXT | vive 30 min y se usa una sola vez |
-
-#### `mail_log` — correo saliente
-| Columna | Tipo | Notas |
-|---|---|---|
-| `id` | INTEGER PK | |
-| `ts` | TEXT | |
-| `to_addr`, `subject`, `kind` | TEXT | `kind`: `reset`, `change`, `password-changed`… |
-| `ok` | INTEGER | salió o no |
-| `error` | TEXT | el error del SMTP si falló |
-| `mode` | TEXT | `smtp` \| `outbox` |
-
-#### `telemetry_events` — eventos con nombre
-| Columna | Tipo | Notas |
-|---|---|---|
-| `id` | INTEGER PK | |
-| `ts` | TEXT | UTC |
-| `kind` | TEXT | `login`, `login_fail`, `register`, `forgot`, `reset_done`, `admin_*`… |
-| `user_id`, `username` | | quién (el nombre se guarda plano: sobrevive al borrado) |
-| `detail`, `ip` | TEXT | |
-| `ok` | INTEGER | 0 = intento fallido |
-
-#### `telemetry_requests` — una fila por petición HTTP
-| Columna | Tipo | Notas |
-|---|---|---|
-| `id` | INTEGER PK | |
-| `ts` | TEXT | UTC |
-| `method`, `path` | TEXT | la ruta va normalizada: `/api/campaigns/{id}/enemies` |
-| `status` | INTEGER | |
-| `ms` | REAL | cuánto tardó |
-| `user_id` | INTEGER | sesión que la hizo, si había |
 
 #### `campaigns` — campañas (mesa de un DM)
 | Columna | Tipo | Notas |
@@ -486,22 +420,6 @@ acarreo de semanas, meses y años. Arranca en `1173.1.1.1`.
   absoluto; `app/roshar.py` traduce a año/mes/semana/día y arma los nombres por
   composición. El frontend repite esa aritmética (cuatro líneas) para dibujar la grilla
   sin pedirle 50 fechas al servidor.
-- **La contraseña no cambia sin pasar por el correo**: tanto "me la olvidé" como el
-  cambio desde *Mi cuenta* generan un `auth_tokens` con enlace + código de 6 dígitos, y
-  el cambio se aplica recién al usarlo. El par enlace/código existe porque el server vive
-  en una LAN: el mail se abre en el celular, donde `BASE_URL` puede no resolver, y ahí el
-  código es la salida. Aplicar el cambio **cierra todas las sesiones** de esa cuenta.
-- **Sin SMTP no se rompe nada**: si falta `MAIL_PASSWORD`, `mailer` escribe el mensaje en
-  `outbox/` como `.eml` en vez de mandarlo. La recuperación sigue siendo usable en una
-  mesa sin internet, y los tests leen los mensajes de `mailer.SENT` sin tocar el disco.
-- **Telemetría por lotes**: los eventos (pocos) se escriben en el momento; las peticiones
-  (muchas) se juntan en memoria y un hilo las vuelca cada 5 s. Escribir una fila por
-  request dentro del ciclo de la petición le agregaría contención al WAL, que ya comparten
-  los WebSockets y el polling. Se purga sola por antigüedad (`TELEMETRY_DAYS`).
-- **Admin por email, no por rol en la base**: administrador es quien entra con un email de
-  `ADMIN_EMAILS` (o tiene `users.is_admin`). Así la cuenta del correo de la app siempre
-  puede entrar al panel aunque la base se haya perdido, y el permiso no se puede "editar"
-  desde adentro de la app para las cuentas de configuración.
 - **Modo fijo por sesión**: el rol `dm`/`player` se elige al entrar y no se cambia sin
   volver a loguear; el router `frontend` redirige si intentás entrar al panel del otro
   rol.
@@ -525,9 +443,9 @@ acarreo de semanas, meses y años. Arranca en `1173.1.1.1`.
 
 Suite con **pytest + TestClient** en `tests/`. Corre siempre contra una **base temporal**
 (nunca toca `cosmere.db`): `conftest.py` repunta `app.database.DB_PATH` a un archivo
-temporal por test y limpia la cache de combate en memoria (y `mailer.SENT`). Cubre auth,
-recuperación de contraseña por correo, panel de admin, campañas, personajes (incluido
-import de PDF Cosmere y D&D), bestiario, encuentros, mascotas y combate.
+temporal por test y limpia la cache de combate en memoria. Cubre auth, campañas,
+personajes (incluido import de PDF Cosmere y D&D), bestiario, encuentros, mascotas y
+combate.
 
 ```bash
 pip install -r requirements-dev.txt

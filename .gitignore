@@ -20,9 +20,3 @@ Thumbs.db
 
 # Otros
 miv.md
-
-# Configuración del server con credenciales (correo, admins)
-.env
-
-# Correos guardados cuando no hay SMTP configurado
-outbox/

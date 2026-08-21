@@ -28,12 +28,10 @@ separado. El modo **queda fijo para esa sesión**: para cambiarlo, cerrá sesió
 a entrar eligiendo el otro (una misma cuenta puede ser DM de sus campañas y jugador en
 campañas de otros, pero de a un modo por vez).
 
-- **Entrar:** podés poner tu **usuario o tu email**, con la contraseña.
-- **¿Olvidaste la contraseña?** Desde la pantalla de entrada pedís el correo de
-  recuperación: te llega un **enlace** y un **código de 6 dígitos** para elegir una
-  nueva. Ver *Recuperar la contraseña* más abajo.
+- **¿Olvidaste la contraseña?** Desde la pantalla de entrada podés restablecerla dando
+  tu usuario y el email de la cuenta.
 - **Editar tu cuenta:** el botón **Cuenta** (arriba a la derecha) te deja cambiar
-  usuario, email y contraseña. El cambio de contraseña **se confirma por correo**.
+  usuario, email y contraseña.
 
 ### ¿Cómo saber tu IP local?
 
@@ -53,26 +51,17 @@ cosmere-app/
   app/
     database.py         ← conexión SQLite + esquema
     auth.py             ← cuentas y sesiones (login por cookie)
-    recovery.py         ← tokens y códigos para recuperar / confirmar contraseñas
-    mailer.py           ← correo saliente (SMTP o carpeta outbox/) y plantillas
-    telemetry.py        ← eventos y métricas que muestra el panel de admin
-    admin.py            ← quién es administrador
-    settings.py         ← configuración del server (correo, admins, URL pública)
     access.py           ← chequeos de acceso a campañas (DM / miembro)
     models.py           ← modelos Pydantic
     pdf_import.py       ← extracción de fichas de personaje y su retrato desde PDF
     cosmere_import.py   ← parser de statblocks (importar enemigos)
     state.py            ← estado del combate por campaña (memoria + persistencia)
     ws.py               ← WebSockets con salas por campaña
-    routers/            ← auth, admin, campaigns, characters, enemies, encounters, combat, frontend
+    routers/            ← auth, campaigns, characters, enemies, encounters, combat, frontend
   cosmere.db            ← base de datos (se crea sola)
-  .env                  ← configuración local (correo, admins). No va al repo
-  .env.example          ← plantilla para armar el .env
-  outbox/               ← correos guardados si no hay SMTP configurado
   requirements.txt
   static/
-    login.html          ← entrar / crear cuenta / recuperar contraseña
-    admin.html          ← panel de control (telemetría y administración)
+    login.html          ← entrar / crear cuenta
     home.html           ← panel principal (tus campañas y tus personajes)
     dm.html             ← vista del DM de una campaña
     player.html         ← vista de juego del jugador
@@ -618,83 +607,11 @@ al PDF.
 - Si una herida **genera un estado**, ese estado queda **marcado y bloqueado**: no se
   puede quitar a mano hasta que la herida se cure.
 
-## Recuperar la contraseña
-
-El sistema no cambia nada sin pasar por el correo de la cuenta.
-
-**Me la olvidé (pantalla de entrada):**
-
-1. Clic en *¿Olvidaste tu contraseña?* y poné tu **usuario o tu email**.
-2. Llega un mensaje con un **enlace** y un **código de 6 dígitos**. Cualquiera de los
-   dos sirve: el enlace abre la pantalla directo, el código se tipea si el mail lo
-   abriste en otro aparato.
-3. Elegís la contraseña nueva. Al guardarla **se cierran todas las sesiones abiertas**
-   de esa cuenta y llega un aviso de "tu contraseña cambió".
-
-**Cambiarla estando adentro (botón Cuenta):** se pide la contraseña actual, sale un
-correo de confirmación y **el cambio recién se aplica al confirmarlo** (con el código o
-el enlace). Hasta entonces sigue valiendo la vieja.
-
-Detalles: el enlace y el código **vencen a los 30 minutos**, sirven **una sola vez**,
-aguantan pocos intentos fallidos y hay un tope de **5 pedidos por hora** por cuenta.
-La pantalla contesta lo mismo exista o no la cuenta, así nadie la usa para averiguar
-qué usuarios hay.
-
-### Configurar el correo (`.env`)
-
-Copiá `.env.example` como `.env` y completá la cuenta desde la que salen los mensajes:
-
-```
-MAIL_USER=gmcito234@gmail.com
-MAIL_PASSWORD=xxxxxxxxxxxxxxxx     # contraseña de APLICACIÓN de Google
-BASE_URL=http://192.168.1.50:8000  # la IP del server, para que el enlace sirva
-```
-
-La `MAIL_PASSWORD` **no es la del Gmail**: es una *contraseña de aplicación* de 16
-letras que se genera en <https://myaccount.google.com/apppasswords> con la verificación
-en dos pasos activada.
-
-**Sin `MAIL_PASSWORD` la app no se rompe:** entra en modo *outbox* y escribe cada
-mensaje en la carpeta `outbox/` como archivo `.eml` (se abre con doble clic). La
-recuperación funciona igual, con el código que está adentro del archivo — práctico para
-una mesa en LAN sin internet.
-
-`BASE_URL` tiene que ser una dirección a la que lleguen desde donde abran el correo: si
-ponés `localhost`, el enlace solo va a funcionar en la máquina del server (el código,
-en cambio, siempre sirve).
-
-## Panel de control (admin)
-
-Entrando con la cuenta cuyo email es el de la app (por defecto `gmcito234@gmail.com`,
-configurable con `ADMIN_EMAILS`) aparece el botón **⚙ Panel** y el login lleva derecho a
-`/admin`. Tiene cinco pestañas:
-
-- **Resumen** — usuarios, gente en línea, campañas, peticiones y errores de las últimas
-  24 h, tiempo de respuesta (media y p95), tamaño de la base, tiempo encendido, gráficos
-  de tráfico por hora y por día, rutas más pedidas, rutas más lentas y últimos
-  movimientos.
-- **Usuarios** — todas las cuentas con sus campañas, personajes, entradas y última vez.
-  Desde acá se puede: ver el detalle (sesiones abiertas, campañas, eventos y correos),
-  editar usuario y email, **bloquear** una cuenta (la echa al instante), dar o sacar
-  permiso de administración, **mandarle un reset de contraseña** por correo, cerrar sus
-  sesiones y eliminarla con todo lo suyo.
-- **Campañas** — todas las campañas con su DM, miembros, personajes y encuentros, con
-  opción de eliminarlas.
-- **Eventos** — el registro de lo que pasó (entradas, altas, recuperaciones, acciones
-  del panel) filtrable por tipo, más las peticiones que terminaron en error.
-- **Correo** — cómo está configurado el SMTP, botón para **mandar un correo de prueba**
-  (muestra el error exacto si falla) y el historial de envíos.
-
-La telemetría se guarda en la misma base, se junta en memoria y se vuelca cada pocos
-segundos (no frena las peticiones), y se **purga sola** pasados los días de
-`TELEMETRY_DAYS` (45 por defecto). No guarda contenidos: solo ruta, estado, duración y
-quién.
-
 ## Datos y persistencia
 
 Todo se guarda en `cosmere.db` (SQLite) y **sobrevive a reiniciar/apagar el servidor**:
 cuentas, campañas, membresías, personajes (con su PDF), bestiario y encuentros por
-campaña, más el registro de telemetría y de correos del panel de admin.
+campaña.
 
 - **Combate activo (por campaña):** si reiniciás a mitad de combate, se restaura tal
   cual (ronda, turnos, vida y estados de todos).

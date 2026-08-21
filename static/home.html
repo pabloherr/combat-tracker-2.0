@@ -74,7 +74,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
       <span class="modebadge" id="modeBadge" title="El modo se elige al iniciar sesión. Para cambiarlo, cerrá sesión y volvé a entrar.">…</span>
       <span class="who">Hola, <b id="me">…</b></span>
       <span id="themePicker"></span>
-      <button class="btn sm" id="adminBtn" style="display:none" onclick="location.href='/admin'">⚙ Panel</button>
       <button class="btn sm" onclick="openAccount()">Cuenta</button>
       <button class="btn sm" onclick="logout()">Salir</button>
     </div>
@@ -139,8 +138,6 @@ async function logout(){await fetch('/api/auth/logout',{method:'POST'});location
 async function loadMe(){
   ME=await api('/api/auth/me');
   document.getElementById('me').textContent=ME.username;
-  // El panel de administración solo existe para la cuenta admin.
-  document.getElementById('adminBtn').style.display=ME.admin?'':'none';
 }
 function applyMode(){
   document.getElementById('dmMode').style.display=MODE==='dm'?'':'none';
@@ -156,14 +153,9 @@ function openAccount(){
     +'<div class="cname" style="font-size:18px">Mi cuenta</div>'
     +'<label class="fl-lbl">Usuario</label><input class="fi" id="acc-user" value="'+esc(ME.username)+'" style="width:100%"/>'
     +'<label class="fl-lbl">Email</label><input class="fi" id="acc-email" type="email" value="'+esc(ME.email||'')+'" style="width:100%"/>'
-    +'<div style="border-top:1px solid var(--border);margin:16px 0 4px;padding-top:12px;font-size:13px;color:var(--text3);font-style:italic">Cambiar contraseña (dejá en blanco si no querés cambiarla). Te va a llegar un correo para confirmarlo: el cambio recién se aplica ahí.</div>'
+    +'<div style="border-top:1px solid var(--border);margin:16px 0 4px;padding-top:12px;font-size:13px;color:var(--text3);font-style:italic">Cambiar contraseña (dejá en blanco si no querés cambiarla)</div>'
     +'<label class="fl-lbl">Contraseña actual</label><input class="fi" id="acc-cur" type="password" style="width:100%"/>'
     +'<label class="fl-lbl">Nueva contraseña</label><input class="fi" id="acc-new" type="password" style="width:100%"/>'
-    +'<div id="acc-confirm" style="display:none;border:1px solid var(--border2);border-radius:var(--r);padding:12px;margin-top:14px;background:var(--bg3)">'
-      +'<div style="font-size:13px;color:var(--text2);font-style:italic;margin-bottom:8px">Te mandamos un correo. Pegá acá el código de 6 dígitos (o abrí el enlace del mensaje).</div>'
-      +'<div class="row" style="margin:0;gap:8px"><input class="fi" id="acc-code" inputmode="numeric" maxlength="6" placeholder="000000" style="flex:1;letter-spacing:.3em;text-align:center"/>'
-      +'<button class="btn accent" onclick="confirmPasswordChange()">Confirmar</button></div>'
-    +'</div>'
     +'<div id="acc-err" style="color:var(--err);font-size:13px;min-height:18px;margin-top:8px;font-style:italic"></div>'
     +'<div class="card-actions" style="justify-content:flex-end;margin-top:6px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="saveAccount()">Guardar</button></div>'
     +'<div style="border-top:1px solid var(--border);margin:18px 0 4px;padding-top:12px">'
@@ -189,31 +181,9 @@ async function saveAccount(){
   };
   var r=await fetch('/api/auth/account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});document.getElementById('acc-err').textContent=e.detail||'Error';return;}
-  var d=await r.json();
-  ME.username=d.username; ME.email=d.email;
+  ME=await r.json();
   document.getElementById('me').textContent=ME.username;
-  if(d.password_pendiente){
-    // El usuario y el email ya se guardaron; la contraseña espera el correo.
-    document.getElementById('acc-cur').value='';
-    document.getElementById('acc-new').value='';
-    document.getElementById('acc-confirm').style.display='';
-    var e2=document.getElementById('acc-err');
-    e2.style.color='var(--ok)';
-    e2.textContent=d.aviso||'Revisá tu correo para confirmar el cambio.';
-    document.getElementById('acc-code').focus();
-    return;
-  }
   closeModal();
-}
-async function confirmPasswordChange(){
-  var code=document.getElementById('acc-code').value.trim();
-  var e=document.getElementById('acc-err');
-  if(!code){e.style.color='var(--err)';e.textContent='Pegá el código que te llegó por correo.';return;}
-  var r=await fetch('/api/auth/confirm-change',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:code})});
-  if(!r.ok){var x=await r.json().catch(function(){return{detail:'Error'};});e.style.color='var(--err)';e.textContent=x.detail||'Error';return;}
-  // Confirmar cierra todas las sesiones, incluida esta: hay que volver a entrar.
-  alert('Listo, tu contraseña cambió. Volvé a entrar con la nueva.');
-  location.href='/login';
 }
 
 // ─── DM: campañas ───

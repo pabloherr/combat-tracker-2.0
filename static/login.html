@@ -25,20 +25,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .fl{font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;display:block;}
 .fi{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:var(--font-b);font-size:16px;outline:none;margin-bottom:14px;}
 .fi:focus{border-color:var(--gold);}
-.fi.code{font-family:var(--font-h);font-size:26px;letter-spacing:.42em;text-align:center;padding:12px 0 12px 12px;}
 .btn{width:100%;font-family:var(--font-h);font-size:13px;letter-spacing:.06em;text-transform:uppercase;padding:11px;border-radius:var(--r);cursor:pointer;border:1px solid var(--gold);background:var(--gold);color:var(--onacc);font-weight:600;}
 .btn:hover{background:var(--gold2);border-color:var(--gold2);}
-.btn[disabled]{opacity:.55;cursor:default;}
 .link{display:block;text-align:center;margin-top:12px;color:var(--text3);font-size:13px;font-style:italic;cursor:pointer;}
 .link:hover{color:var(--gold);}
 .err{color:var(--err);font-size:13px;text-align:center;min-height:20px;margin-top:8px;font-style:italic;}
-.ok{color:var(--ok);}
-.hint{font-size:12.5px;color:var(--text3);text-align:center;margin-bottom:14px;font-style:italic;line-height:1.5;}
-.steps{display:flex;gap:6px;margin-bottom:16px;}
-.step{flex:1;height:3px;border-radius:2px;background:var(--border);}
-.step.on{background:var(--gold);}
-.meter{height:3px;border-radius:2px;background:var(--border);margin:-6px 0 14px;overflow:hidden;}
-.meter i{display:block;height:100%;width:0;background:var(--gold);transition:width .2s,background .2s;}
+.hint{font-size:12px;color:var(--text3);text-align:center;margin-bottom:12px;font-style:italic;}
 </style>
 </head>
 <body>
@@ -46,13 +38,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
   <div class="title">Cosmere Tracker</div>
   <div class="subtitle">Combate en tiempo real</div>
 
+  <!-- selector de rol -->
   <div style="text-align:center;margin-bottom:1rem"><span id="themePicker"></span></div>
-
-  <!-- barra de pasos: solo en la recuperación -->
-  <div class="steps" id="steps" style="display:none">
-    <div class="step" id="step1"></div><div class="step" id="step2"></div>
-  </div>
-
   <div id="roleBox">
     <div class="role-lbl">Entrar como</div>
     <div class="role">
@@ -66,180 +53,70 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
     <button class="tab" id="tab-reg" onclick="setMode('reg')">Crear cuenta</button>
   </div>
 
-  <div id="hint" class="hint" style="display:none"></div>
+  <div id="resetHint" class="hint" style="display:none">Recuperá tu contraseña con el email de tu cuenta.</div>
 
-  <div id="f-ident"><label class="fl" id="lbl-ident">Usuario o email</label><input class="fi" id="ident" autocomplete="username" onkeydown="if(event.key==='Enter')submit()"/></div>
-  <div id="f-email" style="display:none"><label class="fl">Email</label><input class="fi" id="email" type="email" autocomplete="email" onkeydown="if(event.key==='Enter')submit()"/></div>
-  <div id="f-code" style="display:none"><label class="fl">Código del correo</label><input class="fi code" id="code" inputmode="numeric" maxlength="6" placeholder="000000" onkeydown="if(event.key==='Enter')submit()"/></div>
-  <div id="f-password"><label class="fl" id="lbl-password">Contraseña</label><input class="fi" id="password" type="password" autocomplete="current-password" oninput="meter()" onkeydown="if(event.key==='Enter')submit()"/></div>
-  <div class="meter" id="meter" style="display:none"><i id="meterbar"></i></div>
-  <div id="f-password2" style="display:none"><label class="fl">Confirmar contraseña</label><input class="fi" id="password2" type="password" autocomplete="new-password" onkeydown="if(event.key==='Enter')submit()"/></div>
+  <div id="f-username"><label class="fl">Usuario</label><input class="fi" id="username" autocomplete="username"/></div>
+  <div id="f-email" style="display:none"><label class="fl">Email</label><input class="fi" id="email" type="email" autocomplete="email"/></div>
+  <div id="f-password"><label class="fl" id="lbl-password">Contraseña</label><input class="fi" id="password" type="password" onkeydown="if(event.key==='Enter')submit()"/></div>
+  <div id="f-password2" style="display:none"><label class="fl">Confirmar contraseña</label><input class="fi" id="password2" type="password" onkeydown="if(event.key==='Enter')submit()"/></div>
 
   <button class="btn" id="submitBtn" onclick="submit()">Entrar</button>
   <div class="err" id="err"></div>
-  <span class="link" id="forgot" onclick="setMode('forgot')">¿Olvidaste tu contraseña?</span>
-  <span class="link" id="resend" style="display:none" onclick="setMode('forgot')">Mandar otro correo</span>
-  <span class="link" id="backLink" style="display:none" onclick="setMode('login')">← Volver a entrar</span>
+  <span class="link" id="forgot" onclick="setMode('reset')">¿Olvidaste tu contraseña?</span>
+  <span class="link" id="backLink" style="display:none" onclick="setMode('login')">← Volver</span>
 </div>
 <script>
-/* Modos de esta pantalla:
-     login   entrar (usuario o email)
-     reg     crear cuenta
-     forgot  pedir el correo de recuperación
-     code    código de 6 dígitos + contraseña nueva
-     token   llegó por el enlace del correo (/recuperar?token=…)
-     change  confirmar un cambio pedido desde "Mi cuenta" (/confirmar?token=…)  */
-var mode='login', role='dm', TOKEN='', PEDIDO='';
-
-function $(id){return document.getElementById(id);}
-function show(id,on){$(id).style.display=on?'':'none';}
-function val(id){return $(id).value;}
-function err(m){var e=$('err');e.className='err';e.textContent=m;}
-function ok(m){var e=$('err');e.className='err ok';e.textContent=m;}
-
+var mode='login', role='dm';
 function setRole(r){
   role=r;
-  $('role-dm').classList.toggle('on',r==='dm');
-  $('role-player').classList.toggle('on',r==='player');
+  document.getElementById('role-dm').classList.toggle('on',r==='dm');
+  document.getElementById('role-player').classList.toggle('on',r==='player');
 }
-
+function show(id,on){document.getElementById(id).style.display=on?'':'none';}
 function setMode(m){
   mode=m;
-  var reg=m==='reg', login=m==='login', forgot=m==='forgot',
-      code=m==='code', token=m==='token', change=m==='change';
-  var nueva=code||token;   // pantallas donde se elige contraseña nueva
-
-  $('tab-login').classList.toggle('active',login);
-  $('tab-reg').classList.toggle('active',reg);
-  show('tabs',login||reg); show('roleBox',login||reg);
-  show('steps',forgot||code||token);
-  $('step1').classList.toggle('on',forgot||code||token);
-  $('step2').classList.toggle('on',code||token);
-
-  show('f-ident',login||reg||forgot||code);
-  show('f-email',reg);
-  show('f-code',code);
-  show('f-password',login||reg||nueva);
-  show('meter',reg||nueva);
-  show('f-password2',reg||nueva);
-  show('forgot',login);
-  show('resend',code);
-  show('backLink',!login&&!reg);
-  show('submitBtn',true);
-
-  $('lbl-ident').textContent=forgot?'Usuario o email de la cuenta':(code?'Usuario o email':'Usuario o email');
-  $('lbl-password').textContent=nueva?'Contraseña nueva':'Contraseña';
-  $('password').setAttribute('autocomplete',nueva||reg?'new-password':'current-password');
-  $('submitBtn').textContent=login?'Entrar':reg?'Crear cuenta':
-    forgot?'Mandarme el correo':nueva?'Guardar contraseña':'Confirmar el cambio';
-
-  var h=$('hint');
-  h.style.display=(login||reg)?'none':'';
-  if(forgot) h.textContent='Te mandamos un correo con un enlace y un código de 6 dígitos. Sirve por 30 minutos.';
-  if(code) h.innerHTML='Revisá tu correo'+(PEDIDO?' ('+PEDIDO+')':'')+' y copiá el código. Si no llegó, mirá en spam.';
-  if(token) h.textContent='Elegí tu contraseña nueva. Al guardarla se cierran todas las sesiones abiertas.';
-  if(change) h.textContent='Confirmá el cambio de contraseña que pediste desde tu cuenta.';
-  $('err').textContent='';
-  if(!login&&!reg) setTimeout(function(){ (code?$('code'):nueva?$('password'):$('ident')).focus(); },30);
+  var reg=m==='reg', reset=m==='reset', login=m==='login';
+  document.getElementById('tab-login').classList.toggle('active',login);
+  document.getElementById('tab-reg').classList.toggle('active',reg);
+  show('tabs',!reset); show('roleBox',!reset); show('resetHint',reset);
+  show('f-email', reg||reset);
+  show('f-password2', reg||reset);
+  show('forgot', login);
+  show('backLink', reset);
+  document.getElementById('lbl-password').textContent=reset?'Nueva contraseña':'Contraseña';
+  document.getElementById('submitBtn').textContent=login?'Entrar':(reg?'Crear cuenta':'Restablecer contraseña');
+  document.getElementById('err').textContent='';
 }
-
-/* Fuerza de la contraseña: solo orientativa, la regla real la aplica el server. */
-function meter(){
-  var p=val('password'), n=0;
-  if(p.length>=6)n++; if(p.length>=10)n++;
-  if(/[A-Z]/.test(p)&&/[a-z]/.test(p))n++;
-  if(/[0-9]/.test(p))n++; if(/[^A-Za-z0-9]/.test(p))n++;
-  var b=$('meterbar');
-  b.style.width=(n*20)+'%';
-  b.style.background=n<=1?'var(--red)':n<=3?'var(--orange2)':'var(--green)';
-}
-
+function val(id){return document.getElementById(id).value;}
 async function post(path,body){
   var r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  var data=await r.json().catch(function(){return{};});
-  if(!r.ok){err(data.detail||'Error');return null;}
-  return data||{};
+  if(r.ok) return true;
+  var e=await r.json().catch(function(){return{detail:'Error'};});
+  document.getElementById('err').textContent=e.detail||'Error';
+  return false;
 }
-
 async function submit(){
-  var btn=$('submitBtn'); btn.disabled=true;
-  try{ await run(); } finally { btn.disabled=false; }
-}
-
-async function run(){
-  var u=val('ident').trim(), p=val('password');
-  $('err').textContent='';
-
+  var u=val('username').trim(), p=val('password');
+  document.getElementById('err').textContent='';
   if(mode==='login'){
-    if(!u||!p) return err('Completá usuario y contraseña.');
-    var d=await post('/api/auth/login',{username:u,password:p,role:role});
-    if(d) go(d);
-    return;
-  }
-  if(mode==='reg'){
-    var em=val('email').trim();
-    if(!u||!em||!p) return err('Completá todos los campos.');
-    if(p!==val('password2')) return err('Las contraseñas no coinciden.');
-    var d2=await post('/api/auth/register',{username:u,email:em,password:p,role:role});
-    if(d2) go(d2);
-    return;
-  }
-  if(mode==='forgot'){
-    if(!u) return err('Escribí tu usuario o tu email.');
-    var d3=await post('/api/auth/forgot',{identifier:u});
-    if(!d3) return;
-    PEDIDO=d3.pista||'';
-    setMode('code');
-    ok(d3.mensaje||'Correo enviado.');
-    return;
-  }
-  if(mode==='code'||mode==='token'){
-    if(p!==val('password2')) return err('Las contraseñas no coinciden.');
-    var body=mode==='token'?{token:TOKEN,password:p}
-                           :{identifier:u,code:val('code').trim(),password:p};
-    if(mode==='code'&&(!u||!val('code').trim())) return err('Poné tu usuario y el código del correo.');
-    var d4=await post('/api/auth/reset',body);
-    if(!d4) return;
-    listo('Contraseña cambiada. Entrá con la nueva.',d4.username);
-    return;
-  }
-  if(mode==='change'){
-    var d5=await post('/api/auth/confirm-change',{token:TOKEN});
-    if(!d5) return;
-    listo('Cambio confirmado. Entrá con tu contraseña nueva.',d5.username);
+    if(!u||!p){return err('Completá usuario y contraseña.');}
+    if(await post('/api/auth/login',{username:u,password:p,role:role})) go();
+  }else if(mode==='reg'){
+    var em=val('email').trim(), p2=val('password2');
+    if(!u||!em||!p){return err('Completá todos los campos.');}
+    if(p!==p2){return err('Las contraseñas no coinciden.');}
+    if(await post('/api/auth/register',{username:u,email:em,password:p,role:role})) go();
+  }else{ // reset
+    var em2=val('email').trim(), p2b=val('password2');
+    if(!u||!em2||!p){return err('Completá todos los campos.');}
+    if(p!==p2b){return err('Las contraseñas no coinciden.');}
+    if(await post('/api/auth/reset',{username:u,email:em2,password:p})){
+      setMode('login'); document.getElementById('err').style.color='var(--green)'; document.getElementById('err').textContent='Contraseña cambiada. Entrá con la nueva.';
+    }
   }
 }
-
-function listo(msg,username){
-  TOKEN='';
-  setMode('login');
-  if(username) $('ident').value=username;
-  $('password').value=''; $('password2').value='';
-  ok(msg);
-}
-
-function go(d){
-  if(d&&d.admin){location.href='/admin';return;}
-  location.href=role==='dm'?'/dm':'/jugar';
-}
-
-/* Arranque: si vinimos de un enlace del correo, validamos el token primero. */
-(async function(){
-  var params=new URLSearchParams(location.search);
-  var t=(params.get('token')||'').trim();
-  var esCambio=location.pathname.indexOf('/confirmar')===0;
-  if(!t){ setMode('login'); return; }
-  TOKEN=t;
-  var r=await fetch((esCambio?'/api/auth/change/':'/api/auth/reset/')+encodeURIComponent(t));
-  var d=await r.json().catch(function(){return{};});
-  if(!r.ok){
-    setMode(esCambio?'login':'forgot');
-    err(d.detail||'Ese enlace ya no sirve.');
-    return;
-  }
-  setMode(esCambio?'change':'token');
-  ok('Hola '+(d.username||'')+'. Te quedan '+(d.minutos||0)+' minutos.');
-})();
+function err(m){document.getElementById('err').textContent=m;}
+function go(){location.href=role==='dm'?'/dm':'/jugar';}
 </script>
 </body>
 </html>

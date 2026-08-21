@@ -3,7 +3,6 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from ..admin import is_admin
 from ..auth import optional_user
 from ..database import STATIC
 from ..version import VERSION
@@ -38,9 +37,6 @@ def api_version():
 
 
 def _role_home(u: dict) -> str:
-    # El admin entra derecho al panel; desde ahí puede pasar a la app.
-    if is_admin(u):
-        return "/admin"
     return "/jugar" if u.get("role") == "player" else "/dm"
 
 
@@ -76,31 +72,6 @@ def player_home(request: Request):
 @router.get("/login")
 def login_page():
     return _page("login.html")
-
-
-# Las dos pantallas del correo. Son la misma página que el login, en otro modo:
-# lo que cambia lo decide el JS mirando la ruta y el `?token=`.
-@router.get("/recuperar")
-def recuperar_page():
-    """Enlace de "olvidé mi contraseña": elegir una nueva."""
-    return _page("login.html")
-
-
-@router.get("/confirmar")
-def confirmar_page():
-    """Enlace de confirmación de un cambio pedido desde "Mi cuenta"."""
-    return _page("login.html")
-
-
-@router.get("/admin")
-def admin_page(request: Request):
-    """Panel de administración: telemetría, cuentas, campañas y correo."""
-    u = optional_user(request)
-    if not u:
-        return RedirectResponse("/login")
-    if not is_admin(u):
-        return RedirectResponse("/dm" if u.get("role") != "player" else "/jugar")
-    return _page("admin.html")
 
 
 @router.get("/campaign/{cid}")
