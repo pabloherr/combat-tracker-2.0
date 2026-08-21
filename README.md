@@ -172,19 +172,6 @@ ya agregada no cambia.
 cambia tocando el nombre o el **✎** que tiene al lado, en la ficha, en combate o en el
 modal de 🐾 Mascotas. El enemigo del bestiario no se toca: solo cambia tu bicho.
 
-**Editar la ficha.** El botón **✎ Ficha** (en el recuadro de la mascota y en el modal de
-🐾 Mascotas) abre el mismo formulario que usa el DM con los enemigos: vida, focus e
-investidura (actual y máximo), el tier, los nueve atributos, movimiento, sentidos,
-deflect, inmunidades, resistencias, debilidades, idiomas, habilidades, rasgos, acciones y
-oportunidades. En una campaña de D&D 5e sale la versión del manual de monstruos (CA,
-velocidad, CR, las seis características, salvaciones y acciones legendarias). Como la
-ficha es una copia, editarla no toca al enemigo del bestiario ni a las mascotas que hayan
-sacado los demás del mismo bicho. Si bajás un máximo, el valor actual se recorta solo, y
-si hay un combate en curso el cambio entra ahí también.
-
-La ficha la edita **quien trajo la mascota** (o el DM), incluso si está marcada como de
-todos: los demás la manejan, pero no le reescriben los números.
-
 **Mascotas de todos.** Quien trajo la mascota (o el DM) puede marcarla como **de todos**
 con el botón *Hacerla de todos*. A partir de ahí deja de ser suya: aparece en la ficha de
 **cada** jugador bajo *Mascotas del grupo*, y cualquiera de la mesa le maneja la vida, el

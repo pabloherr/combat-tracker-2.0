@@ -13,8 +13,8 @@ from ..dnd_pdf import parse_dnd_pdf
 from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
                       InventoryIn, InventoryMove, InventoryQty, InventoryStash,
                       InventoryTransfer, LiveStat, LiveStatus, MarcosChange, MarcosSet,
-                      PetFromEnemy, PetName, PetSheet, SizeIn, SlotsConfigIn,
-                      SlotSpend, TakeIn)
+                      PetFromEnemy, PetName, SizeIn, SlotsConfigIn, SlotSpend,
+                      TakeIn)
 from ..pdf_import import extract_pdf_image, parse_character_pdf
 from ..state import combats
 from ..ws import push_state
@@ -384,49 +384,6 @@ async def rename_pet(cid: int, pid: int, p: PetName, user=Depends(current_user))
     return {"ok": True, "name": name}
 
 
-@router.put("/{cid}/pets/{pid}/sheet")
-async def edit_pet_sheet(cid: int, pid: int, p: PetSheet, user=Depends(current_user)):
-    """Reescribe la ficha entera de la mascota: números, atributos, rasgos y
-    acciones.
-
-    La toca quien la trajo (o el DM). Una mascota de todos la maneja cualquiera
-    de la mesa, pero la ficha sigue siendo del dueño: ver `_pet_de_su_dueno`.
-
-    La ficha entró como copia del bestiario, así que editarla no toca al enemigo
-    original ni a las mascotas que hayan sacado los demás del mismo bicho."""
-    name = p.name.strip()[:80]
-    if not name:
-        raise HTTPException(400, "Poné un nombre a la mascota")
-    maxes = {s: max(0, int(getattr(p, f"{s}_max") or 0)) for s in _STATS}
-    if maxes["vida"] < 1:
-        raise HTTPException(400, "La vida máxima tiene que ser al menos 1")
-    with db() as conn:
-        r = _pet_de_su_dueno(conn, cid, pid, user)
-        # Los actuales: los que manden, o los de antes, siempre recortados al
-        # máximo nuevo (si le bajás la vida máxima, la actual no queda por arriba).
-        cur = {}
-        for s in _STATS:
-            v = getattr(p, s)
-            if v is None:
-                v = r[s] if r[s] is not None else maxes[s]
-            cur[s] = max(0, min(maxes[s], int(v)))
-        conn.execute(
-            "UPDATE pets SET name=?, vida_max=?, focus_max=?, inv_max=?, "
-            "vida=?, focus=?, inv=?, acciones=?, stats=? WHERE id=?",
-            (name, maxes["vida"], maxes["focus"], maxes["inv"],
-             cur["vida"], cur["focus"], cur["inv"],
-             json.dumps(p.acciones or []), json.dumps(p.stats or {}), r["id"]),
-        )
-        campaign_id = _campaign_of(conn, r["character_id"])
-    await _sync_combat(campaign_id, {
-        "name": name,
-        "vida_max": maxes["vida"], "focus_max": maxes["focus"], "inv_max": maxes["inv"],
-        "vida": cur["vida"], "focus": cur["focus"], "inv": cur["inv"],
-        "acciones": p.acciones or [], "stats": p.stats or {},
-    }, pet_id=r["id"])
-    return {"ok": True, "name": name}
-
-
 @router.post("/{cid}/pets/{pid}/shared")
 async def toggle_pet_shared(cid: int, pid: int, user=Depends(current_user)):
     """Marca la mascota como **de todos**: pasa a ser del grupo y cualquiera de
@@ -467,8 +424,11 @@ def _toggle_status(st: list, status: str) -> list:
     return st
 
 
-def _buscar_pet(conn, cid: int, pid: int):
-    """La mascota, sin mirar permisos todavía."""
+def _owned_pet(conn, cid: int, pid: int, user: dict):
+    """Mascota que este usuario puede manejar.
+
+    La propia siempre; una marcada como **de todos** la maneja cualquiera de la
+    mesa (y el DM), aunque la haya traído otro jugador."""
     r = conn.execute("SELECT * FROM pets WHERE id=? AND character_id=?", (pid, cid)).fetchone()
     if not r:
         # el pedido puede venir con el personaje de quien la maneja, no con el
@@ -479,26 +439,6 @@ def _buscar_pet(conn, cid: int, pid: int):
             "  (SELECT campaign_id FROM characters WHERE id=?)", (pid, cid)).fetchone()
     if not r:
         raise HTTPException(404, "Mascota no encontrada")
-    return r
-
-
-def _pet_de_su_dueno(conn, cid: int, pid: int, user: dict):
-    """Mascota cuya **ficha** puede editar este usuario.
-
-    Más estricto que `_owned_pet`: la ficha es de quien la trajo (o del DM),
-    aunque esté marcada como de todos. Los demás le manejan la vida, los
-    estados y el inventario, pero no le reescriben los números."""
-    r = _buscar_pet(conn, cid, pid)
-    _owned_or_dm(conn, r["character_id"], user)
-    return r
-
-
-def _owned_pet(conn, cid: int, pid: int, user: dict):
-    """Mascota que este usuario puede manejar.
-
-    La propia siempre; una marcada como **de todos** la maneja cualquiera de la
-    mesa (y el DM), aunque la haya traído otro jugador."""
-    r = _buscar_pet(conn, cid, pid)
     if not r["compartida"]:
         _owned_or_dm(conn, r["character_id"], user)
     else:
