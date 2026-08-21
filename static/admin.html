@@ -457,6 +457,25 @@ async function verEventos(kind){
 }
 
 /* ── Correo ── */
+/* Por qué el correo está como está: el archivo .env aparece o no, y con qué
+   claves. Sin esto, "puse la contraseña y sigue en outbox" se debuguea a ciegas. */
+function cfgOrigen(c){
+  if(c.password_desde_entorno) return '<span class="pill ok">Variable de entorno</span>';
+  var claves=c.env_keys||[];
+  if(!c.env_file_ok){
+    return '<span class="pill bad">Sin archivo</span> <span class="mono">'+esc(c.env_file)+'</span>'
+      +'<div class="section-sub" style="margin:6px 0 0">No existe ese archivo. El <code>.env</code> va exactamente ahí, al lado de <span class="mono">main.py</span>.</div>';
+  }
+  if(claves.indexOf('MAIL_PASSWORD')<0){
+    return '<span class="pill bad">Falta MAIL_PASSWORD</span> <span class="mono">'+esc(c.env_file)+'</span>'
+      +'<div class="section-sub" style="margin:6px 0 0">El archivo se leyó bien ('+claves.length+' claves: '+esc(claves.join(', '))+') pero no trae esa línea.</div>';
+  }
+  if(!c.enabled){
+    return '<span class="pill bad">MAIL_PASSWORD vacía</span> <span class="mono">'+esc(c.env_file)+'</span>';
+  }
+  return '<span class="pill ok">Leída del .env</span> <span class="mono">'+esc(c.env_file)+'</span>';
+}
+
 async function verCorreo(){
   var d=await api('/api/admin/mail');
   var c=d.config;
@@ -470,6 +489,7 @@ async function verCorreo(){
       +'<tr><td class="mono">Remitente</td><td>'+esc(c.from_name)+'</td></tr>'
       +'<tr><td class="mono">Enlaces</td><td>'+esc(c.base_url)+'</td></tr>'
       +'<tr><td class="mono">Admins</td><td>'+esc((DATA&&DATA.admins||[]).join(', '))+'</td></tr>'
+      +'<tr><td class="mono">Config</td><td>'+cfgOrigen(c)+'</td></tr>'
       +'</table>'
       +(c.enabled?'':'<div class="section-sub" style="margin-top:10px">Sin <b>MAIL_PASSWORD</b> en el <code>.env</code> los mensajes no salen a internet: se guardan en <span class="mono">'+esc(c.outbox)+'</span> y se abren con doble clic. La recuperación funciona igual (el código está adentro del archivo).</div>')
     +'</div>'

@@ -63,8 +63,6 @@ def env(key: str, default: str = "") -> str:
 def env_keys() -> list[str]:
     """Qué claves trae el `.env`, sin sus valores. Para que el panel pueda
     decir "el archivo está pero le falta MAIL_PASSWORD" sin mostrar nada."""
-    if _env_cache is None:
-        _load_env_file()
     return sorted(_load_env_file().keys())
 
 
