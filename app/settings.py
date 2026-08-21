@@ -34,7 +34,9 @@ def _load_env_file() -> dict[str, str]:
     data: dict[str, str] = {}
     if not ENV_FILE.exists():
         return data
-    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+    # utf-8-sig: si el archivo se creó desde PowerShell viene con BOM, y sin esto
+    # la primera clave quedaría ilegible (`﻿MAIL_USER`).
+    for line in ENV_FILE.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
