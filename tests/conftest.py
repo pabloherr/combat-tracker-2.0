@@ -8,6 +8,7 @@ importar `main` (que corre `init_db()` en el import). Eso se hace a nivel de
 módulo acá, porque pytest importa este conftest antes que cualquier test.
 """
 
+import os
 import tempfile
 from pathlib import Path
 
@@ -15,10 +16,15 @@ import pytest
 
 import app.database as database
 
+# Los tests no escriben correos en `outbox/`: el mailer igual deja cada mensaje
+# en `mailer.SENT`, que es lo que miran las pruebas de recuperación.
+os.environ["MAIL_OUTBOX"] = "0"
+
 # Base descartable para el init_db() que corre al importar main (nunca la real).
 database.DB_PATH = Path(tempfile.mkdtemp()) / "boot.db"
 
 import main  # noqa: E402  (debe ir después de fijar DB_PATH)
+from app import mailer  # noqa: E402
 from app.state import combats  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -30,8 +36,10 @@ def _db(tmp_path, monkeypatch):
     monkeypatch.setattr(database, "DB_PATH", tmp_path / "test.db")
     database.init_db()
     combats._cache.clear()
+    mailer.SENT.clear()
     yield
     combats._cache.clear()
+    mailer.SENT.clear()
 
 
 @pytest.fixture

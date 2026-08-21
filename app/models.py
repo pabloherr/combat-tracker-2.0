@@ -18,10 +18,24 @@ class LoginIn(BaseModel):
     role: str = "dm"
 
 
+class ForgotIn(BaseModel):
+    """Pedido de recuperación: alcanza con el usuario o el email."""
+    identifier: str = ""
+
+
 class ResetIn(BaseModel):
-    username: str
-    email: str
+    """Contraseña nueva. Se identifica con el token del enlace del correo o,
+    si el enlace no sirve, con usuario/email + el código de seis dígitos."""
+    token: str = ""
+    identifier: str = ""
+    code: str = ""
     password: str
+
+
+class ConfirmChangeIn(BaseModel):
+    """Confirmación del cambio de contraseña pedido desde "Mi cuenta"."""
+    token: str = ""
+    code: str = ""
 
 
 class AccountUpdate(BaseModel):
@@ -354,3 +368,17 @@ class ColorChange(BaseModel):
 class InitiativeIn(BaseModel):
     uid: str
     value: int                 # iniciativa del participante (D&D)
+
+
+# ── Panel de administración ────────────────────────────────
+
+class AdminUserUpdate(BaseModel):
+    """Edición de una cuenta desde el panel. Solo se aplica lo que venga."""
+    username: str | None = None
+    email: str | None = None
+    blocked: bool | None = None
+    is_admin: bool | None = None
+
+
+class MailTestIn(BaseModel):
+    to: str = ""            # vacío = a la casilla de la app

@@ -8,6 +8,10 @@ routers. La lógica vive en el paquete `app/`:
 
     app/database.py         → conexión SQLite + esquema
     app/auth.py             → cuentas y sesiones
+    app/recovery.py         → tokens de recuperación de contraseña
+    app/mailer.py           → correo saliente (SMTP o carpeta outbox/)
+    app/telemetry.py        → eventos y métricas para el panel de admin
+    app/settings.py         → configuración del server (correo, admins, URL)
     app/access.py           → chequeos de acceso a campañas
     app/models.py           → modelos Pydantic
     app/pdf_import.py       → extracción de fichas PDF
@@ -19,20 +23,51 @@ Ejecutar:
     uvicorn main:app --host 0.0.0.0 --port 8000
 """
 
-from fastapi import FastAPI
+import time
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
-from app import ws
+from app import telemetry, ws
+from app.auth import COOKIE_NAME, session_user_id
 from app.database import STATIC, init_db
-from app.routers import (auth, campaigns, characters, combat, encounters,
+from app.routers import (admin, auth, campaigns, characters, combat, encounters,
                          enemies, frontend, items)
 
 init_db()
 
-app = FastAPI(title="Cosmere Combat Tracker")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    # Al apagar, lo que quedó juntado en memoria se guarda igual.
+    telemetry.flush()
+
+
+app = FastAPI(title="Cosmere Combat Tracker", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def telemetria(request: Request, call_next):
+    """Anota cada petición para el panel: ruta, estado y cuánto tardó.
+
+    No escribe en la base acá: `record_request` junta en memoria y un hilo
+    vuelca cada pocos segundos. Los archivos estáticos no cuentan (son ruido y
+    los sirve Starlette sin pasar por la app)."""
+    t0 = time.perf_counter()
+    respuesta = await call_next(request)
+    ruta = request.url.path
+    if not ruta.startswith("/static"):
+        uid = session_user_id(request.cookies.get(COOKIE_NAME))
+        telemetry.record_request(request.method, ruta, respuesta.status_code,
+                                 (time.perf_counter() - t0) * 1000, uid)
+    return respuesta
+
 
 app.include_router(ws.router)
 app.include_router(auth.router)
+app.include_router(admin.router)
 app.include_router(campaigns.router)
 app.include_router(characters.router)
 app.include_router(enemies.router)

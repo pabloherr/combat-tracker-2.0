@@ -2,7 +2,7 @@
 DB): así los propios helpers ejercitan la API y los tests quedan legibles."""
 
 
-def register(client, user, role="dm", password="xxxx", email=None):
+def register(client, user, role="dm", password="secreta", email=None):
     """Registra (y deja logueado por la cookie) a un usuario con un rol."""
     r = client.post("/api/auth/register", json={
         "username": user, "email": email or f"{user}@x.com",

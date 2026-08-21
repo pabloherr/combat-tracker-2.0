@@ -405,3 +405,88 @@ def init_db():
             "  WHERE p.id = inventory.pet_id"
             ") WHERE campaign_id IS NULL AND pet_id IS NOT NULL"
         )
+
+        # ── Recuperación de contraseña y confirmaciones por correo ─────────
+        # Un token por pedido: `token` viaja en el enlace del mail y `code` es
+        # el código corto por si el enlace no sirve (LAN sin DNS, mail en el
+        # celular). `payload` guarda lo que se aplica al confirmar: en un
+        # cambio de contraseña, el hash nuevo ya calculado.
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS auth_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL,                 -- reset | change
+            token TEXT UNIQUE NOT NULL,
+            code TEXT NOT NULL,
+            payload TEXT DEFAULT '{}',
+            ip TEXT DEFAULT '',
+            attempts INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            expires_at TEXT NOT NULL,
+            used_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_authtok_user ON auth_tokens(user_id, kind);
+
+        -- Correo saliente: qué se mandó, a quién y si salió bien. Lo lee el
+        -- panel de administración para saber si el SMTP está andando.
+        CREATE TABLE IF NOT EXISTS mail_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts TEXT DEFAULT (datetime('now')),
+            to_addr TEXT NOT NULL,
+            subject TEXT DEFAULT '',
+            kind TEXT DEFAULT '',
+            ok INTEGER NOT NULL DEFAULT 0,
+            error TEXT DEFAULT '',
+            mode TEXT DEFAULT ''                -- smtp | outbox
+        );
+
+        -- ── Telemetría ────────────────────────────────────
+        -- Eventos con nombre (login, registro, reset…) y un resumen por
+        -- petición HTTP. Los dos se purgan solos por antigüedad.
+        CREATE TABLE IF NOT EXISTS telemetry_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts TEXT DEFAULT (datetime('now')),
+            kind TEXT NOT NULL,
+            user_id INTEGER,
+            username TEXT DEFAULT '',
+            detail TEXT DEFAULT '',
+            ip TEXT DEFAULT '',
+            ok INTEGER NOT NULL DEFAULT 1
+        );
+        CREATE INDEX IF NOT EXISTS idx_tevents_ts ON telemetry_events(ts);
+        CREATE INDEX IF NOT EXISTS idx_tevents_kind ON telemetry_events(kind, ts);
+
+        CREATE TABLE IF NOT EXISTS telemetry_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts TEXT NOT NULL,
+            method TEXT NOT NULL,
+            path TEXT NOT NULL,                 -- con los ids reemplazados por {id}
+            status INTEGER NOT NULL,
+            ms REAL NOT NULL DEFAULT 0,
+            user_id INTEGER
+        );
+        CREATE INDEX IF NOT EXISTS idx_treq_ts ON telemetry_requests(ts);
+        CREATE INDEX IF NOT EXISTS idx_treq_path ON telemetry_requests(path);
+        """)
+
+        # Migración: datos de cuenta que usa el panel (último acceso, cuántas
+        # veces entró, si está bloqueada y si es admin más allá del email).
+        ucols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
+        for col, ddl in (
+            ("last_login", "TEXT"),
+            ("login_count", "INTEGER DEFAULT 0"),
+            ("blocked", "INTEGER DEFAULT 0"),
+            ("is_admin", "INTEGER DEFAULT 0"),
+        ):
+            if col not in ucols:
+                conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
+
+        # Migración: desde dónde y cuándo se usó cada sesión (sesiones activas).
+        scols = {r["name"] for r in conn.execute("PRAGMA table_info(sessions)")}
+        for col, ddl in (
+            ("last_seen", "TEXT"),
+            ("ip", "TEXT DEFAULT ''"),
+            ("user_agent", "TEXT DEFAULT ''"),
+        ):
+            if col not in scols:
+                conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {ddl}")
