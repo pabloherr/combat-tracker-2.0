@@ -141,6 +141,24 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .ed-del{background:transparent;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:2px 6px;}
 .ed-del:hover{color:var(--red);}
 .ed-hint{font-size:12px;color:var(--text3);margin-bottom:8px;font-style:italic;}
+/* editor de la ficha del personaje: atributos por columna y habilidades con
+   los puntitos de rango, que se tocan */
+.ed-at{display:flex;align-items:center;gap:6px;margin:3px 4px;}
+.ed-at .fl{width:74px;margin:0;flex:none;}
+.ed-at .fi{padding:4px 6px;text-align:center;}
+.ed-at.def .fl{color:var(--gold);}
+.ed-sk3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.ed-sk{display:flex;align-items:center;gap:6px;padding:3px 2px;border-bottom:.5px solid var(--border);}
+.ed-sk:last-child{border-bottom:none;}
+.ed-sk .sh-sk-n{font-size:10px;}
+.ed-sk .sh-sk-b{min-width:34px;}
+.sh-pips.ed .sh-pip{width:13px;height:13px;cursor:pointer;}
+.sh-pips.ed .sh-pip:hover{border-color:var(--gold);}
+.ed-deriv{font-size:12px;color:var(--text2);background:var(--bg3);border-radius:var(--r);padding:6px 10px;margin-top:6px;}
+.ed-deriv b{font-family:var(--font-h);color:var(--gold2);font-weight:500;}
+.ed-lines{width:100%;min-height:64px;resize:vertical;font-family:inherit;font-size:13px;}
+/* en el teléfono las tres columnas de atributos no entran con etiqueta y casilla */
+@media(max-width:620px){ .ed-sk3{grid-template-columns:1fr;} .ed-attrs.pj{grid-template-columns:1fr !important;} }
 /* En el teléfono las filas del editor se apilan: si no, los pares actual/máx
    se salen del modal. El !important pisa el grid-template que va inline. */
 @media(max-width:620px){
@@ -1859,16 +1877,48 @@ var CAT3=[{k:'physical',n:'Físico',a:[['STR','Fuerza'],['SPD','Velocidad']]},
           {k:'cognitive',n:'Cognitivo',a:[['INT','Intelecto'],['WIL','Voluntad']]},
           {k:'spiritual',n:'Espiritual',a:[['AWA','Conciencia'],['PRE','Presencia']]}];
 
+// ── Tablas del manual: lo que sale de cada atributo ──
+// Las seis tienen los mismos escalones (0, 1-2, 3-4, 5-6, 7-8, 9+).
+function escalon(v){ v=Math.max(0,parseInt(v)||0); return v===0?0:v<=2?1:v<=4?2:v<=6?3:v<=8?4:5; }
+var TABLA={
+  mov:   [20,25,30,40,60,80],                       // Velocidad → pies por acción
+  rec:   ['1d4','1d6','1d8','1d10','1d12','1d20'],  // Voluntad → dado de recuperación
+  sent:  [5,10,20,50,100,null],                     // Conciencia → alcance de los sentidos
+  alza:  [100,200,500,1000,5000,10000],             // Fuerza → levanta (lb)
+  carga: [50,100,250,500,2500,5000],                // Fuerza → carga (lb)
+  cont:  ['1 año','50 días','5 días','1 día','1 hora',null]   // Presencia → contactos
+};
+function movDeSPD(v){ return TABLA.mov[escalon(v)]; }
+function recDeWIL(v){ return TABLA.rec[escalon(v)]; }
+function sentDeAWA(v){ var x=TABLA.sent[escalon(v)]; return x==null?'Sin límite':x+' ft.'; }
+function contDePRE(v){ var x=TABLA.cont[escalon(v)]; return x==null?'Tu reputación te precede':x; }
+function fmtLb(n){ return n>=1000?(n/1000)+'.000':String(n); }
+// Movimiento / recuperación / sentidos en texto, para guardarlos en la ficha
+// (el DM los lee de ahí) y para el editor.
+function derivados(a){
+  a=a||{};
+  if(a.SPD==null&&a.WIL==null&&a.AWA==null) return null;
+  return {movement:movDeSPD(a.SPD)+' ft.', recovery:recDeWIL(a.WIL), senses:sentDeAWA(a.AWA)};
+}
+
 // `eff` son los efectos de las condiciones activas: el atributo modificado se
 // suma al modificador, y la penalización de Exhausted se resta de todos.
+// Rango de una habilidad: el que se editó a mano, o el que se deduce del PDF
+// (modificador total menos el atributo).
+function rangoDe(x,base){
+  if(x&&x.rank!=null) return Math.max(0,Math.min(5,parseInt(x.rank)||0));
+  if(x&&x.value!=null&&base!=null) return Math.max(0,Math.min(5,x.value-base));
+  return 0;
+}
 function shSkRows(cat,s,eff){
-  var a=s.attributes||{}, puestas=(s.skills&&s.skills[cat])||[], val={};
-  puestas.forEach(function(x){ val[x.name]=x.value; });
+  var a=s.attributes||{}, puestas=(s.skills&&s.skills[cat])||[], por={};
+  puestas.forEach(function(x){ por[x.name]=x; });
   var nombres=SK_ORDEN[cat].slice();
   puestas.forEach(function(x){ if(nombres.indexOf(x.name)<0) nombres.push(x.name); });
   return nombres.map(function(n){
-    var at=SK_ATTR[n]||'', base=(at&&a[at]!=null)?a[at]:null;
-    var mod=(val[n]==null?base:val[n]);
+    var at=SK_ATTR[n]||'', base=(at&&a[at]!=null)?a[at]:null, x=por[n];
+    // con rango guardado el modificador se recalcula: si cambia el atributo, cambia
+    var mod=(x&&x.rank!=null&&base!=null)?base+rangoDe(x,base):((x&&x.value!=null)?x.value:base);
     if(mod==null) return '';
     var delta=(at?(eff.attr[at]||0):0)+eff.tests;
     var total=mod+delta;
@@ -1879,7 +1929,7 @@ function shSkRows(cat,s,eff){
       ? '<span class="sh-desv" title="Desventaja por una condición">▼</span>' : '';
     var pips='';
     if(base!=null){
-      var r=Math.max(0,Math.min(5,mod-base));
+      var r=rangoDe(x,base);
       for(var i=0;i<5;i++) pips+='<span class="sh-pip'+(i<r?' on':'')+'"></span>';
     }
     return '<div class="sh-sk"><span class="sh-sk-b'+cls+'"'+tip+'>'+(total>=0?'+':'')+total+'</span>'
@@ -1934,32 +1984,50 @@ function shAtBox(lbl,v,cls,delta){
   return '<div class="sh-atbox'+(cls?' '+cls:'')+'"><span class="l">'+lbl+'</span>'
     +'<span class="v'+col+'"'+tip+'>'+txt+'</span></div>';
 }
-// Movimiento con las condiciones aplicadas: Slowed y Prone lo parten al medio,
-// Immobilized/Restrained/Unconscious lo dejan en 0.
+// Un dato del pie: verde si una condición lo sube, rojo si lo baja.
+function shPie(lbl,val,cls,tip){
+  return '<div><span class="l">'+lbl+'</span>'
+    +'<span class="v'+(cls||'')+'"'+(tip?' title="'+escA(tip)+'"':'')+'>'+esc(val)+'</span></div>';
+}
+// Movimiento: sale de la tabla de Velocidad con la Velocidad que haya (Enhanced
+// y Diminished la mueven de escalón). Slowed y Prone lo parten al medio,
+// Immobilized/Restrained/Unconscious lo dejan en 0. Sin atributos cargados se
+// muestra lo que diga la ficha, tal cual.
 function shMov(s,eff){
-  var txt=String(s.movement||''), m=txt.match(/-?\d+/);
-  var val=txt||'—', cls='', tips=[];
-  if(m&&eff.mov!==null){
-    var base=parseInt(m[0]);
-    var v=(eff.mov===0)?0:Math.ceil(base/2);
-    if(v!==base){
-      val=txt.replace(/-?\d+/,String(v));
-      cls=' mod-down';                       // frenado: manda el rojo
-      tips.push('Sin condiciones: '+txt);
-    }
+  var a=s.attributes||{};
+  if(a.SPD==null){
+    var txt=String(s.movement||''), m=txt.match(/-?\d+/);
+    if(!m||eff.mov===null) return shPie('Movimiento',txt||'—');
+    var v0=(eff.mov===0)?0:Math.ceil(parseInt(m[0])/2);
+    return shPie('Movimiento',txt.replace(/-?\d+/,String(v0)),' mod-down','Sin condiciones: '+txt);
   }
-  // La Velocidad cambia el movimiento por tabla, no proporcionalmente: se avisa
-  // en vez de inventar un número.
-  var spd=eff.attr.SPD||0;
-  if(spd){
-    if(!cls) cls=spd>0?' mod-up':' mod-down';
-    tips.push('Velocidad '+(spd>0?'+':'')+spd+': ajustá el movimiento por la tabla de Velocidad');
+  var spd=eff.attr.SPD||0, base=movDeSPD(a.SPD), val=movDeSPD(a.SPD+spd), tips=[];
+  if(spd) tips.push('Velocidad '+(a.SPD+spd)+' ('+(spd>0?'+':'')+spd+' por una condición)');
+  if(eff.mov!==null){
+    val=(eff.mov===0)?0:Math.ceil(val/2);
+    tips.push(eff.mov===0?'Una condición te deja sin movimiento':'Una condición lo parte al medio');
   }
-  var tip=tips.join(' · ');
-  return '<div><span class="l">Movimiento</span>'
-    +'<span class="v'+cls+'"'+(tip?' title="'+escA(tip)+'"':'')+'>'+esc(val)
-    +(spd?' <span style="font-size:11px;color:'+(spd>0?'var(--green)':'var(--red)')+'">('
-      +(spd>0?'+':'')+spd+' VEL)</span>':'')+'</span></div>';
+  var cls=val<base?' mod-down':(val>base?' mod-up':'');
+  if(cls) tips.unshift('Sin condiciones: '+base+' ft.');
+  return shPie('Movimiento',val+' ft.',cls,tips.join(' · '));
+}
+// El resto del pie: recuperación (Voluntad), sentidos (Conciencia), lo que
+// levanta y carga (Fuerza) y cuánto tarda en hacer contactos (Presencia).
+function shPieResto(s,eff){
+  var a=s.attributes||{};
+  if(a.WIL==null&&a.AWA==null&&a.STR==null&&a.PRE==null)
+    return shPie('Recuperación',s.recovery||'—')+shPie('Sentidos',s.senses||'—');
+  function con(k,fn){
+    var d=eff.attr[k]||0, base=fn(a[k]), v=fn((a[k]||0)+d);
+    var cls=(v!==base)?(d>0?' mod-up':' mod-down'):'';
+    return {v:v,cls:cls,tip:cls?('Sin condiciones: '+base):''};
+  }
+  var r=con('WIL',recDeWIL), se=con('AWA',sentDeAWA);
+  var al=con('STR',function(v){return fmtLb(TABLA.alza[escalon(v)])+' / '+fmtLb(TABLA.carga[escalon(v)])+' lb';});
+  var co=con('PRE',contDePRE);
+  return shPie('Recuperación',r.v,r.cls,r.tip)+shPie('Sentidos',se.v,se.cls,se.tip)
+    +shPie('Levanta / carga',al.v,al.cls,(al.tip?al.tip+' · ':'')+'Por Fuerza: peso máximo que levantás y el que cargás sin penalización')
+    +shPie('Contactos',co.v,co.cls,(co.tip?co.tip+' · ':'')+'Por Presencia: cuánto tardás en conseguir un contacto en un lugar nuevo');
 }
 function cosmere3HTML(c){
   var s=c.sheet||{}, a=s.attributes||{}, d=s.defenses||{};
@@ -1977,10 +2045,7 @@ function cosmere3HTML(c){
       +'<div class="sh-res3">'+res+'</div>'
       +'<div class="sh-sk3">'+shSkRows(cat.k,s,eff)+'</div></div>';
   }).join('');
-  var pie=shMov(s,eff)
-    +[['Recuperación',s.recovery],['Sentidos',s.senses]]
-    .map(function(x){ return '<div><span class="l">'+x[0]+'</span>'
-      +'<span class="v">'+(x[1]?esc(x[1]):'—')+'</span></div>'; }).join('');
+  var pie=shMov(s,eff)+shPieResto(s,eff);
   // el PDF trae las especialidades en una sola línea separadas por comas
   var exp=String(s.expertise||'').split(/\s*[,;\n]\s*/).filter(Boolean);
   return '<div class="sh3">'+cols+'</div>'
@@ -1990,7 +2055,7 @@ function cosmere3HTML(c){
         +'<div class="chips">'+exp.map(function(x){return '<span class="chip">'+esc(x)+'</span>';}).join('')+'</div>'
       : '')
     +(a.STR==null?'<div class="sh-meta" style="margin-top:10px">Sin ficha cargada: subí tu PDF con '
-       +'“⭳ Actualizar PDF” para que se completen atributos y habilidades.</div>':'');
+       +'“⭳ Actualizar PDF”, o cargá atributos y habilidades a mano con “✎ Editar”.</div>':'');
 }
 // Cabecera: retrato, nombre, ascendencia y sendas, nivel/tier y condiciones.
 function shHeroHTML(c){
@@ -2144,7 +2209,160 @@ function renderRoster(){
 // ─── Gestión del personaje (editar / mascotas / PDF / imagen) ───
 function meChar(){ var m=ROSTER&&ROSTER.members.find(function(x){return x.user_id===MY_UID;}); return m?m.character:null; }
 function _num(id,v){return '<input class="oc-fi" type="number" style="width:80px" id="'+id+'" value="'+(v==null?'':v)+'"/>';}
+// ── Editor de la ficha (Cosmere): identidad, recursos, atributos y defensas,
+// rangos de habilidad (los puntitos se tocan), talentos, especialidades, armas,
+// equipo y contactos. Movimiento, recuperación y sentidos no se escriben: salen
+// de las tablas del manual según Velocidad, Voluntad y Conciencia.
+var CH_ED=null;   // {ranks:{cat:{nombre:rango}}} mientras el editor está abierto
+var ED_ATTRS=[['STR','Fuerza'],['SPD','Velocidad'],['INT','Intelecto'],['WIL','Voluntad'],['AWA','Conciencia'],['PRE','Presencia']];
+function edAtRow(id,lbl,v,def){
+  return '<div class="ed-at'+(def?' def':'')+'"><span class="fl">'+lbl+'</span>'
+    +'<input class="fi" type="number" id="'+id+'" value="'+(v==null?'':v)+'" oninput="edPreview()"/></div>';
+}
+function edAttrsHTML(s){
+  var a=s.attributes||{}, d=s.defenses||{};
+  return '<div class="ed-attrs pj">'+CAT3.map(function(cat){
+    return '<div class="sh-col"><div class="sh-col-h">'+cat.n+'</div>'
+      +edAtRow('edA'+cat.a[0][0],cat.a[0][1],a[cat.a[0][0]])
+      +edAtRow('edA'+cat.a[1][0],cat.a[1][1],a[cat.a[1][0]])
+      +edAtRow('edD'+cat.k,'Defensa',d[cat.k],true)+'</div>';
+  }).join('')+'</div>';
+}
+function edAttrVal(k){ return edNum('edA'+k); }
+function edSkillsHTML(){
+  return '<div class="ed-sk3">'+CAT3.map(function(cat){
+    return '<div class="sh-col"><div class="sh-col-h">'+cat.n+'</div>'
+      +SK_ORDEN[cat.k].map(function(n,i){
+        var at=SK_ATTR[n]||'', pips='';
+        for(var j=0;j<5;j++) pips+='<span class="sh-pip" onclick="edRank(\''+cat.k+'\','+i+','+j+')"></span>';
+        return '<div class="ed-sk"><span class="sh-sk-b" id="edmod-'+cat.k+'-'+i+'">—</span>'
+          +'<span class="sh-sk-n">'+esc(n)+'</span><span class="sh-sk-a">'+at+'</span>'
+          +'<span class="sh-pips ed" id="edpips-'+cat.k+'-'+i+'" title="Tocá un puntito para poner el rango">'+pips+'</span></div>';
+      }).join('')+'</div>';
+  }).join('')+'</div>';
+}
+// Tocar el último puntito prendido lo apaga; cualquier otro deja el rango ahí.
+function edRank(cat,i,j){
+  if(!CH_ED)return;
+  var n=SK_ORDEN[cat][i], r=CH_ED.ranks[cat][n]||0;
+  CH_ED.ranks[cat][n]=(r===j+1)?j:j+1;
+  edPreview();
+}
+// Repinta modificadores, puntitos y los derivados con lo que hay escrito.
+function edPreview(){
+  if(!CH_ED)return;
+  CAT3.forEach(function(cat){
+    SK_ORDEN[cat.k].forEach(function(n,i){
+      var at=SK_ATTR[n], base=edAttrVal(at), r=CH_ED.ranks[cat.k][n]||0;
+      var pips=document.getElementById('edpips-'+cat.k+'-'+i).children;
+      for(var j=0;j<5;j++) pips[j].classList.toggle('on',j<r);
+      var mod=(base==null?r:base+r);
+      document.getElementById('edmod-'+cat.k+'-'+i).textContent=(mod>=0?'+':'')+mod;
+    });
+  });
+  var spd=edAttrVal('SPD'), wil=edAttrVal('WIL'), awa=edAttrVal('AWA'), str=edAttrVal('STR'), pre=edAttrVal('PRE');
+  document.getElementById('edDeriv').innerHTML=
+     'Movimiento <b>'+(spd==null?'—':movDeSPD(spd)+' ft.')+'</b> · '
+    +'Recuperación <b>'+(wil==null?'—':recDeWIL(wil))+'</b> · '
+    +'Sentidos <b>'+(awa==null?'—':sentDeAWA(awa))+'</b> · '
+    +'Levanta / carga <b>'+(str==null?'—':fmtLb(TABLA.alza[escalon(str)])+' / '+fmtLb(TABLA.carga[escalon(str)])+' lb')+'</b> · '
+    +'Contactos <b>'+(pre==null?'—':contDePRE(pre))+'</b>';
+}
+function edLineas(id,lista){
+  return '<textarea class="fi ed-lines" id="'+id+'" placeholder="Una por línea">'+esc((lista||[]).join('\n'))+'</textarea>';
+}
+function leerLineas(id){
+  return edVal(id).split(/\n/).map(function(x){return x.trim();}).filter(Boolean);
+}
 function openEditChar(){
+  var c=meChar(); if(!c)return; var s=c.sheet||{};
+  if(SYSTEM==='dnd'){ openEditCharDnd(); return; }
+  var a=s.attributes||{};
+  CH_ED={ranks:{}};
+  CAT3.forEach(function(cat){
+    var por={}; ((s.skills||{})[cat.k]||[]).forEach(function(x){ por[x.name]=x; });
+    CH_ED.ranks[cat.k]={};
+    SK_ORDEN[cat.k].forEach(function(n){
+      var at=SK_ATTR[n], base=(a[at]==null?null:a[at]);
+      CH_ED.ranks[cat.k][n]=rangoDe(por[n],base);
+    });
+  });
+  var modal=document.getElementById('modal');
+  modal.classList.add('wide');
+  modal.innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">✎ Editar '+esc(c.name)+'</div>'
+    +'<div class="sh-meta" style="margin-bottom:10px">Editá lo que quieras a mano. “Actualizar PDF” vuelve a leer la ficha entera y pisa esto.</div>'
+    +'<div class="ed-row" style="grid-template-columns:2fr 1fr 1fr">'
+      +edFld('Nombre',edInp('edName',c.name))
+      +edFld('Ascendencia',edInp('edAncestry',s.ancestry,'Humana'))
+      +edFld('Nivel',edInp('edLevel',s.level,'1'))+'</div>'
+    +'<div class="ed-row">'+edFld('Sendas',edInp('edPaths',s.paths,'Agente, Guerrero…'))+'</div>'
+    +'<div class="ed-sec">Recursos</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr">'+edRes(c,false)+'</div>'
+    +'<div class="ed-sec">Atributos y defensas</div>'
+    +edAttrsHTML(s)
+    +'<div class="ed-row" style="grid-template-columns:1fr 2fr;margin-top:8px">'
+      +edFld('Deflect',edInp('edDeflect',s.deflect,'2'))
+      +'<div><div class="fl">Sale de las tablas del manual</div><div class="ed-deriv" id="edDeriv"></div></div></div>'
+    +'<div class="ed-sec">Habilidades <span style="text-transform:none;letter-spacing:0;color:var(--text3);font-family:inherit;font-size:11px">(el modificador es atributo + rango)</span></div>'
+    +edSkillsHTML()
+    +'<div class="ed-sec">Talentos</div><div id="edTalents"></div>'
+    +'<button class="btn-sheet ed-add" onclick="addEntryRow(\'edTalents\')">+ Agregar talento</button>'
+    +'<div class="ed-sec">Especialidades</div>'
+    +'<div class="ed-row">'+edFld('',edInp('edExpertise',s.expertise,'Cultura, Idiomas, Herrería… (separadas por coma)'))+'</div>'
+    +'<div class="ed-sec">Armas, equipo y contactos</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr">'
+      +edFld('Armas',edLineas('edWeapons',s.weapons))
+      +edFld('Equipo',edLineas('edEquipment',s.equipment))
+      +edFld('Contactos',edLineas('edConnections',s.connections))+'</div>'
+    +'<div class="form-actions" style="margin-top:16px">'
+      +'<button class="btn-sheet" onclick="closeModal()">Cancelar</button>'
+      +'<button class="btn-sheet" style="background:var(--gold);color:var(--onacc);border-color:var(--gold)" onclick="saveEditChar()">Guardar</button></div>';
+  renderEntryRows('edTalents',s.talents||[]);
+  edPreview();
+  document.getElementById('overlay').classList.add('on');
+}
+async function saveEditChar(){
+  var c=meChar(); if(!c||!CH_ED)return; var s=Object.assign({},c.sheet||{});
+  var name=edVal('edName');
+  if(!name){ alert('Poné un nombre.'); return; }
+  var vidaM=edNum('edVidaM')||0;
+  if(vidaM<1){ alert('La vida máxima tiene que ser al menos 1.'); return; }
+  s.ancestry=edVal('edAncestry'); s.paths=edVal('edPaths'); s.level=edVal('edLevel');
+  s.deflect=edVal('edDeflect');
+  var a={};
+  ED_ATTRS.forEach(function(x){ var v=edAttrVal(x[0]); if(v!=null) a[x[0]]=v; });
+  if(Object.keys(a).length) s.attributes=a; else delete s.attributes;
+  var d={}; CAT3.forEach(function(cat){ var v=edNum('edD'+cat.k); if(v!=null) d[cat.k]=v; });
+  if(Object.keys(d).length) s.defenses=d; else delete s.defenses;
+  // Habilidades: las 18 con su rango (y el total, que es lo que lee el resto);
+  // las que el PDF trajo con otro nombre se conservan tal cual.
+  var sk={};
+  CAT3.forEach(function(cat){
+    var viejas=((s.skills||{})[cat.k]||[]).filter(function(x){return SK_ORDEN[cat.k].indexOf(x.name)<0;});
+    sk[cat.k]=SK_ORDEN[cat.k].map(function(n){
+      var r=CH_ED.ranks[cat.k][n]||0, base=a[SK_ATTR[n]];
+      return {name:n,rank:r,value:(base==null?r:base+r)};
+    }).concat(viejas);
+  });
+  s.skills=sk;
+  var der=derivados(a);
+  if(der){ s.movement=der.movement; s.recovery=der.recovery; s.senses=der.senses; }
+  s.talents=readEntries('edTalents');
+  s.expertise=edVal('edExpertise');
+  s.weapons=leerLineas('edWeapons'); s.equipment=leerLineas('edEquipment'); s.connections=leerLineas('edConnections');
+  try{
+    await api('/api/characters/'+MYCHAR,'PUT',{
+      name:name, vida_max:vidaM,
+      focus_max:edNum('edFocusM')||0, inv_max:edNum('edInvM')||0,
+      vida:edNum('edVida'), focus:edNum('edFocus'), inv:edNum('edInv'), sheet:s
+    });
+  }catch(e){ alert('No se pudo guardar la ficha.'); return; }
+  CH_ED=null;
+  closeModal(); loadRoster();
+}
+// D&D: la hoja rellenable tiene otra forma, así que el editor sigue siendo el corto.
+function openEditCharDnd(){
   var c=meChar(); if(!c)return; var s=c.sheet||{};
   document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
     +'<div class="sh-name">✎ Editar '+esc(c.name)+'</div>'
@@ -2158,11 +2376,11 @@ function openEditChar(){
     +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Investidura (actual / máx)</span><span style="display:flex;gap:6px">'+_num('ec-inv',c.inv)+'<span style="color:var(--text3)">/</span>'+_num('ec-invm',c.inv_max)+'</span></label>')
     +'</div>'
     +'<div class="me-sheet-row" style="justify-content:flex-end;border:none;margin-top:16px"><button class="btn-sheet" onclick="closeModal()">Cancelar</button>'
-    +'<button class="btn-sheet" style="background:var(--gold);color:var(--onacc);border-color:var(--gold)" onclick="saveEditChar()">Guardar</button></div>';
+    +'<button class="btn-sheet" style="background:var(--gold);color:var(--onacc);border-color:var(--gold)" onclick="saveEditCharDnd()">Guardar</button></div>';
   document.getElementById('overlay').classList.add('on');
 }
 function _iv(id){var v=parseInt(document.getElementById(id).value);return isNaN(v)?null:v;}
-async function saveEditChar(){
+async function saveEditCharDnd(){
   var c=meChar(); if(!c)return; var s=Object.assign({},c.sheet||{});
   s.paths=document.getElementById('ec-class').value.trim();
   s.level=document.getElementById('ec-level').value.trim();
