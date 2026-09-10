@@ -78,6 +78,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .turn-opt.on-slow{background:rgba(74,138,200,.22);color:var(--blue2);}
 .mstat{margin-bottom:12px;}
 .mstat-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+/* mejora radiante: Enhanced [Strength +1] y [Speed +1] con luz tormentosa */
+.rad-btn{font-family:var(--font-h);font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;
+  border-radius:var(--pill);border:1px solid var(--purple);color:var(--purple);background:transparent;cursor:pointer;
+  margin-left:8px;vertical-align:middle;}
+.rad-btn.on{background:var(--purple);color:var(--onacc);}
+.rad-btn:hover{filter:brightness(1.2);}
 .mstat-l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);}
 .mstat-v{font-family:var(--font-h);font-size:16px;}
 .mbar{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-bottom:7px;}
@@ -863,12 +869,45 @@ function injuryChips(inj){
 }
 // En combate cada stat va con su barra y una casilla de cuánto sumar o restar:
 // de un vistazo se ve cómo viene la cosa, y un mandoble de 7 se anota una vez.
+// ── Mejora radiante ──
+// Un Radiante con luz tormentosa está Enhanced [Strength +1] y [Speed +1]: un
+// botón al lado de la Investidura las pone y las saca juntas. Solo aparece en
+// quien tiene Investidura máxima.
+var RAD_CONDS=['Enhanced [Strength +1]','Enhanced [Speed +1]'];
+function radianteActivo(o){
+  var st=(o&&o.statuses)||[];
+  return RAD_CONDS.every(function(c){ return st.indexOf(c)>=0; });
+}
+function radianteBtn(target,o){
+  var on=radianteActivo(o);
+  return '<button class="rad-btn'+(on?' on':'')+'" onclick="toggleRadiante(\''+target+'\')" title="'
+    +(on?'Sacar la mejora radiante (Enhanced [Strength +1] y [Speed +1])'
+        :'Mejora radiante: con luz tormentosa estás Enhanced [Strength +1] y [Speed +1]')+'">✦ '
+    +(on?'Radiante activo':'Enhance radiante')+'</button>';
+}
+async function toggleRadiante(target){
+  var o=(target.indexOf('k:')===0)
+    ? (COMBAT&&COMBAT.participants||[]).filter(function(p){return p.uid===target.slice(2);})[0]
+    : meChar();
+  if(!o) return;
+  var on=radianteActivo(o);
+  for(var i=0;i<RAD_CONDS.length;i++){
+    if(on){
+      if(target.indexOf('k:')===0) await api(API+'/combat/status/remove_one','POST',{uid:target.slice(2),status:RAD_CONDS[i]});
+      else await api(ocUrl(target)+'/status/remove_one','POST',{status:RAD_CONDS[i]});
+    }else if((o.statuses||[]).indexOf(RAD_CONDS[i])<0){
+      await condAdd(target,RAD_CONDS[i],true);
+    }
+  }
+  loadRoster();
+}
 function statCtl(p,stat,label,color){
   var v=p[stat],mx=p[stat+'_max'];
   var pct=mx>0?Math.round(v/mx*100):0;
   var arg='\'k:'+p.uid+'\',\''+stat+'\',\''+p.uid+'\'';
+  var extra=(stat==='inv'&&p.kind==='player')?radianteBtn('k:'+p.uid,p):'';
   return '<div class="mstat">'
-    +'<div class="mstat-head"><span class="mstat-l">'+label+'</span>'
+    +'<div class="mstat-head"><span class="mstat-l">'+label+extra+'</span>'
     +'<span class="mstat-v" style="color:'+color+'">'+v+' <span style="font-size:12px;color:var(--text3)">/ '+mx+'</span></span></div>'
     +'<div class="mbar"><div class="mbar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
     +'<div class="madj">'
@@ -2017,6 +2056,7 @@ function shPuntoRow(c,stat,label,color){
   if(!mx) return '<div class="sh-res3-row"><span class="sh-res3-l">'+label+'</span>'
     +'<span style="color:var(--text3)">—</span></div>';
   return '<div class="sh-res3-row"><span class="sh-res3-l">'+label+'</span>'
+    +(stat==='inv'?radianteBtn('c',c):'')
     +'<span class="res-cur" style="font-size:20px;color:'+color+'" '
       +'onclick="editRes(this,\'c\',\''+stat+'\','+v+')" title="Tocá para escribir el valor exacto">'+v+'</span>'
     +'<span class="res-max">/ '+mx+'</span>'
