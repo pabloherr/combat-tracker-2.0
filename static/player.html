@@ -13,6 +13,9 @@
 body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:16px;line-height:1.55;
   background-image:var(--glow);}
 .app{max-width:680px;margin:0 auto;padding:1rem .9rem 4rem;}
+/* En pantalla grande la página se ensancha: la ficha de personaje necesita las
+   tres columnas a la vista. En el teléfono no cambia nada. */
+@media(min-width:900px){ .app{max-width:1080px;} }
 .header{text-align:center;padding-bottom:.9rem;margin-bottom:1rem;border-bottom:.5px solid var(--border2);}
 .title{font-family:var(--font-h);font-size:18px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;}
 .round-block{display:inline-flex;align-items:center;gap:8px;margin-top:10px;background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--pill);padding:5px 16px;}
@@ -78,7 +81,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .mstat-v{font-family:var(--font-h);font-size:16px;}
 .mbar{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-bottom:7px;}
 .mbar-fill{height:100%;border-radius:3px;transition:width .3s;}
-.madj{display:flex;gap:8px;align-items:stretch;}
+/* en el teléfono ocupa todo el ancho; en pantalla grande no hace falta que la
+   casilla de cantidad mida media pantalla */
+.madj{display:flex;gap:8px;align-items:stretch;max-width:300px;}
 .madj input{flex:1;background:var(--bg3);border:.5px solid var(--border);border-radius:var(--r);padding:8px;color:var(--text);font-size:16px;text-align:center;outline:none;min-width:0;}
 .madj-btn{width:52px;border:.5px solid var(--border);border-radius:var(--r);font-family:var(--font-h);font-size:20px;cursor:pointer;background:var(--bg3);}
 .madj-btn.minus{color:var(--red);border-color:var(--red);}
@@ -205,6 +210,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .tabbar{display:flex;gap:4px;margin-bottom:1.1rem;border-bottom:1px solid var(--border);}
 .tab{flex:1;font-family:var(--font-h);font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:11px 6px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text3);cursor:pointer;}
 .tab.on{color:var(--gold2);border-bottom-color:var(--gold);}
+/* con cuatro solapas, en un teléfono angosto conviene apretarlas un poco */
+@media(max-width:430px){ .tab{font-size:10px;padding:9px 3px;letter-spacing:.03em;} }
 .tab-badge{color:var(--red);margin-left:5px;font-size:9px;vertical-align:middle;}
 /* cabecera del personaje */
 .pj-hero{display:flex;gap:14px;align-items:center;margin-bottom:12px;}
@@ -215,7 +222,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .pj-hero-sub{font-size:13px;color:var(--text2);margin-top:3px;}
 .pj-hero-lvl{display:inline-block;font-size:10px;letter-spacing:.05em;padding:1px 8px;border-radius:var(--pill);border:1px solid var(--border2);color:var(--gold);font-family:var(--font-h);margin-top:6px;}
 .pj-actions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;}
-.pj-sheet-wrap{margin-top:16px;padding-top:14px;border-top:1px solid var(--border);}
 .import-ta{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:'Courier New',monospace;font-size:12px;line-height:1.5;outline:none;resize:vertical;min-height:150px;white-space:pre;}
 .import-ta:focus{border-color:var(--gold);}
 .inv-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;margin-bottom:8px;}
@@ -283,6 +289,103 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .dnd-ctr-btn{width:36px;height:32px;border:.5px solid var(--border);border-radius:var(--r);font-family:var(--font-h);font-size:17px;cursor:pointer;background:var(--bg3);}
 .dnd-ctr-btn:active{background:var(--bg4);}
 .dnd-rec-tag{font-size:9px;font-family:var(--font-h);letter-spacing:.05em;text-transform:uppercase;padding:1px 7px;border-radius:var(--pill);border:.5px solid var(--border2);color:var(--text3);white-space:nowrap;}
+/* ── Plegables: secciones y recuadros que cada uno abre y cierra ── */
+.fold-h{display:flex;align-items:center;gap:8px;width:100%;cursor:pointer;background:transparent;border:none;
+  border-bottom:.5px solid var(--border);padding:0 0 5px;margin:1rem 0 8px;text-align:left;}
+.fold-t{font-family:var(--font-h);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);flex:1;}
+.fold-h:hover .fold-t{color:var(--gold2);}
+.fold-a{font-size:11px;color:var(--text3);width:11px;flex:none;line-height:1;}
+.fold-n{font-family:var(--font-h);font-size:10px;color:var(--text3);}
+/* recuadro de un compañero: la cabecera se toca para plegarlo */
+.ally-head{display:flex;align-items:center;gap:7px;cursor:pointer;}
+.ally-mini{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;margin-top:5px;cursor:pointer;}
+.ally-mini .cstat-l{font-size:9px;}
+/* ── Recursos de mi personaje: el número actual al lado del máximo ── */
+.res-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;}
+.res-cell{flex:1 1 170px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--rl);padding:8px 10px;}
+.res-l{font-family:var(--font-h);font-size:9px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px;}
+.res-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.res-cur{font-family:var(--font-h);font-size:24px;line-height:1;cursor:pointer;padding:0 3px;
+  border-bottom:1px dashed var(--border2);}
+.res-cur:hover{background:var(--accsoft);}
+.res-max{font-family:var(--font-h);font-size:14px;color:var(--text3);}
+.res-inp{width:64px;background:var(--bg2);border:1px solid var(--gold);border-radius:5px;color:inherit;
+  font-family:var(--font-h);font-size:22px;text-align:center;outline:none;padding:0;-moz-appearance:textfield;}
+.res-inp::-webkit-outer-spin-button,.res-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.res-btns{display:flex;gap:5px;margin-left:auto;}
+.res-btn{width:30px;height:28px;border:.5px solid var(--border);border-radius:var(--r);background:var(--bg2);
+  font-family:var(--font-h);font-size:16px;line-height:1;cursor:pointer;}
+.res-btn.minus{color:var(--red);}
+.res-btn.plus{color:var(--green);}
+.res-btn:active{background:var(--bg4);}
+/* armas: se leen de un vistazo, como en la hoja */
+.wpn{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;background:var(--bg3);
+  border-left:2px solid var(--gold);border-radius:0 var(--r) var(--r) 0;padding:6px 10px;margin-bottom:5px;font-size:13px;}
+.wpn .n{font-family:var(--font-h);color:var(--gold2);font-size:12px;}
+.wpn .dmg{font-family:var(--font-h);color:var(--red);}
+.wpn .t{font-size:12px;color:var(--text3);font-style:italic;}
+/* la ficha de la mascota, embutida en su recuadro */
+.pet-hoja{border-top:1px solid var(--border);padding-top:8px;}
+.pet-hoja .sh-name{font-size:15px;}
+/* ── Ficha de personaje: las tres columnas de la hoja de papel ── */
+/* En el teléfono se apilan (Físico, Cognitivo, Espiritual, una debajo de otra). */
+.sh3{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px;}
+@media(min-width:900px){ .sh3{grid-template-columns:repeat(3,1fr);} }
+.sh-hero{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--bg2);
+  border:1px solid var(--border2);border-radius:var(--rl);padding:12px 14px;margin-bottom:10px;
+  box-shadow:var(--shadow);}
+.sh-hero-id{flex:1 1 190px;min-width:0;}
+.sh-lvl{display:flex;gap:16px;flex:none;}
+.sh-lvl>div{text-align:center;}
+.sh-lvl .l{display:block;font-family:var(--font-h);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text3);}
+.sh-lvl .v{font-family:var(--font-h);font-size:20px;color:var(--gold2);}
+.sh-cond{border:1px solid var(--border2);border-radius:var(--r);padding:5px 10px;flex:1 1 170px;min-width:0;
+  background:var(--bg3);}
+.sh-cond-h{font-family:var(--font-h);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);}
+.sh-col3{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;
+  box-shadow:var(--shadow);}
+.sh-col3-h{font-family:var(--font-h);font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+  text-align:center;color:var(--gold2);background:var(--bg4);padding:7px 4px;border-bottom:1px solid var(--border2);}
+.sh-at3{display:grid;grid-template-columns:1fr auto 1fr;gap:6px;align-items:end;padding:10px 10px 7px;}
+.sh-atbox{border:1px solid var(--border2);border-radius:var(--r);background:var(--bg3);padding:4px 2px;text-align:center;}
+.sh-atbox .l{display:block;font-family:var(--font-h);font-size:8px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--text3);white-space:nowrap;}
+.sh-atbox .v{font-family:var(--font-h);font-size:22px;line-height:1.15;}
+.sh-atbox.def{border-color:var(--gold);min-width:62px;}
+.sh-atbox.def .l{color:var(--gold);}
+.sh-atbox.def .v{color:var(--gold2);}
+.sh-res3{padding:0 10px 8px;border-bottom:1px solid var(--border);}
+.sh-res3-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:4px 0;}
+.sh-res3-l{font-family:var(--font-h);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);}
+.sh-res3-v{font-family:var(--font-h);font-size:16px;}
+/* daño y curación: se escribe cuánto y se toca de qué lado */
+.dmg-box{display:inline-flex;align-items:stretch;border:1px solid var(--border);border-radius:var(--r);
+  overflow:hidden;margin-left:auto;flex:none;}
+.dmg-btn{border:none;font-family:var(--font-h);font-size:9px;letter-spacing:.06em;text-transform:uppercase;
+  padding:0 9px;cursor:pointer;}
+.dmg-btn.d{background:rgba(190,70,55,.22);color:var(--red);}
+.dmg-btn.h{background:rgba(74,154,96,.22);color:var(--green);}
+.dmg-btn:active{filter:brightness(1.4);}
+.dmg-amt{width:44px;border:none;border-left:1px solid var(--border);border-right:1px solid var(--border);
+  background:var(--bg3);color:var(--text);font-family:var(--font-h);font-size:13px;text-align:center;
+  outline:none;padding:5px 0;-moz-appearance:textfield;}
+.dmg-amt::-webkit-outer-spin-button,.dmg-amt::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.sh-sk3{padding:8px 10px 10px;}
+.sh-sk{display:flex;align-items:center;gap:7px;padding:3px 0;}
+.sh-sk-b{font-family:var(--font-h);font-size:12px;border:1px solid var(--border2);border-radius:4px;
+  padding:1px 5px;color:var(--gold2);flex:none;min-width:30px;text-align:center;}
+.sh-sk-n{font-family:var(--font-h);font-size:11px;letter-spacing:.04em;text-transform:uppercase;flex:1;min-width:0;}
+.sh-sk-a{font-family:var(--font-h);font-size:9px;letter-spacing:.06em;color:var(--gold);flex:none;}
+.sh-pips{display:flex;gap:3px;flex:none;}
+.sh-pip{width:9px;height:9px;border-radius:50%;border:1px solid var(--border2);}
+.sh-pip.on{background:var(--text2);border-color:var(--text2);}
+.sh-foot{display:flex;flex-wrap:wrap;gap:8px 30px;justify-content:center;background:var(--bg2);
+  border:1px solid var(--border);border-radius:var(--rl);padding:9px 12px;margin-bottom:10px;}
+.sh-foot>div{text-align:center;}
+.sh-foot .l{display:block;font-family:var(--font-h);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text3);}
+.sh-foot .v{font-family:var(--font-h);font-size:17px;color:var(--gold2);}
 </style>
 </head>
 <body>
@@ -308,40 +411,33 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
   </div>
 
   <div class="tabbar">
+    <button class="tab cosmere-only" data-mod="inventario" id="tab-inv" onclick="setTab('inv')">Inventario</button>
     <button class="tab" id="tab-pj" onclick="setTab('pj')">Mi personaje</button>
-    <button class="tab" id="tab-grupo" onclick="setTab('grupo')">Grupo</button>
-    <button class="tab" id="tab-combate" onclick="setTab('combate')">Combate<span class="tab-badge" id="combBadge" style="display:none">●</span></button>
+    <button class="tab" id="tab-mesa" onclick="setTab('mesa')">Grupo y combate<span class="tab-badge" id="combBadge" style="display:none">●</span></button>
     <button class="tab cosmere-only" data-mod="catalogo" id="tab-tiendas" onclick="setTab('tiendas')">Catálogo</button>
+  </div>
+
+  <!-- El inventario tiene su propia pestaña: en la del personaje va la ficha. -->
+  <div id="tabInv" class="tabpanel" style="display:none">
+    <div id="invPanel"></div>
   </div>
 
   <div id="tabPJ" class="tabpanel">
     <div id="ocMe"></div>
   </div>
 
-  <div id="tabGrupo" class="tabpanel" style="display:none">
-    <div class="section-lbl" id="ocOthersLbl" style="display:none">Otros jugadores</div>
-    <div class="grid" id="ocOthers"></div>
-    <div class="empty-msg" id="grupoEmpty" style="display:none">Todavía no hay otros jugadores en la campaña.</div>
-  </div>
-
-  <div id="tabCombate" class="tabpanel" style="display:none">
-    <div class="empty-msg" id="noCombat">No hay combate activo. Cuando el DM lo inicie, aparece acá.</div>
-    <div id="activeCombat" style="display:none">
-      <div class="phase-bar" id="phaseBarP">
-        <div class="phase p1">1 · PJ rápidos</div>
-        <div class="phase p2">2 · Enemigos rápidos</div>
-        <div class="phase p3">3 · PJ lentos</div>
-        <div class="phase p4">4 · Enemigos lentos</div>
-      </div>
-
-      <div id="mePanel"></div>
-
-      <div class="section-lbl" id="playersLbl">Personajes</div>
-      <div class="grid" id="playersGrid"></div>
-
-      <div class="section-lbl" id="enemiesLbl">Enemigos</div>
-      <div class="grid" id="enemiesGrid"></div>
+  <!-- El grupo y el combate viven en la misma página: a los compañeros se los ve
+       siempre, y los enemigos se suman abajo cuando el DM larga el combate. -->
+  <div id="tabMesa" class="tabpanel" style="display:none">
+    <div class="phase-bar" id="phaseBarP" style="display:none">
+      <div class="phase p1">1 · PJ rápidos</div>
+      <div class="phase p2">2 · Enemigos rápidos</div>
+      <div class="phase p3">3 · PJ lentos</div>
+      <div class="phase p4">4 · Enemigos lentos</div>
     </div>
+    <div id="mePanel"></div>
+    <div id="alliesWrap"></div>
+    <div id="enemiesWrap"></div>
   </div>
 
   <div id="tabTiendas" class="tabpanel" style="display:none">
@@ -381,9 +477,28 @@ var MY_UID=null;   // id de mi usuario (para reconocer mi personaje en el combat
 var CID=parseInt(location.pathname.split('/').filter(Boolean).pop());
 var API='/api/campaigns/'+CID;
 var _qtab=(new URLSearchParams(location.search).get('tab')||'').toLowerCase();
-var TAB=({pj:'pj',grupo:'grupo',combate:'combate'}[_qtab])||'pj';
+// 'grupo' y 'combate' quedaron como una sola pestaña: los links viejos siguen andando.
+var TAB=({pj:'pj',grupo:'mesa',combate:'mesa',mesa:'mesa',tiendas:'tiendas',inv:'inv'}[_qtab])||'pj';
 var TAB_EXPLICIT=!!_qtab;   // si el usuario pidió una pestaña explícita en la URL
 var IMG_V=0;                // versión de la imagen (para refrescar caché al cambiarla)
+
+// ─── Plegables (secciones y recuadros) ───
+// Qué queda cerrado es preferencia de quien mira: vive en su navegador y no se
+// le impone a nadie más.
+var PLEG={};
+try{ PLEG=JSON.parse(localStorage.getItem('plegados')||'{}')||{}; }catch(e){ PLEG={}; }
+function abierto(k){ return !PLEG[k]; }
+function togglePleg(k){
+  if(PLEG[k]) delete PLEG[k]; else PLEG[k]=1;
+  try{ localStorage.setItem('plegados',JSON.stringify(PLEG)); }catch(e){}
+  repaintMe();
+}
+function foldHead(k,titulo,n){
+  return '<button class="fold-h" onclick="togglePleg(\''+k+'\')" title="'+(abierto(k)?'Plegar':'Desplegar')+'">'
+    +'<span class="fold-a">'+(abierto(k)?'▾':'▸')+'</span>'
+    +'<span class="fold-t">'+titulo+'</span>'
+    +(n!=null?'<span class="fold-n">'+n+'</span>':'')+'</button>';
+}
 
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 async function api(path,method,body){
@@ -394,11 +509,18 @@ async function api(path,method,body){
   if(!r.ok) throw new Error('err');
   return r.status===204?null:r.json();
 }
-async function chStat(uid,stat,sign){
-  var el=document.getElementById('mi-'+stat);
-  var val=Math.max(1,parseInt(el&&el.value)||1);
-  await api(API+'/combat/stat','POST',{uid:uid,stat:stat,delta:sign*val});
-  if(stat==='inv') loadRoster();  // la luz baja al cargar: refresca el recuadro de marcos
+// Un mismo control sirve para la ficha y para el combate. El destino es 'c' (mi
+// personaje), 'pN' (una mascota) o 'k:<uid>' (un participante del combate).
+async function aplicarDelta(target,stat,delta){
+  if(!delta)return;
+  if(target.indexOf('k:')===0){
+    await api(API+'/combat/stat','POST',{uid:target.slice(2),stat:stat,delta:delta});
+    // la luz baja al cargar investidura: refresca el recuadro de marcos
+    if(stat==='inv') loadRoster();
+    return;
+  }
+  await api(ocUrl(target)+'/stat','POST',{stat:stat,delta:delta});
+  loadRoster();
 }
 async function chStatus(uid,status){await api(API+'/combat/status','POST',{uid:uid,status:status});}
 async function rmStatus(uid,status){await api(API+'/combat/status/remove_one','POST',{uid:uid,status:status});}
@@ -413,20 +535,6 @@ async function saveInit(uid){
   await api(API+'/combat/initiative','POST',{uid:uid,value:v});
 }
 
-// control de un stat: [−] a la izquierda, [+] a la derecha
-function statCtl(p,stat,label,color){
-  var v=p[stat],mx=p[stat+'_max'];
-  var pct=mx>0?Math.round(v/mx*100):0;
-  return '<div class="mstat">'
-    +'<div class="mstat-head"><span class="mstat-l">'+label+'</span>'
-    +'<span class="mstat-v" style="color:'+color+'">'+v+' <span style="font-size:12px;color:var(--text3)">/ '+mx+'</span></span></div>'
-    +'<div class="mbar"><div class="mbar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
-    +'<div class="madj">'
-    +'<button class="madj-btn minus" onclick="chStat(\''+p.uid+'\',\''+stat+'\',-1)">−</button>'
-    +'<input type="number" id="mi-'+stat+'" value="1" min="1"/>'
-    +'<button class="madj-btn plus" onclick="chStat(\''+p.uid+'\',\''+stat+'\',1)">+</button>'
-    +'</div></div>';
-}
 function statusPanel(p){
   // Los estados que impone una herida se muestran fijados (🔒) igual que en la
   // pestaña "Mi personaje": no se pueden sacar hasta curar la herida.
@@ -459,6 +567,22 @@ function injuryChips(inj){
   return '<div class="stags" style="margin-top:6px">'+inj.map(function(i){
     return '<span class="stag" style="border-color:var(--orange);color:var(--orange)">🩹 '+esc(i.name)
       +(i.permanent?'':' ('+i.days+'d)')+'</span>';}).join('')+'</div>';
+}
+// En combate cada stat va con su barra y una casilla de cuánto sumar o restar:
+// de un vistazo se ve cómo viene la cosa, y un mandoble de 7 se anota una vez.
+function statCtl(p,stat,label,color){
+  var v=p[stat],mx=p[stat+'_max'];
+  var pct=mx>0?Math.round(v/mx*100):0;
+  var arg='\'k:'+p.uid+'\',\''+stat+'\',\''+p.uid+'\'';
+  return '<div class="mstat">'
+    +'<div class="mstat-head"><span class="mstat-l">'+label+'</span>'
+    +'<span class="mstat-v" style="color:'+color+'">'+v+' <span style="font-size:12px;color:var(--text3)">/ '+mx+'</span></span></div>'
+    +'<div class="mbar"><div class="mbar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
+    +'<div class="madj">'
+    +'<button class="madj-btn minus" onclick="pasoRes('+arg+',-1)">−</button>'
+    +'<input type="number" id="monto-'+p.uid+'-'+stat+'" value="1" min="1"/>'
+    +'<button class="madj-btn plus" onclick="pasoRes('+arg+',1)">+</button>'
+    +'</div></div>';
 }
 function meControls(p){
   if(SYSTEM==='dnd') return statCtl(p,'vida','Vida','var(--red)')+statusPanel(p);
@@ -695,23 +819,42 @@ var STAT_META={
 // Porcentaje representativo de cada tramo, para elegir etiqueta y color cuando
 // el backend solo manda el tramo (modo 'color').
 var NIVEL_PCT=[0,10,30,60,80,100];
-// Una barra por stat. Según lo que el DM deje ver de ese grupo, el backend manda
+// Cómo se lee un stat según lo que el DM deje ver de ese grupo: el backend manda
 // los números, un porcentaje (la barra se vacía), un tramo (la barra queda llena
-// y solo cambia de color) o nada.
-function statBar(p,stat){
+// y solo cambia de color) o nada. Devuelve null cuando no manda nada.
+function statLectura(p,stat){
   var m=STAT_META[stat];
+  if(!m) return null;
   var exacto=(p[stat]!=null&&p[stat+'_max']!=null);
+  // un focus o una investidura en 0/0 es "no tiene": no se muestra
+  if(exacto&&stat!=='vida'&&!p[stat+'_max']) return null;
   var pct, llena=false;
   if(exacto) pct=(p[stat+'_max']>0?Math.round(p[stat]/p[stat+'_max']*100):0);
   else if(p[stat+'_pct']!=null) pct=p[stat+'_pct'];
   else if(p[stat+'_nivel']!=null){ pct=NIVEL_PCT[p[stat+'_nivel']]; llena=true; }
-  if(pct==null) return '';                 // el DM no deja ver este stat
+  if(pct==null) return null;               // el DM no deja ver este stat
   var n=m.nivel(pct);
+  return {lbl:m.lbl,col:n.c,pct:llena?100:pct,
+          txt:exacto?(p[stat]+' / '+p[stat+'_max']):n.t};
+}
+function statBar(p,stat){
+  var r=statLectura(p,stat);
+  if(!r) return '';
   return '<div class="cstat">'
-    +'<div class="cstat-head"><span class="cstat-l">'+m.lbl+'</span>'
-      +'<span style="color:'+n.c+'">'+(exacto?p[stat]+' / '+p[stat+'_max']:n.t)+'</span></div>'
-    +'<div class="hbar"><div class="hbar-fill" style="width:'+(llena?100:pct)+'%;background:'+n.c+'"></div></div>'
+    +'<div class="cstat-head"><span class="cstat-l">'+r.lbl+'</span>'
+      +'<span style="color:'+r.col+'">'+r.txt+'</span></div>'
+    +'<div class="hbar"><div class="hbar-fill" style="width:'+r.pct+'%;background:'+r.col+'"></div></div>'
     +'</div>';
+}
+// Una línea sola, para cuando el recuadro está plegado.
+function statMini(p,stat){
+  var r=statLectura(p,stat);
+  if(!r) return '';
+  return '<span><span class="cstat-l">'+r.lbl+'</span> <b style="color:'+r.col+'">'+r.txt+'</b></span>';
+}
+// Los stats que tienen sentido en este sistema (en D&D solo hay vida).
+function statsDelSistema(){
+  return (SYSTEM==='dnd'||isDndCombat())?['vida']:['vida','focus','inv'];
 }
 
 function mkTags(statuses){
@@ -749,62 +892,157 @@ function card(p,enemyView){
     +'</div>';
 }
 
-var PREV_ACTIVE=null;   // para autocambiar a Combate cuando arranca
-var PANELS={pj:'tabPJ',grupo:'tabGrupo',combate:'tabCombate',tiendas:'tabTiendas'};
+var PREV_ACTIVE=null;   // para autocambiar a la mesa cuando arranca el combate
+var PANELS={inv:'tabInv',pj:'tabPJ',mesa:'tabMesa',tiendas:'tabTiendas'};
 function setTab(t){
   TAB=t;
   Object.keys(PANELS).forEach(function(x){
     document.getElementById(PANELS[x]).style.display=(x===t)?'':'none';
     document.getElementById('tab-'+x).classList.toggle('on',x===t);
   });
-  if(t==='pj'||t==='grupo') loadRoster();
+  if(t==='pj'||t==='mesa') loadRoster();
+  if(t==='inv') loadInventory();
   if(t==='tiendas') loadCatalog();
+}
+
+// ─── Grupo y combate en la misma página ───
+// Los compañeros están siempre: sus datos salen del combate cuando hay uno (así
+// llegan al instante por WS) y del roster cuando no. Los enemigos se suman abajo
+// recién cuando el DM larga el combate.
+function entradasAliados(myUid){
+  var out=[], usados={};
+  var comb=(COMBAT&&COMBAT.active)?COMBAT.participants:[];
+  function enCombate(pred){
+    for(var i=0;i<comb.length;i++){ if(pred(comb[i])) return comb[i]; }
+    return null;
+  }
+  ((ROSTER&&ROSTER.members)||[]).forEach(function(m){
+    if(m.user_id===MY_UID||!m.character)return;
+    var c=m.character;
+    var cp=enCombate(function(p){return p.kind==='player'&&p.user_id===m.user_id;});
+    if(cp) usados[cp.uid]=1;
+    out.push({key:'u'+m.user_id,kind:'player',name:(cp||c).name,sub:m.username,
+              d:cp||c,comb:cp,dnd:c.dnd});
+    (m.pets||[]).forEach(function(p){
+      if(p.compartida)return;   // las de todos las manejo yo, desde Mi personaje
+      var pp=enCombate(function(x){return x.kind==='pet'&&x.pet_id===p.id;});
+      if(pp) usados[pp.uid]=1;
+      out.push({key:'p'+p.id,kind:'pet',name:(pp||p).name,
+                sub:'🐾 mascota de '+c.name,d:pp||p,comb:pp});
+    });
+  });
+  // Lo que está en el combate pero no en el roster (una mascota recién sumada).
+  comb.forEach(function(p){
+    if(p.kind==='enemy'||usados[p.uid])return;
+    if(manejoYo(p,myUid))return;
+    out.push({key:'c'+p.uid,kind:p.kind,name:p.name,
+              sub:p.kind==='pet'?('🐾 mascota'+(p.owner_name?' de '+p.owner_name:'')):'',
+              d:p,comb:p});
+  });
+  return out;
+}
+// Slots y contadores de D&D, como chips (solo el roster los trae)
+function dndChips(dnd){
+  if(SYSTEM!=='dnd'||!dnd)return '';
+  var parts=[], slots=dnd.slots||{};
+  Object.keys(slots).map(Number).sort(function(a,b){return a-b;}).forEach(function(n){
+    var s=slots[String(n)]; parts.push('✨N'+n+' '+s.cur+'/'+s.max);});
+  (dnd.counters||[]).forEach(function(k){parts.push(esc(k.name)+' '+k.cur+'/'+k.max);});
+  if(!parts.length)return '';
+  return '<div class="stags">'+parts.map(function(x){
+    return '<span class="stag" style="border-color:var(--border2);color:var(--text2)">'+x+'</span>';}).join('')+'</div>';
+}
+// Recuadro de un compañero. Se pliega de a uno tocando la cabecera: queda el
+// nombre y una línea con sus números.
+function aliadoCard(e){
+  var d=e.d, cb=e.comb, k='al:'+e.key, ab=abierto(k);
+  var acted=cb?(cb.turn==='both'?(cb.acted&&cb.acted_slow):cb.acted):false;
+  var col=(cb&&cb.faction_color)||'';
+  var st=d.statuses||[];
+  var head='<div class="ally-head" onclick="togglePleg(\''+k+'\')" title="'+(ab?'Plegar':'Desplegar')+'">'
+    +'<span class="fold-a">'+(ab?'▾':'▸')+'</span>'
+    +'<span class="cname" style="flex:1;margin:0">'
+      +(col?'<span class="color-dot" style="background:'+col+'"></span>':'')+esc(e.name)+'</span></div>';
+  var cuerpo;
+  if(!ab){
+    var mini=statsDelSistema().map(function(s){return statMini(d,s);}).filter(Boolean);
+    if(st.length) mini.push('<span class="cstat-l">'+st.length+(st.length===1?' estado':' estados')+'</span>');
+    cuerpo='<div class="ally-mini" onclick="togglePleg(\''+k+'\')" title="Tocá para desplegar">'
+      +(mini.length?mini.join(''):'<span style="color:var(--text3)">Sin datos.</span>')+'</div>';
+  }else{
+    var ti=turnInfo(d);
+    var turnTag=!cb?'':(isDndCombat()
+      ? '<span class="turn-tag" style="color:var(--gold);border-color:var(--gold)">⚡ '+(d.initiative==null?'—':d.initiative)+'</span>'
+      : '<span class="turn-tag '+ti.cls+'">'+ti.lbl+'</span>');
+    var tags=mkTags(st);
+    cuerpo=(e.sub?'<div class="ctype">'+esc(e.sub)+'</div>':'')
+      +turnTag
+      +statsDelSistema().map(function(s){return statBar(d,s);}).join('')
+      +(tags?'<div class="stags">'+tags+'</div>':'')
+      +injuryChips(d.injuries)
+      +dndChips(e.dnd)
+      +(acted?'<div class="acted-mark">✓ Ya actuó esta ronda</div>':'');
+  }
+  return '<div class="card'+(cb&&cb.defeated?' defeated':'')+(acted?' acted':'')+'"'
+    +(col?' style="border-left:3px solid '+col+'"':'')+'>'+head+cuerpo+'</div>';
+}
+function renderMesa(){
+  var wrap=document.getElementById('alliesWrap');
+  if(!wrap)return;
+  var activo=!!(COMBAT&&COMBAT.active), isDnd=isDndCombat();
+  document.getElementById('phaseBarP').style.display=(activo&&!isDnd)?'':'none';
+  var myUid=MY_UID;
+  if(activo) myUid=renderMe(COMBAT);
+  else document.getElementById('mePanel').innerHTML='';
+
+  var list=entradasAliados(myUid);
+  var en=activo?COMBAT.participants.filter(function(p){return p.kind==='enemy'&&!p.hidden;}):[];
+  var lbl='Grupo';
+  if(activo&&isDnd){
+    // D&D: todos en una sola lista, por iniciativa (mayor primero)
+    en.forEach(function(p){list.push({key:'e'+p.uid,kind:'enemy',name:p.name,d:p,comb:p});});
+    en=[];
+    list.sort(function(a,b){return initOf(b.d)-initOf(a.d);});
+    lbl='Orden de iniciativa';
+  }else if(activo){
+    // los personajes por turno; los enemigos van aparte y en orden fijo, para no
+    // revelar quién es rápido y quién lento
+    list.sort(function(a,b){return (a.d.turn==='slow'?1:0)-(b.d.turn==='slow'?1:0);});
+  }
+  var h=foldHead('sec:grupo',lbl,list.length);
+  if(abierto('sec:grupo')) h+=list.length
+    ? '<div class="grid">'+list.map(function(e){
+        return e.kind==='enemy'?card(e.d,true):aliadoCard(e);}).join('')+'</div>'
+    : '<div class="empty-msg" style="padding:1.2rem 0">Todavía no hay otros jugadores en la campaña.</div>';
+  wrap.innerHTML=h;
+
+  var ew=document.getElementById('enemiesWrap');
+  if(!activo){
+    ew.innerHTML='<div class="empty-msg" style="padding:1.6rem 0">No hay combate activo. '
+      +'Cuando el DM lo inicie, los enemigos aparecen acá.</div>';
+  }else if(isDnd){
+    ew.innerHTML='';
+  }else{
+    ew.innerHTML=foldHead('sec:enemigos','Enemigos',en.length)
+      +(abierto('sec:enemigos')
+        ? (en.length?'<div class="grid">'+en.map(function(p){return card(p,true);}).join('')+'</div>'
+                    :'<div class="empty-msg" style="padding:1.2rem 0">Sin enemigos a la vista.</div>')
+        : '');
+  }
 }
 
 function render(combat){
   COMBAT=combat;
   var active=!!(combat&&combat.active);
   document.getElementById('roundNum').textContent=active?combat.round:'—';
-  document.getElementById('noCombat').style.display=active?'none':'';
-  document.getElementById('activeCombat').style.display=active?'':'none';
   document.getElementById('combBadge').style.display=active?'':'none';
-  var isDnd=(combat&&combat.system?combat.system:SYSTEM)==='dnd';
-  document.getElementById('phaseBarP').style.display=isDnd?'none':'';
-  if(active){
-    var myUid=renderMe(combat);
-    if(isDnd){
-      // D&D: todos juntos, ordenados por iniciativa (mayor primero)
-      var others=combat.participants.filter(function(p){
-        return !manejoYo(p,myUid) && !(p.kind==='enemy'&&p.hidden);
-      });
-      others.sort(function(a,b){return initOf(b)-initOf(a);});
-      document.getElementById('playersLbl').textContent='Orden de iniciativa';
-      document.getElementById('playersLbl').style.display=others.length?'':'none';
-      document.getElementById('playersGrid').innerHTML=others.map(function(p){return card(p,p.kind==='enemy');}).join('');
-      document.getElementById('enemiesLbl').style.display='none';
-      document.getElementById('enemiesGrid').innerHTML='';
-    }else{
-      var pl=combat.participants.filter(function(p){
-        return (p.kind==='player'||p.kind==='pet')&&!manejoYo(p,myUid);});
-      var en=combat.participants.filter(function(p){return p.kind==='enemy'&&!p.hidden;});
-      // los personajes se ordenan por turno; los enemigos quedan en orden fijo
-      // (no por turno) para no revelar quién es rápido o lento
-      pl.sort(function(a,b){return (a.turn==='slow'?1:0)-(b.turn==='slow'?1:0);});
-      document.getElementById('playersLbl').textContent='Personajes';
-      document.getElementById('playersLbl').style.display=pl.length?'':'none';
-      document.getElementById('enemiesLbl').style.display='';
-      document.getElementById('playersGrid').innerHTML=pl.map(card).join('');
-      document.getElementById('enemiesGrid').innerHTML=en.map(function(p){return card(p,true);}).join('');
-    }
-  }else{
-    document.getElementById('mePanel').innerHTML='';
-  }
+  renderMesa();
   if(PREV_ACTIVE===null){
-    // primera carga: si no pidieron pestaña y ya hay combate, mostrá Combate
-    if(!TAB_EXPLICIT && active) setTab('combate');
+    // primera carga: si no pidieron pestaña y ya hay combate, abrí la mesa
+    if(!TAB_EXPLICIT && active) setTab('mesa');
   }else{
-    if(active && !PREV_ACTIVE) setTab('combate');   // arrancó el combate
-    if(!active && PREV_ACTIVE) loadRoster();          // terminó: refrescá la ficha
+    if(active && !PREV_ACTIVE) setTab('mesa');   // arrancó el combate
+    if(!active && PREV_ACTIVE) loadRoster();     // terminó: refrescá la ficha
   }
   PREV_ACTIVE=active;
 }
@@ -833,10 +1071,12 @@ async function loadRoster(){
     var m=el.dataset.mod;
     el.style.display=(m?MODULO(m):SYSTEM!=='dnd')?'':'none';
   });
+  // si el DM apagó un módulo, su pestaña no existe: no te quedes mirando la nada
   if(!MODULO('catalogo')&&TAB==='tiendas') setTab('pj');
+  if(!MODULO('inventario')&&TAB==='inv') setTab('pj');
   renderRoster();
   if(MODULO('inventario')) loadInventory();     // el inventario cuelga de la ficha
-  if(COMBAT&&COMBAT.active) renderMe(COMBAT);   // refresca el recuadro de marcos del combate
+  renderMesa();                                 // el grupo se dibuja con el roster
 }
 // tracker de altas tormentas: el jugador ve la barra pero NO el día/momento exactos
 var STORM=null;
@@ -1019,25 +1259,49 @@ function ocUrl(target){
   var pid=target.slice(1);
   return '/api/characters/'+(PET_CHAR[pid]||MYCHAR)+'/pets/'+pid;
 }
-async function ocStat(target,stat,sign){
-  var el=document.getElementById('oc-amt-'+target+'-'+stat);
-  var val=Math.max(1,parseInt(el&&el.value)||1);
-  await api(ocUrl(target)+'/stat','POST',{stat:stat,delta:sign*val});
-  loadRoster();
-}
+async function ocStat(target,stat,delta){ return aplicarDelta(target,stat,delta); }
 async function ocStatus(target,status){ await api(ocUrl(target)+'/status','POST',{status:status}); loadRoster(); }
 async function ocStatusRm(target,status){ await api(ocUrl(target)+'/status/remove_one','POST',{status:status}); loadRoster(); }
 
-function ocStatCtl(target,o,stat,label,color){
-  if(stat!=='vida'&&o[stat+'_max']===0)return '';
-  var v=(o[stat]==null?o[stat+'_max']:o[stat]),mx=o[stat+'_max'];
-  var pct=mx>0?Math.round(v/mx*100):0;
-  return '<div class="mstat"><div class="mstat-head"><span class="mstat-l">'+label+'</span>'
-    +'<span class="mstat-v" style="color:'+color+'">'+v+' <span style="font-size:12px;color:var(--text3)">/ '+mx+'</span></span></div>'
-    +'<div class="mbar"><div class="mbar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
-    +'<div class="madj"><button class="madj-btn minus" onclick="ocStat(\''+target+'\',\''+stat+'\',-1)">−</button>'
-    +'<input type="number" id="oc-amt-'+target+'-'+stat+'" value="1" min="1"/>'
-    +'<button class="madj-btn plus" onclick="ocStat(\''+target+'\',\''+stat+'\',1)">+</button></div></div>';
+// ─── Recursos: el número actual al lado del máximo, sin barra ───
+// Se toca el número y se escribe el valor exacto; los botones lo mueven de uno
+// en uno. El máximo se cambia desde "✎ Editar".
+function resCell(target,o,stat,label,color){
+  var mx=o[stat+'_max']||0;
+  if(stat!=='vida'&&!mx)return '';
+  var v=(o[stat]==null?mx:o[stat]);
+  var col=(stat==='vida'?hl(mx>0?Math.round(v/mx*100):0).c:color);
+  var arg='\''+target+'\',\''+stat+'\',null';
+  return '<div class="res-cell">'
+    +'<div class="res-l" style="color:'+color+'">'+label+'</div>'
+    +'<div class="res-row">'
+      +'<span class="res-cur" style="color:'+col+'" onclick="editRes(this,\''+target+'\',\''+stat+'\','+v+')" '
+        +'title="Tocá para escribir el valor exacto">'+v+'</span>'
+      +'<span class="res-max">/ '+mx+'</span>'
+      +'<span class="res-btns">'
+        +'<button class="res-btn minus" onclick="pasoRes('+arg+',-1)" title="Restar">−</button>'
+        +'<button class="res-btn plus" onclick="pasoRes('+arg+',1)" title="Sumar">+</button>'
+      +'</span></div></div>';
+}
+function pasoRes(target,stat,monto,sign){
+  var n=1;
+  if(monto){
+    var el=document.getElementById('monto-'+monto+'-'+stat);
+    n=Math.max(1,parseInt(el&&el.value)||1);
+  }
+  aplicarDelta(target,stat,sign*n);
+}
+function editRes(el,target,stat,actual){
+  if(el.querySelector('input'))return;
+  var cancelado=false;
+  el.innerHTML='<input class="res-inp" type="number" value="'+actual+'"/>';
+  var inp=el.firstChild; inp.focus(); inp.select();
+  inp.onkeydown=function(e){ if(e.key==='Enter'){inp.blur();} else if(e.key==='Escape'){cancelado=true;inp.blur();} };
+  inp.onblur=function(){
+    var v=parseInt(inp.value);
+    if(cancelado||isNaN(v)||v===actual){ repaintMe(); return; }
+    aplicarDelta(target,stat,v-actual);
+  };
 }
 function ocStatuses(target,statuses,injuries){
   var locked=lockedCounts(injuries);
@@ -1129,7 +1393,7 @@ function marcosWidget(c){
       +'<span class="marcos-w-cell dun" onclick="editMarco(this,\'dun\')" title="Opacos — tocá para editar">'+dun+'</span>'
     +'</div></div>';
 }
-function repaintMe(){ renderRoster(); if(COMBAT&&COMBAT.active) renderMe(COMBAT); }
+function repaintMe(){ renderRoster(); renderMesa(); }
 function editMarco(el, which){
   if(el.querySelector('input'))return;
   var canceled=false;
@@ -1343,10 +1607,16 @@ function petCard(p,mia){
       +'<button class="me-change" style="color:var(--red)" onclick="delPet('+p.id+')">Quitar</button>'
       +'</span>'
     : '';
+  // Plegada queda el nombre y una línea; desplegada van sus números, sus estados
+  // y la ficha entera (que a su vez se puede cerrar aparte).
+  var kh='pethoja:'+p.id;
   var cuerpo=abierta
-    ? '<div class="me-sheet-row" style="margin-top:0;padding-top:0;border:none"><button class="btn-sheet" onclick="openRosterSheet(\''+t+'\')">Ver ficha</button></div>'
-      +PET_STATS.map(function(s){return ocStatCtl(t,p,s[0],s[1],s[2]);}).join('')
+    ? '<div class="res-grid" style="margin-top:8px">'
+        +PET_STATS.map(function(s){return resCell(t,p,s[0],s[1],s[2]);}).join('')+'</div>'
       +ocStatuses(t,p.statuses)
+      +foldHead(kh,'Ficha')
+      +(abierto(kh)?'<div class="pet-hoja">'+petSheetHTML({name:p.name,stats:p.stats,
+          acciones:p.acciones,vida_max:p.vida_max,focus_max:p.focus_max,inv_max:p.inv_max})+'</div>':'')
     : '<div class="pet-mini" onclick="togglePet('+p.id+')" title="Tocá para desplegar">'+petMiniStats(p)+'</div>';
   return '<div class="me-card" style="margin-top:8px"><div class="me-head">'
     +'<button class="pet-fold" onclick="togglePet('+p.id+')" title="'+(abierta?'Plegar':'Desplegar')+'">'+(abierta?'▾':'▸')+'</button>'
@@ -1359,24 +1629,190 @@ async function togglePetShared(pid){
   loadRoster();
 }
 
-function allyCard(m){
-  var c=m.character;
-  var t=mkTags(c.statuses);
-  var inj=(c.injuries||[]).length?'<div class="stags">'+(c.injuries||[]).map(function(i){
-    return '<span class="stag" style="border-color:var(--orange);color:var(--orange)">🩹 '+esc(i.name)+(i.permanent?'':' ('+i.days+'d)')+'</span>';}).join('')+'</div>':'';
-  var dndChips='';
-  if(SYSTEM==='dnd'&&c.dnd){
-    var parts=[]; var slots=c.dnd.slots||{};
-    Object.keys(slots).map(Number).sort(function(a,b){return a-b;}).forEach(function(n){
-      var s=slots[String(n)]; parts.push('✨N'+n+' '+s.cur+'/'+s.max);});
-    (c.dnd.counters||[]).forEach(function(k){parts.push(esc(k.name)+' '+k.cur+'/'+k.max);});
-    if(parts.length) dndChips='<div class="stags">'+parts.map(function(x){
-      return '<span class="stag" style="border-color:var(--border2);color:var(--text2)">'+x+'</span>';}).join('')+'</div>';
+// ─── Ficha de personaje a tres columnas (como la hoja de papel) ───
+// Físico / Cognitivo / Espiritual: cada una con sus dos atributos, su defensa,
+// su medidor y sus habilidades. Los puntitos de una habilidad son sus rangos: el
+// modificador es atributo + rangos, así que los rangos salen de restar.
+var SK_ATTR={Athletics:'STR','Heavy Weaponry':'STR',
+  Agility:'SPD','Light Weaponry':'SPD',Stealth:'SPD',Thievery:'SPD',
+  Crafting:'INT',Deduction:'INT',Lore:'INT',Medicine:'INT',Transportation:'INT',
+  Discipline:'WIL',Intimidation:'WIL',Transformation:'WIL',
+  Deception:'PRE',Leadership:'PRE',Persuasion:'PRE',
+  Insight:'AWA',Perception:'AWA',Survival:'AWA'};
+// Orden de la hoja. Las que el jugador no anotó se muestran igual, con el
+// atributo solo y ningún rango: la ficha se lee completa.
+var SK_ORDEN={physical:['Agility','Athletics','Heavy Weaponry','Light Weaponry','Stealth','Thievery'],
+  cognitive:['Crafting','Deduction','Discipline','Intimidation','Lore','Medicine'],
+  spiritual:['Deception','Insight','Leadership','Perception','Persuasion','Survival']};
+var CAT3=[{k:'physical',n:'Físico',a:[['STR','Fuerza'],['SPD','Velocidad']]},
+          {k:'cognitive',n:'Cognitivo',a:[['INT','Intelecto'],['WIL','Voluntad']]},
+          {k:'spiritual',n:'Espiritual',a:[['AWA','Conciencia'],['PRE','Presencia']]}];
+
+function shSkRows(cat,s){
+  var a=s.attributes||{}, puestas=(s.skills&&s.skills[cat])||[], val={};
+  puestas.forEach(function(x){ val[x.name]=x.value; });
+  var nombres=SK_ORDEN[cat].slice();
+  puestas.forEach(function(x){ if(nombres.indexOf(x.name)<0) nombres.push(x.name); });
+  return nombres.map(function(n){
+    var at=SK_ATTR[n]||'', base=(at&&a[at]!=null)?a[at]:null;
+    var mod=(val[n]==null?base:val[n]);
+    if(mod==null) return '';
+    var pips='';
+    if(base!=null){
+      var r=Math.max(0,Math.min(5,mod-base));
+      for(var i=0;i<5;i++) pips+='<span class="sh-pip'+(i<r?' on':'')+'"></span>';
+    }
+    return '<div class="sh-sk"><span class="sh-sk-b">'+(mod>=0?'+':'')+mod+'</span>'
+      +'<span class="sh-sk-n">'+esc(n)+'</span>'
+      +'<span class="sh-sk-a">'+at+'</span>'
+      +'<span class="sh-pips">'+pips+'</span></div>';
+  }).join('');
+}
+// Vida: el número se toca y se escribe, y al lado va cuánto daño quitar o curar.
+function shVidaRow(c){
+  var mx=c.vida_max||0, v=(c.vida==null?mx:c.vida);
+  return '<div class="sh-res3-row"><span class="sh-res3-l">Vida</span>'
+    +'<span class="res-cur" style="font-size:20px;color:'+hl(mx>0?Math.round(v/mx*100):0).c+'" '
+      +'onclick="editRes(this,\'c\',\'vida\','+v+')" title="Tocá para escribir el valor exacto">'+v+'</span>'
+    +'<span class="res-max">/ '+mx+'</span>'
+    +'<span class="dmg-box">'
+      +'<button class="dmg-btn d" onclick="golpe(-1)" title="Quitar ese daño">Dmg</button>'
+      +'<input class="dmg-amt" type="number" min="1" id="dmgAmt" placeholder="1"/>'
+      +'<button class="dmg-btn h" onclick="golpe(1)" title="Curar esa cantidad">Heal</button>'
+    +'</span></div>';
+}
+function golpe(sign){
+  var el=document.getElementById('dmgAmt');
+  aplicarDelta('c','vida',sign*Math.max(1,parseInt(el&&el.value)||1));
+}
+function shPuntoRow(c,stat,label,color){
+  var mx=c[stat+'_max']||0, v=(c[stat]==null?mx:c[stat]);
+  if(!mx) return '<div class="sh-res3-row"><span class="sh-res3-l">'+label+'</span>'
+    +'<span style="color:var(--text3)">—</span></div>';
+  return '<div class="sh-res3-row"><span class="sh-res3-l">'+label+'</span>'
+    +'<span class="res-cur" style="font-size:20px;color:'+color+'" '
+      +'onclick="editRes(this,\'c\',\''+stat+'\','+v+')" title="Tocá para escribir el valor exacto">'+v+'</span>'
+    +'<span class="res-max">/ '+mx+'</span>'
+    +'<span class="res-btns">'
+      +'<button class="res-btn minus" onclick="pasoRes(\'c\',\''+stat+'\',null,-1)" title="Uno menos">−</button>'
+      +'<button class="res-btn plus" onclick="pasoRes(\'c\',\''+stat+'\',null,1)" title="Uno más">+</button>'
+    +'</span></div>';
+}
+function shTextoRow(label,v){
+  return '<div class="sh-res3-row"><span class="sh-res3-l">'+label+'</span>'
+    +'<span class="sh-res3-v">'+((v&&v!=='-')?esc(v):'—')+'</span></div>';
+}
+function shAtBox(lbl,v,cls){
+  return '<div class="sh-atbox'+(cls?' '+cls:'')+'"><span class="l">'+lbl+'</span>'
+    +'<span class="v">'+(v==null||v===''?'—':v)+'</span></div>';
+}
+function cosmere3HTML(c){
+  var s=c.sheet||{}, a=s.attributes||{}, d=s.defenses||{};
+  var cols=CAT3.map(function(cat){
+    var res=cat.k==='physical' ? shVidaRow(c)+shTextoRow('Deflect',s.deflect)
+      : cat.k==='cognitive' ? shPuntoRow(c,'focus','Focus','var(--blue)')
+      : shPuntoRow(c,'inv','Investidura','var(--purple)');
+    return '<div class="sh-col3"><div class="sh-col3-h">'+cat.n+'</div>'
+      +'<div class="sh-at3">'
+        +shAtBox(cat.a[0][1],a[cat.a[0][0]])
+        +shAtBox('Defensa',d[cat.k],'def')
+        +shAtBox(cat.a[1][1],a[cat.a[1][0]])
+      +'</div>'
+      +'<div class="sh-res3">'+res+'</div>'
+      +'<div class="sh-sk3">'+shSkRows(cat.k,s)+'</div></div>';
+  }).join('');
+  var pie=[['Movimiento',s.movement],['Recuperación',s.recovery],['Sentidos',s.senses]]
+    .map(function(x){ return '<div><span class="l">'+x[0]+'</span>'
+      +'<span class="v">'+(x[1]?esc(x[1]):'—')+'</span></div>'; }).join('');
+  // el PDF trae las especialidades en una sola línea separadas por comas
+  var exp=String(s.expertise||'').split(/\s*[,;\n]\s*/).filter(Boolean);
+  return '<div class="sh3">'+cols+'</div>'
+    +'<div class="sh-foot">'+pie+'</div>'
+    +(exp.length
+      ? '<div class="section-lbl">Especialidades ('+exp.length+')</div>'
+        +'<div class="chips">'+exp.map(function(x){return '<span class="chip">'+esc(x)+'</span>';}).join('')+'</div>'
+      : '')
+    +(a.STR==null?'<div class="sh-meta" style="margin-top:10px">Sin ficha cargada: subí tu PDF con '
+       +'“⭳ Actualizar PDF” para que se completen atributos y habilidades.</div>':'');
+}
+// Cabecera: retrato, nombre, ascendencia y sendas, nivel/tier y condiciones.
+function shHeroHTML(c){
+  var s=c.sheet||{};
+  var sub=[s.ancestry,s.paths].filter(Boolean).map(esc).join(' · ');
+  var m=String(s.level||'').match(/\d+/), lvl=m?parseInt(m[0]):0;
+  var tier=lvl?Math.floor((lvl-1)/5)+1:0;
+  var portrait=c.has_image
+    ? '<img class="pj-portrait-sm" src="/api/characters/'+c.id+'/image?v='+IMG_V+'" alt=""/>'
+    : '<div class="pj-hero-ph">'+(c.has_pdf?'📜':'🛡')+'</div>';
+  var st=c.statuses||[];
+  return '<div class="sh-hero">'+portrait
+    +'<div class="sh-hero-id"><div class="pj-hero-name">'+esc(c.name)+'</div>'
+      +(sub?'<div class="pj-hero-sub">'+sub+'</div>':'')+'</div>'
+    +'<div class="sh-cond"><div class="sh-cond-h">Condiciones ('+st.length+')</div>'
+      +(st.length?'<div class="stags">'+mkTags(st)+'</div>'
+                 :'<div style="font-size:12px;color:var(--text3)">Ninguna</div>')+'</div>'
+    +(SYSTEM==='dnd'?'':marcosWidget(c))
+    +'<div class="sh-lvl">'
+      +'<div><span class="l">Nivel</span><span class="v">'+(lvl||'—')+'</span></div>'
+      +'<div><span class="l">Tier</span><span class="v">'+(tier||'—')+'</span></div>'
+    +'</div></div>';
+}
+// Lo que no entra en las tres columnas: talentos, armas, equipo y contactos.
+function shRestoHTML(s){
+  var h='';
+  if((s.talents||[]).length) h+='<div class="sh-h">Talentos</div>'
+    +s.talents.map(function(t){return shItem(t,'');}).join('');
+  if((s.weapons||[]).length) h+='<div class="sh-h">Armas</div>'
+    +s.weapons.map(function(w){return '<div class="sh-item">'+esc(w)+'</div>';}).join('');
+  if((s.equipment||[]).length) h+='<div class="sh-h">Equipo</div><div class="chips">'
+    +s.equipment.map(function(e){return '<span class="chip">'+esc(e)+'</span>';}).join('')+'</div>';
+  if((s.connections||[]).length) h+='<div class="sh-h">Contactos</div><div class="chips">'
+    +s.connections.map(function(e){return '<span class="chip">'+esc(e)+'</span>';}).join('')+'</div>';
+  return h||'<div class="sh-meta">Todavía no hay talentos ni equipo en la ficha.</div>';
+}
+
+// ─── Armas: lo que hay que mirar cuando toca pegar ───
+// Salen del inventario (que es donde están los números de verdad) y, si la ficha
+// del PDF trae armas escritas a mano, también.
+function armasDeInv(){
+  var out=[];
+  function rec(list){
+    (list||[]).forEach(function(i){
+      if(i.kind==='arma') out.push(i);
+      if(i.children) rec(i.children);
+    });
   }
-  return '<div class="card"><div class="cname">'+esc(c.name)+'</div>'
-    +'<div class="ctype">'+esc(m.username)+'</div>'
-    +statBar(c,'vida')+(SYSTEM==='dnd'?'':statBar(c,'focus')+statBar(c,'inv'))
-    +(t?'<div class="stags">'+t+'</div>':'')+inj+dndChips+'</div>';
+  if(INV&&INV.character) rec(INV.character.items);
+  return out;
+}
+function armasHTML(){
+  var c=meChar();
+  if(!c)return '';
+  var s=c.sheet||{}, filas=[];
+  armasDeInv().forEach(function(it){
+    var st=it.stats||{};
+    var tr=(st.traits||[]).concat(st.expert_traits||[]);
+    filas.push('<div class="wpn"><span class="n">'+esc(it.name)+'</span>'
+      +(st.damage?'<span class="dmg">'+esc(st.damage)+'</span>':'')
+      +(st.range?'<span>'+esc(st.range)+'</span>':'')
+      +(tr.length?'<span class="t">'+tr.map(esc).join(', ')+'</span>':'')
+      +(it.equipado?'':'<span class="t">— no la llevás encima</span>')+'</div>');
+  });
+  // D&D: los ataques vienen de la hoja rellenable
+  (s.attacks||[]).forEach(function(a){
+    filas.push('<div class="wpn"><span class="n">'+esc(a.name)+'</span>'
+      +(a.bonus?'<span>'+esc(a.bonus)+'</span>':'')
+      +(a.damage?'<span class="dmg">'+esc(a.damage)+'</span>':'')+'</div>');
+  });
+  (s.weapons||[]).forEach(function(w){
+    filas.push('<div class="wpn"><span class="n">'+esc(w)+'</span><span class="t">de la ficha</span></div>');
+  });
+  return filas.length?filas.join('')
+    :'<div style="font-size:13px;color:var(--text3);font-style:italic">Sin armas cargadas.</div>';
+}
+function renderArmas(){
+  var el=document.getElementById('armasPanel');
+  if(el) el.innerHTML=armasHTML();
 }
 function renderRoster(){
   if(!ROSTER)return;
@@ -1386,16 +1822,9 @@ function renderRoster(){
   var mp=document.getElementById('ocMe');
   var html='';
   if(meM&&meM.character){
-    var c=meM.character; var s=c.sheet||{};
-    var sub=[s.ancestry,s.paths].filter(Boolean).map(esc).join(' · ');
-    var lvl=s.level?'<div class="pj-hero-lvl">Nivel '+esc(s.level)+'</div>':'';
-    var portrait=c.has_image
-      ? '<img class="pj-portrait-sm" src="/api/characters/'+c.id+'/image?v='+IMG_V+'" alt=""/>'
-      : '<div class="pj-hero-ph">'+(c.has_pdf?'📜':'🛡')+'</div>';
-    html+='<div class="pj-hero">'+portrait
-      +'<div style="flex:1;min-width:0"><div class="pj-hero-name">'+esc(c.name)+'</div>'
-      +(sub?'<div class="pj-hero-sub">'+sub+'</div>':'')+lvl+'</div>'
-      +(SYSTEM==='dnd'?'':marcosWidget(c))+'</div>'
+    var c=meM.character, s=c.sheet||{};
+    var esDnd=(SYSTEM==='dnd')||!!s.dnd;
+    html+=shHeroHTML(c)
       +'<div class="pj-actions">'
         +'<button class="btn-sheet" onclick="openEditChar()">✎ Editar</button>'
         +'<button class="btn-sheet" onclick="openPets()">🐾 Mascotas</button>'
@@ -1403,23 +1832,37 @@ function renderRoster(){
         +(c.has_image?'<button class="btn-sheet" onclick="removeImg()">Quitar imagen</button>':'')
         +'<label class="btn-sheet" style="cursor:pointer">⭳ Actualizar PDF<input type="file" accept="application/pdf" hidden onchange="reimportPDF(this)"/></label>'
         +(c.has_pdf?'<a class="btn-sheet" href="/api/characters/'+c.id+'/pdf" target="_blank">Ver PDF</a>':'')
-      +'</div>'
-      +'<div class="me-card">'
-      +ocStatCtl('c',c,'vida','Vida','var(--red)')
-      +(SYSTEM==='dnd'?'':ocStatCtl('c',c,'focus','Focus','var(--blue)')+ocStatCtl('c',c,'inv','Investidura','var(--purple)'))
-      +ocStatuses('c',c.statuses,c.injuries)+ocInjuriesHTML(c)
-      +(SYSTEM==='dnd'?dndSlotsHTML(c)+dndCountersHTML(c):'')+'</div>';
-    var mias=meM.pets||[];
-    if(mias.length) html+='<div class="section-lbl">Mis mascotas</div>'
-      +mias.map(function(p){return petCard(p,true);}).join('');
-    if(PETS_GRUPO.length) html+='<div class="section-lbl">Mascotas del grupo</div>'
-      +PETS_GRUPO.map(function(p){return petCard(p,false);}).join('');
-    // el inventario va después de las vidas: las del personaje y las de sus mascotas
-    if(MODULO('inventario')) html+='<div id="invPanel"></div>';
-    // ficha detallada del personaje
-    html+='<div class="pj-sheet-wrap">'
-      +charSheetHTML({name:c.name,stats:c.sheet,vida_max:c.vida_max,focus_max:c.focus_max,inv_max:c.inv_max})
       +'</div>';
+    if(esDnd){
+      // D&D: la hoja rellenable tiene otra forma, así que va como venía.
+      html+='<div class="res-grid">'+resCell('c',c,'vida','Vida','var(--red)')+'</div>'
+        +'<div class="me-card">'+dnd5eSheetHTML({name:c.name,stats:s,vida_max:c.vida_max})+'</div>';
+    }else{
+      html+=cosmere3HTML(c);
+    }
+    var nEst=(c.statuses||[]).length+(c.injuries||[]).length;
+    html+=foldHead('sec:estados','Estados y heridas',nEst);
+    if(abierto('sec:estados'))
+      html+='<div class="me-card">'+ocStatuses('c',c.statuses,c.injuries)+ocInjuriesHTML(c)+'</div>';
+    if(esDnd){
+      html+=foldHead('sec:dnd','✨ Conjuros y recursos');
+      if(abierto('sec:dnd')) html+='<div class="me-card">'+dndSlotsHTML(c)+dndCountersHTML(c)+'</div>';
+    }
+    html+=foldHead('sec:armas','⚔ Armas y ataques');
+    if(abierto('sec:armas')) html+='<div class="me-card" id="armasPanel"></div>';
+    if(!esDnd){
+      // lo que no entra en las tres columnas
+      html+=foldHead('sec:resto','📜 Talentos y equipo');
+      if(abierto('sec:resto')) html+='<div class="me-card">'+shRestoHTML(s)+'</div>';
+    }
+    // Las mascotas van al final y se pliegan: enteras de una, o de a una.
+    var mias=(meM.pets||[]).map(function(p){return {p:p,mia:true};})
+      .concat(PETS_GRUPO.map(function(p){return {p:p,mia:false};}));
+    if(mias.length){
+      html+=foldHead('sec:pets','🐾 Mascotas',mias.length);
+      if(abierto('sec:pets'))
+        html+=mias.map(function(x){return petCard(x.p,x.mia);}).join('');
+    }
   }else{
     html+='<div class="me-select"><div class="me-q">No tenés personaje en esta campaña.</div>'
       +'<div style="font-size:13px;color:var(--text3)">Se crea al aceptar la invitación desde el inicio.</div></div>';
@@ -1433,28 +1876,8 @@ function renderRoster(){
     var injSnap=snapInjForm();
     mp.innerHTML=html;
     restoreInjForm(injSnap);
-    renderInventory();          // el div queda vacío al reconstruir el panel
+    renderArmas();              // el div queda vacío al reconstruir el panel
   }
-  var os=ROSTER.members.filter(function(m){return m.user_id!==MY_UID&&m.character;});
-  document.getElementById('ocOthersLbl').style.display=os.length?'':'none';
-  document.getElementById('grupoEmpty').style.display=os.length?'none':'';
-  document.getElementById('ocOthers').innerHTML=os.map(allyCard).join('');
-}
-function openRosterSheet(target){
-  if(!ROSTER)return;
-  var meM=ROSTER.members.find(function(m){return m.user_id===MY_UID;});
-  if(!meM)return;
-  var html;
-  if(target==='c'){
-    var c=meM.character;
-    html=charSheetHTML({name:c.name,stats:c.sheet,vida_max:c.vida_max,focus_max:c.focus_max,inv_max:c.inv_max});
-  }else{
-    var p=(meM.pets||[]).concat(PETS_GRUPO).find(function(x){return 'p'+x.id===target;});
-    if(!p)return;
-    html=petSheetHTML({name:p.name,stats:p.stats,acciones:p.acciones,vida_max:p.vida_max,focus_max:p.focus_max,inv_max:p.inv_max});
-  }
-  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'+html;
-  document.getElementById('overlay').classList.add('on');
 }
 
 // ─── Gestión del personaje (editar / mascotas / PDF / imagen) ───
@@ -1816,6 +2239,7 @@ async function loadInventory(){
   CAN_CREATE=canCreateItems();
   try{ INV=await api('/api/characters/'+MYCHAR+'/inventory'); }catch(e){ return; }
   renderInventory();
+  renderArmas();     // las armas se leen del inventario
 }
 function capBar(c){
   var pct=c.capacidad>0?Math.min(100,Math.round(c.usado/c.capacidad*100)):0;
