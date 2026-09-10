@@ -370,6 +370,9 @@ def init_db():
             # Si un objeto con dosis o cargas se muestra en la pestaña de
             # combate del jugador (antisépticos, fabriales…). Él lo decide.
             ("en_combate", "INTEGER DEFAULT 1"),
+            # Expertise en este objeto: '' = la deduce el sistema de las
+            # especialidades de la ficha; 'si' / 'no' = lo marcó el jugador.
+            ("experto", "TEXT DEFAULT ''"),
         ):
             if col not in vcols:
                 conn.execute(f"ALTER TABLE inventory ADD COLUMN {col} {ddl}")

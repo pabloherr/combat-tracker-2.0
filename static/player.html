@@ -347,6 +347,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .wpn .dmg b{font-weight:500;}
 .rol-tag{font-family:var(--font-h);font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:var(--pill);border:1px solid var(--gold);color:var(--gold);}
 .rol-tag.sec{border-color:var(--blue2);color:var(--blue2);}
+.rol-tag.exp{border-color:var(--yellow);color:var(--yellow);padding:2px 5px;}
+.inv-trait.off{opacity:.55;text-decoration:line-through;}
 .wpn .sec-nota{width:100%;color:var(--yellow);font-style:normal;}
 /* equipo de combate: defensas, deflect, armas en mano y objetos con cargas */
 .kit{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
@@ -566,6 +568,35 @@ function condActivas(o){
     var cn=(it.cond!=null?it.cond:condDeHerida(it.name));
     if(cn){ var x=parseCond(cn); x.herida=it.name; out.push(x); }
   });
+  if(esMiPJ(o)) out=out.concat(condPorEquipo());
+  return out;
+}
+// Mi personaje, venga de la ficha (roster) o del combate (participante).
+function esMiPJ(o){
+  if(!o||MYCHAR==null) return false;
+  if(o.kind) return o.kind==='player'&&o.user_id===MY_UID;
+  return o.sheet!==undefined&&o.id===MYCHAR;
+}
+var SK_VELOCIDAD=['Agility','Light Weaponry','Stealth','Thievery'];
+var CUMBERSOME_DESC='Para llevar esta armadura con soltura tu Fuerza tiene que ser igual o mayor que el número '
+  +'entre corchetes. Si es menor, estás Slowed mientras la llevás puesta y tenés desventaja en todos los tests de Velocidad.';
+// La armadura puesta con Cumbersome [N] y Fuerza menor que N: Slowed y
+// desventaja en los tests de Velocidad, mientras la tenga puesta. Se calcula
+// con los rasgos efectivos: con expertise la cota de malla deja de pesar.
+function condPorEquipo(){
+  var c=meChar(); if(!c||!INV||!INV.character) return [];
+  var str=((c.sheet||{}).attributes||{}).STR;
+  if(str==null) return [];
+  var out=[];
+  (INV.character.items||[]).forEach(function(it){
+    if(it.kind!=='armadura'||it.rol!=='puesta') return;
+    var n=null;
+    rasgosEfectivos(it).forEach(function(t){ var m=String(t).match(/cumbersome\s*\[\s*(\d+)/i); if(m) n=parseInt(m[1]); });
+    if(n==null||str>=n) return;
+    out.push({raw:'',name:'Slowed',param:it.name,
+      def:{name:'Slowed',tono:'neg',efecto:{mov:'mitad',desv:SK_VELOCIDAD},desc:CUMBERSOME_DESC},
+      equipo:it.name+' (Cumbersome ['+n+'], tu Fuerza es '+str+')'});
+  });
   return out;
 }
 // Heridas guardadas antes de que llevaran su condición: se busca en el catálogo.
@@ -624,9 +655,10 @@ var COND_UI={};   // destino → instancias dibujadas, para los onclick por índ
 function condChip(target,i,x){
   var col=condColor(x.name);
   var lbl=esc(x.name)+(x.param?' <span style="opacity:.85">['+esc(x.param)+']</span>':'');
-  var quitar=x.herida
+  var quitar=(x.herida||x.equipo)
     ? '<span class="spill-minus" style="color:'+col+';cursor:help" title="'
-      +escA('La fija la herida "'+x.herida+'": se va al curarla')+'">🔒</span>'
+      +escA(x.herida?'La fija la herida "'+x.herida+'": se va al curarla'
+                    :'La impone la armadura '+x.equipo+': se va al sacártela')+'">🔒</span>'
     : '<button class="spill-minus" style="color:'+col+'" onclick="quitarCond(\''+target+'\','+i+')" title="Quitar">✕</button>';
   return '<span class="spill-group" style="border-color:'+col+'">'
     +'<button class="spill on" style="color:'+col+';background:'+col+'22" '
@@ -659,7 +691,8 @@ function condDescList(insts){
     return '<div class="cond-desc" style="border-left-color:'+col+'">'
       +'<div class="n" style="color:'+col+'">'+esc(x.name)
         +(x.param?' ['+esc(x.param)+']':'')
-        +(x.herida?' <span class="d">— por la herida “'+esc(x.herida)+'”</span>':'')+'</div>'
+        +(x.herida?' <span class="d">— por la herida “'+esc(x.herida)+'”</span>':'')
+        +(x.equipo?' <span class="d">— por la armadura '+esc(x.equipo)+'</span>':'')+'</div>'
       +(ef?'<div class="e">'+esc(ef)+'</div>'
           :'<div class="d">No cambia ningún número de la ficha.</div>')
       +((x.def&&x.def.desc)?'<div class="d">'+esc(x.def.desc)+'</div>':'')
@@ -673,6 +706,7 @@ function verCond(target,i){
     +'<div class="sh-name">'+esc(x.name)
       +(x.param?' <span style="color:var(--text3)">['+esc(x.param)+']</span>':'')+'</div>'
     +(x.herida?'<div class="sh-meta">La fija la herida “'+esc(x.herida)+'”: se va al curarla.</div>':'')
+    +(x.equipo?'<div class="sh-meta">La impone la armadura '+esc(x.equipo)+': se va al sacártela.</div>':'')
     +(ef?'<div class="sh-res" style="margin:10px 0"><span>'+esc(ef)+'</span></div>'
         :'<div class="sh-meta" style="margin:10px 0">No cambia ningún número de la ficha.</div>')
     +'<div style="font-size:14px;color:var(--text2)">'
@@ -743,7 +777,7 @@ async function condAdd(target,raw,apila){
 }
 async function quitarCond(target,i){
   var x=(COND_UI[target]||[])[i];
-  if(!x||x.herida)return;
+  if(!x||x.herida||x.equipo)return;
   if(target.indexOf('k:')===0){
     await api(API+'/combat/status/remove_one','POST',{uid:target.slice(2),status:x.raw});
   }else{
@@ -2089,7 +2123,8 @@ function shHeroHTML(c){
   var portrait=c.has_image
     ? '<img class="pj-portrait-sm" src="/api/characters/'+c.id+'/image?v='+IMG_V+'" alt=""/>'
     : '<div class="pj-hero-ph">'+(c.has_pdf?'📜':'🛡')+'</div>';
-  var st=c.statuses||[];
+  // también las que imponen las heridas y la armadura puesta
+  var st=condActivas(c).map(function(x){ return x.raw||(x.name+(x.param?' ['+x.param+']':'')); });
   return '<div class="sh-hero">'+portrait
     +'<div class="sh-hero-id"><div class="pj-hero-name">'+esc(c.name)+'</div>'
       +(sub?'<div class="pj-hero-sub">'+sub+'</div>':'')+'</div>'
@@ -2140,7 +2175,7 @@ function itemsConCargas(){
   var out=[];
   function rec(list,dentro){
     (list||[]).forEach(function(i){
-      if(i.usos_max&&(i.equipado||dentro)) out.push(i);
+      if(i.usos_max) out.push(i);
       if(i.children) rec(i.children,true);
     });
   }
@@ -2158,6 +2193,20 @@ function skillMod(c,name,eff){
   var delta=(at?(eff.attr[at]||0):0)+eff.tests;
   return {base:mod,total:mod+delta,delta:delta};
 }
+// Rasgos que aplican: los del objeto más, con expertise, los de experto; y
+// "pierde el rasgo X" saca a X. El servidor manda la lista ya resuelta
+// (`rasgos`); si no vino, se calcula igual acá.
+function rasgosEfectivos(it){
+  if(it.rasgos) return it.rasgos;
+  var st=it.stats||{}, tr=(st.traits||[]).slice();
+  if(it.expertise) tr=tr.concat(st.expert_traits||[]);
+  var quitar={};
+  tr.forEach(function(t){ var m=String(t).match(/pierde el rasgo\s+([^,;.]+)/i); if(m) quitar[m[1].trim().toLowerCase()]=1; });
+  // "pierde el rasgo X" es una instrucción, no un rasgo: tampoco queda
+  return tr.filter(function(t){ return !/pierde el rasgo/i.test(t)
+    && !quitar[String(t).replace(/\s*\[.*$/,'').trim().toLowerCase()]; });
+}
+function dosManos(it){ return rasgosEfectivos(it).some(function(t){return /two[\s-]*handed|dos manos/i.test(t);}); }
 // Con qué habilidad se pega: la que diga el objeto o, si no, su clase.
 function armaSkill(st){
   var sk=String(st.skill||'');
@@ -2185,18 +2234,18 @@ function danoHTML(dmgTxt,m,tip){
 // Una fila por arma: a qué pega (Heavy o Light Weaponry) y cuánto daño
 // (dado + la misma habilidad). La secundaria recuerda el focus que cuesta.
 function filaArma(it,c,eff){
-  var st=it.stats||{}, tr=(st.traits||[]).concat(st.expert_traits||[]);
+  var st=it.stats||{}, tr=rasgosEfectivos(it), dos=dosManos(it);
   var sk=armaSkill(st), m=sk?skillMod(c,sk,eff):null;
-  var rol=it.rol==='principal'?'<span class="rol-tag">Principal</span>'
+  var rol=it.rol==='principal'?'<span class="rol-tag">'+(dos?'Ambas manos':'Principal')+'</span>'
          :it.rol==='secundaria'?'<span class="rol-tag sec">Secundaria</span>':'';
+  var exp=it.expertise?'<span class="rol-tag exp" title="Tenés expertise: aplican sus rasgos de experto">★</span>':'';
   var offhand=tr.some(function(x){return /off\s*-?\s*hand/i.test(x);});
   var nota=it.rol==='secundaria'
     ? '<span class="t sec-nota">Pegar con la secundaria cuesta '+(offhand?'1 focus (tiene Offhand)':'2 focus')+'</span>':'';
-  return '<div class="wpn">'+rol+'<span class="n">'+esc(it.name)+'</span>'+hitHTML(sk,m)
+  return '<div class="wpn">'+rol+'<span class="n">'+esc(it.name)+'</span>'+exp+hitHTML(sk,m)
     +(st.damage?danoHTML(st.damage,m,m?('Dado del arma + '+sk+' '+fmtMod(m.total)):''):'')
     +(st.range?'<span>'+esc(st.range)+'</span>':'')
-    +(tr.length?'<span class="t">'+tr.map(esc).join(', ')+'</span>':'')
-    +(it.equipado?'':'<span class="t">— no la llevás encima</span>')+nota+'</div>';
+    +(tr.length?'<span class="t">'+tr.map(esc).join(', ')+'</span>':'')+nota+'</div>';
 }
 // Golpe desarmado: se pega con Athletics y el dado escala con la Fuerza
 // (0-2: 1 impacto sin dado · 3-4: 1d4 · 5-6: 1d8 · 7-8: 2d6 · 9+: 2d10).
@@ -2280,6 +2329,14 @@ function kitCombateHTML(c){
 function renderKit(){
   var el=document.getElementById('kitCombate'), c=meChar();
   if(el&&c) el.outerHTML=kitCombateHTML(c);
+}
+// La armadura puesta puede imponer una condición: al cambiar el inventario
+// se vuelve a dibujar la ficha, que es donde se ven sus efectos.
+var INV_FIRMA='';
+function invCambio(){
+  var f='';
+  if(INV&&INV.character) (INV.character.items||[]).forEach(function(i){ if(i.rol) f+=i.id+':'+i.rol+':'+(i.expertise?1:0)+';'; });
+  if(f!==INV_FIRMA){ INV_FIRMA=f; renderRoster(); }
 }
 function renderRoster(){
   if(!ROSTER)return;
@@ -2864,6 +2921,7 @@ async function loadInventory(){
   try{ INV=await api('/api/characters/'+MYCHAR+'/inventory'); }catch(e){ return; }
   renderInventory();
   renderArmas();     // las armas se leen del inventario
+  invCambio();
 }
 function capBar(c){
   var pct=c.capacidad>0?Math.min(100,Math.round(c.usado/c.capacidad*100)):0;
@@ -2877,17 +2935,33 @@ function capBar(c){
       +(c.bonus?' + '+c.bonus+' de mochila':'')+'</div></div>';
 }
 // Ficha corta por tipo (un arma muestra daño y rasgos; una posada, el precio).
+// Rasgos de un arma o armadura: los que aplican normales, y los que no (los de
+// experto sin expertise, o los que la expertise quita) tachados.
+function rasgosHTML(it){
+  var s=it.stats||{}, ef=rasgosEfectivos(it), todos=(s.traits||[]).concat(s.expert_traits||[]);
+  if(!todos.length) return '';
+  var vistos={};
+  return todos.map(function(t){
+    if(vistos[t]) return ''; vistos[t]=1;
+    var deExp=(s.expert_traits||[]).indexOf(t)>=0;
+    var on=/pierde el rasgo/i.test(t)?!!it.expertise:ef.indexOf(t)>=0;
+    return '<span class="inv-trait'+(on?'':' off')+'" title="'
+      +escA(on?(deExp?'Rasgo de experto: aplica porque tenés expertise':'')
+              :(deExp?'Rasgo de experto: aplica solo con expertise':'Lo quita tu expertise'))+'">'+esc(t)+'</span>';
+  }).filter(Boolean).join(', ');
+}
 function invStatsHTML(it){
   var s=it.stats||{};
   if(it.kind==='arma'){
-    var t=(s.traits||[]).concat(s.expert_traits||[]);
+    var r=rasgosHTML(it);
     return '<div style="font-size:12px;color:var(--text3)">'
       +[s.damage,s.range].filter(Boolean).map(esc).join(' · ')
-      +(t.length?' · '+t.map(esc).join(', '):'')+'</div>';
+      +(r?' · '+r:'')+'</div>';
   }
-  if(it.kind==='armadura')
-    return '<div style="font-size:12px;color:var(--text3)">Deflect '+(s.deflect||0)
-      +((s.traits||[]).length?' · '+(s.traits||[]).map(esc).join(', '):'')+'</div>';
+  if(it.kind==='armadura'){
+    var ra=rasgosHTML(it);
+    return '<div style="font-size:12px;color:var(--text3)">Deflect '+(s.deflect||0)+(ra?' · '+ra:'')+'</div>';
+  }
   if(it.kind==='vehiculo')
     return '<div style="font-size:12px;color:var(--text3)">'
       +[s.vehicle_type,s.speed].filter(Boolean).map(esc).join(' · ')+'</div>';
@@ -2925,10 +2999,13 @@ function invItemRow(it,dentro,zona){
     else if(INV_CONTENEDORES.length)
       mover='<button class="btn-sheet" onclick="openMove('+it.id+')" title="Guardar en un contenedor">⇩ guardar</button>';
   }
-  var eq=(guardado||dentro)?''
-    : it.contenedor
-    ? '<button class="btn-sheet'+(it.equipado?'':' off')+'" onclick="invEquip('+it.id+')" title="'+(it.equipado?'Lo llevás encima: tocá para dejarlo':'Lo dejaste: no cuenta para tu carga')+'">'+(it.equipado?'🎒 llevando':'🎒 dejado')+'</button>'
-    : '<button class="btn-sheet'+(it.equipado?'':' off')+'" onclick="invEquip('+it.id+')" title="'+(it.equipado?'Equipado':'Guardado: no cuenta')+'">'+(it.equipado?'✓':'○')+'</button>';
+  // expertise en el arma o la armadura: la deduce el sistema de las
+  // especialidades de la ficha, y el jugador la puede marcar a mano
+  var expBtn=(it.kind==='arma'||it.kind==='armadura')
+    ? '<button class="btn-sheet'+(it.expertise?' rol-on':' off')+'" onclick="invExperto('+it.id+')" title="'
+        +escA((it.expertise?'Tenés expertise en este objeto: aplican sus rasgos de experto.':'Sin expertise: sus rasgos de experto no aplican.')
+          +(it.experto?' Lo marcaste a mano.':' Lo dedujo el sistema de tus especialidades.')+' Tocá para cambiarlo.')+'">'
+        +(it.expertise?'★ experto':'☆ sin expertise')+'</button>':'';
   // lo que está dentro de un contenedor viaja con él: la zona la decide la mochila
   var zonaBtn=dentro?''
     : '<button class="btn-sheet" onclick="openStash('+it.id+',\''+(zona||'')+'\')" title="Mover a otra zona">⇄</button>';
@@ -2936,16 +3013,19 @@ function invItemRow(it,dentro,zona){
     : '<button class="btn-sheet" onclick="openTransfer('+it.id+')" title="Pasárselo a otro">🤝</button>';
   // en mano / puesta: solo lo que se lleva encima y no está en un contenedor
   var rolBtns='';
-  if(!guardado&&!dentro&&it.kind==='arma')
-    rolBtns='<button class="btn-sheet'+(it.rol==='principal'?' rol-on':' off')+'" onclick="invRol('+it.id+',\'principal\')" title="Arma principal">⚔ principal</button>'
-      +'<button class="btn-sheet'+(it.rol==='secundaria'?' rol-on':' off')+'" onclick="invRol('+it.id+',\'secundaria\')" title="Arma secundaria: pegar con ella cuesta 2 focus (1 si tiene Offhand)">🗡 secundaria</button>';
+  if(!guardado&&!dentro&&it.kind==='arma'){
+    var dos=dosManos(it);
+    rolBtns='<button class="btn-sheet'+(it.rol==='principal'?' rol-on':' off')+'" onclick="invRol('+it.id+',\'principal\')" title="'
+        +(dos?'Arma a dos manos: ocupa la principal y la secundaria':'Arma principal')+'">'+(dos?'⚔ ambas manos':'⚔ principal')+'</button>'
+      +(dos?'':'<button class="btn-sheet'+(it.rol==='secundaria'?' rol-on':' off')+'" onclick="invRol('+it.id+',\'secundaria\')" title="Arma secundaria: pegar con ella cuesta 2 focus (1 si tiene Offhand)">🗡 secundaria</button>');
+  }
   if(!guardado&&!dentro&&it.kind==='armadura')
     rolBtns='<button class="btn-sheet'+(it.rol==='puesta'?' rol-on':' off')+'" onclick="invRol('+it.id+',\'puesta\')" title="Armadura puesta: da tu deflect. Solo una.">🛡 puesta</button>';
   var verComb=(it.usos_max&&!guardado)
     ? '<button class="btn-sheet'+(it.en_combate?'':' off')+'" onclick="invCombate('+it.id+')" title="'
         +(it.en_combate?'Se ve en Grupo y combate: tocá para ocultarlo':'Oculto en Grupo y combate: tocá para mostrarlo')+'">'
         +(it.en_combate?'👁 en combate':'👁 oculto')+'</button>':'';
-  var head='<div class="inv-row"'+(it.equipado||guardado?'':' style="opacity:.55"')+'>'
+  var head='<div class="inv-row">'
     +'<span class="inv-info"><b style="color:var(--gold2)">'+esc(it.name)+'</b>'
       +(it.cantidad>1?' <span style="color:var(--text3)">x'+it.cantidad+'</span>':'')
       +' <span style="color:var(--text3);font-size:12px">'+it.slots+' slot'+(it.slots===1?'':'s')
@@ -2954,9 +3034,7 @@ function invItemRow(it,dentro,zona){
       +invDescHTML(it)
     +'</span>'
     +'<span class="inv-btns">'
-    +rolBtns+verComb+mover+eq+zonaBtn+pasar
-    +'<button class="btn-sheet" onclick="invQty('+it.id+',1)">+</button>'
-    +'<button class="btn-sheet" onclick="invQty('+it.id+',-1)">−</button>'
+    +rolBtns+expBtn+verComb+mover+zonaBtn+pasar
     +'<button class="btn-sheet" style="color:var(--red);border-color:var(--red)" onclick="invDel('+it.id+')">✕</button>'
     +'</span></div>';
   if(!it.contenedor) return head;
@@ -3047,13 +3125,18 @@ function stashCard(titulo,hint,list,zona,vacio){
     +(list.length?list.map(function(i){return invItemRow(i,false,zona);}).join(''):invEmpty(vacio))
     +'</div>';
 }
-async function invQty(eid,delta){
-  await api('/api/characters/'+MYCHAR+'/inventory/'+eid+'/qty','POST',{delta:delta});
-  loadInventory();
+// POST que muestra el motivo si el servidor dice que no (dos manos, etc.).
+async function invPost(eid,accion,body){
+  var r=await fetch('/api/characters/'+MYCHAR+'/inventory/'+eid+'/'+accion,
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+  if(!r.ok){ var e=await r.json().catch(function(){return{detail:'Error'};}); alert(e.detail||'No se pudo cambiar.'); return false; }
+  return true;
 }
-async function invEquip(eid){
-  await api('/api/characters/'+MYCHAR+'/inventory/'+eid+'/equip','POST');
-  loadInventory();
+// Tocar el que ya tiene lo apaga: con expertise deducida pasa a "no", sin
+// expertise pasa a "si".
+async function invExperto(eid){
+  var it=findInv(eid); if(!it) return;
+  if(await invPost(eid,'experto',{experto:it.expertise?'no':'si'})) loadInventory();
 }
 function findInv(eid){
   var hallado=null;
@@ -3064,9 +3147,7 @@ function findInv(eid){
 // Tocar el rol que ya tiene se lo saca.
 async function invRol(eid,rol){
   var it=findInv(eid), nuevo=(it&&it.rol===rol)?'':rol;
-  try{ await api('/api/characters/'+MYCHAR+'/inventory/'+eid+'/rol','POST',{rol:nuevo}); }
-  catch(e){ alert('No se pudo cambiar.'); return; }
-  loadInventory();
+  if(await invPost(eid,'rol',{rol:nuevo})) loadInventory();
 }
 async function invCombate(eid){
   await api('/api/characters/'+MYCHAR+'/inventory/'+eid+'/combate','POST');

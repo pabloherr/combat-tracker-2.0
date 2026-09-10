@@ -1,5 +1,6 @@
-"""Equipo de combate: arma principal y secundaria, armadura puesta, y qué
-objetos con cargas se ven en la pestaña de combate."""
+"""Equipo de combate: arma principal y secundaria (y las de dos manos),
+armadura puesta, expertise en el objeto y qué objetos con cargas se ven en la
+pestaña de combate."""
 
 from helpers import party
 
@@ -19,6 +20,13 @@ def _dar(dm, chid, **kw):
 
 def _rol(pl, chid, eid, rol):
     return pl.post(f"/api/characters/{chid}/inventory/{eid}/rol", json={"rol": rol})
+
+
+def _ficha(pl, cid, chid, **sheet):
+    r = pl.put(f"/api/characters/{chid}", json={
+        "name": "Kal", "campaign_id": cid, "vida_max": 20, "focus_max": 4, "inv_max": 0,
+        "sheet": sheet})
+    assert r.status_code == 200, r.text
 
 
 def _armado(make_client):
@@ -69,19 +77,6 @@ def test_the_role_matches_the_kind_of_object(make_client):
     assert _items(pl, chid)["Espada"]["rol"] == ""
 
 
-def test_wielding_equips_and_dropping_unwields(make_client):
-    dm, pl, cid, chid = _armado(make_client)
-    eid = _items(pl, chid)["Espada"]["id"]
-    pl.post(f"/api/characters/{chid}/inventory/{eid}/equip")      # la deja en el suelo
-    assert _items(pl, chid)["Espada"]["equipado"] is False
-    _rol(pl, chid, eid, "principal")                               # la agarra
-    esp = _items(pl, chid)["Espada"]
-    assert esp["equipado"] is True and esp["rol"] == "principal"
-    pl.post(f"/api/characters/{chid}/inventory/{eid}/equip")      # la vuelve a dejar
-    esp = _items(pl, chid)["Espada"]
-    assert esp["equipado"] is False and esp["rol"] == ""
-
-
 def test_storing_or_handing_over_a_weapon_takes_it_out_of_the_hand(make_client):
     dm, pl, cid, chid = _armado(make_client)
     _dar(dm, chid, name="Mochila", contenedor_capacidad=5)
@@ -101,6 +96,90 @@ def test_storing_or_handing_over_a_weapon_takes_it_out_of_the_hand(make_client):
     pl.post(f"/api/characters/{chid}/inventory/{it['Daga']['id']}/stash", json={"stash": "personal"})
     guard = {i["name"]: i for i in _inv(pl, chid)["character"]["guardado"]}
     assert guard["Daga"]["rol"] == ""
+
+
+def test_everything_carried_counts_for_capacity(make_client):
+    dm, pl, cid, chid = party(make_client)
+    _dar(dm, chid, name="Placa completa", slots=6)
+    assert _inv(pl, chid)["character"]["capacity"]["usado"] == 6
+    # ya no hay tick de "equipado": el endpoint no existe
+    eid = _items(pl, chid)["Placa completa"]["id"]
+    assert pl.post(f"/api/characters/{chid}/inventory/{eid}/equip").status_code == 404
+
+
+# ── Dos manos ──────────────────────────────────────────────
+
+def test_a_two_handed_weapon_takes_both_hands(make_client):
+    dm, pl, cid, chid = _armado(make_client)
+    _dar(dm, chid, name="Espadón", kind="arma",
+         stats={"weapon_class": "heavy", "damage": "2d6", "traits": ["Two-Handed"]})
+    it = _items(pl, chid)
+    # no puede ser la secundaria
+    r = _rol(pl, chid, it["Espadón"]["id"], "secundaria")
+    assert r.status_code == 400 and "dos manos" in r.json()["detail"]
+    # como principal, desaloja la secundaria que había
+    _rol(pl, chid, it["Daga"]["id"], "secundaria")
+    _rol(pl, chid, it["Espadón"]["id"], "principal")
+    it = _items(pl, chid)
+    assert it["Espadón"]["rol"] == "principal" and it["Daga"]["rol"] == ""
+    # y mientras está en la mano no entra ninguna secundaria
+    r = _rol(pl, chid, it["Daga"]["id"], "secundaria")
+    assert r.status_code == 400 and "Espadón" in r.json()["detail"]
+    # con una principal de una mano, la secundaria vuelve a valer
+    _rol(pl, chid, it["Espada"]["id"], "principal")
+    assert _rol(pl, chid, it["Daga"]["id"], "secundaria").status_code == 200
+
+
+def test_expertise_can_remove_the_two_handed_trait(make_client):
+    dm, pl, cid, chid = _armado(make_client)
+    _dar(dm, chid, name="Espadón", kind="arma",
+         stats={"weapon_class": "heavy", "damage": "2d6", "traits": ["Two-Handed"],
+                "expert_traits": ["Unique: pierde el rasgo Two-Handed"]})
+    eid = _items(pl, chid)["Espadón"]["id"]
+    assert _rol(pl, chid, eid, "secundaria").status_code == 400
+    # con Espadón entre las especialidades de la ficha, pasa a ser de una mano
+    _ficha(pl, cid, chid, expertise="Cultura, Espadón")
+    esp = _items(pl, chid)["Espadón"]
+    assert esp["expertise"] is True and esp["rasgos"] == []      # Two-Handed se fue
+    assert _rol(pl, chid, eid, "secundaria").status_code == 200
+
+
+# ── Expertise: deducida de la ficha o marcada a mano ───────
+
+def test_expertise_is_deduced_from_the_sheet_and_can_be_overridden(make_client):
+    dm, pl, cid, chid = _armado(make_client)
+    it = _items(pl, chid)
+    assert it["Daga"]["expertise"] is False and it["Daga"]["rasgos"] == []
+
+    _ficha(pl, cid, chid, expertise="Daga, Idiomas")
+    it = _items(pl, chid)
+    assert it["Daga"]["expertise"] is True and it["Daga"]["rasgos"] == ["Offhand"]
+    assert it["Espada"]["expertise"] is False
+
+    # el jugador la niega a mano
+    r = pl.post(f"/api/characters/{chid}/inventory/{it['Daga']['id']}/experto", json={"experto": "no"})
+    assert r.status_code == 200
+    assert _items(pl, chid)["Daga"]["expertise"] is False
+    # y se la da a la espada aunque la ficha no la tenga
+    pl.post(f"/api/characters/{chid}/inventory/{it['Espada']['id']}/experto", json={"experto": "si"})
+    assert _items(pl, chid)["Espada"]["expertise"] is True
+    # vuelve a automático
+    pl.post(f"/api/characters/{chid}/inventory/{it['Daga']['id']}/experto", json={"experto": ""})
+    assert _items(pl, chid)["Daga"]["expertise"] is True
+
+    # solo armas y armaduras
+    r = pl.post(f"/api/characters/{chid}/inventory/{it['Antiséptico']['id']}/experto", json={"experto": "si"})
+    assert r.status_code == 400
+
+
+def test_expertise_matches_the_name_inside_a_longer_one(make_client):
+    dm, pl, cid, chid = party(make_client)
+    _dar(dm, chid, name="Espada larga", kind="arma", stats={"weapon_class": "heavy"})
+    _dar(dm, chid, name="Cota de malla", kind="armadura", stats={"deflect": 2})
+    _ficha(pl, cid, chid, expertise="Espada, Cota de Malla")
+    it = _items(pl, chid)
+    assert it["Espada larga"]["expertise"] is True
+    assert it["Cota de malla"]["expertise"] is True
 
 
 # ── Objetos con cargas en la pestaña de combate ────────────

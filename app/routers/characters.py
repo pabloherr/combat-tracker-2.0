@@ -1,6 +1,8 @@
 """API: Personajes de jugador (CRUD + importar/descargar PDF)."""
 
 import json
+import re
+import unicodedata
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -11,7 +13,8 @@ from ..config import CONFIG_DEFAULTS, get_config, size_bases
 from ..database import db
 from ..dnd_pdf import parse_dnd_pdf
 from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
-                      InventoryIn, InventoryMove, InventoryQty, InventoryRol, InventoryStash,
+                      InventoryExperto, InventoryIn, InventoryMove, InventoryQty, InventoryRol,
+                      InventoryStash,
                       InventoryTransfer, LiveStat, LiveStatus, MarcosChange, MarcosSet,
                       PetFromEnemy, PetName, PetSheet, SizeIn, SlotsConfigIn,
                       SlotSpend, TakeIn)
@@ -869,7 +872,75 @@ def _inv_serialize(r) -> dict:
     d["stash"] = _norm_stash(d.get("stash"))
     d["rol"] = d.get("rol") or ""
     d["en_combate"] = bool(d.get("en_combate", 1) if d.get("en_combate") is not None else 1)
+    d["experto"] = d.get("experto") or ""
     return d
+
+
+# ── Rasgos de armas y armaduras, con la expertise del que los usa ──
+# Con expertise en el objeto se suman sus `expert_traits`, y algunos de esos
+# dicen "pierde el rasgo X": entonces X se saca de la lista.
+
+def _norm_txt(s) -> str:
+    s = unicodedata.normalize("NFKD", str(s or ""))
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    return re.sub(r"\s+", " ", s.lower()).strip()
+
+
+def tiene_expertise(nombre: str, expertise: str) -> bool:
+    """Si el nombre del objeto figura entre las especialidades de la ficha
+    (una lista separada por comas). Vale la coincidencia exacta o que una
+    aparezca entera dentro de la otra ("Espada" en "Espada larga")."""
+    n = _norm_txt(nombre)
+    if not n:
+        return False
+    for t in re.split(r"[,;\n]", expertise or ""):
+        t = _norm_txt(t)
+        if len(t) < 3:
+            continue
+        if t == n or re.search(r"\b" + re.escape(t) + r"\b", n) \
+                or re.search(r"\b" + re.escape(n) + r"\b", t):
+            return True
+    return False
+
+
+def es_experto(r, sheet: dict | None) -> bool:
+    """Lo que marcó el jugador manda; si no marcó nada, se deduce de la ficha."""
+    marca = (r["experto"] if "experto" in r.keys() else "") or ""
+    if marca == "si":
+        return True
+    if marca == "no":
+        return False
+    return tiene_expertise(r["name"], (sheet or {}).get("expertise") or "")
+
+
+def rasgos_efectivos(stats: dict, experto: bool) -> list:
+    tr = list(stats.get("traits") or [])
+    if experto:
+        tr += list(stats.get("expert_traits") or [])
+    quitar, meta = set(), []
+    for t in tr:
+        m = re.search(r"pierde el rasgo\s+([^,;.]+)", str(t), re.I)
+        if m:
+            quitar.add(_norm_txt(m.group(1)))
+            meta.append(t)
+    # "pierde el rasgo X" es una instrucción, no un rasgo: no queda en la lista
+    return [t for t in tr if t not in meta
+            and _norm_txt(re.sub(r"\s*\[.*$", "", str(t))) not in quitar]
+
+
+def _dos_manos(rasgos) -> bool:
+    return any(re.search(r"two[\s-]*handed|dos manos", str(t), re.I) for t in rasgos)
+
+
+def _marcar_expertise(items: list, sheet: dict | None):
+    """Le pone a cada arma y armadura si se usa con expertise (y sus rasgos
+    efectivos), que es lo que el jugador ve y lo que decide las dos manos."""
+    for d in items or []:
+        if d.get("kind") in ("arma", "armadura"):
+            d["expertise"] = es_experto(d, sheet)
+            d["rasgos"] = rasgos_efectivos(d.get("stats") or {}, d["expertise"])
+        if d.get("children"):
+            _marcar_expertise(d["children"], sheet)
 
 
 def _slots_de(r) -> int:
@@ -881,13 +952,13 @@ def _slots_de(r) -> int:
 def carrying_capacity(size: str, fuerza: int, rows, bases=None) -> dict:
     """Capacidad, uso y sobrecarga. No bloquea: solo informa.
 
-    Solo cuenta lo que la criatura lleva encima: lo **equipado** y que no esté
-    dentro de un contenedor (eso va contra la capacidad del contenedor).
+    Cuenta todo lo que la criatura lleva encima y no está dentro de un
+    contenedor (eso va contra la capacidad del contenedor).
 
     `bases` es la tabla de base por tamaño de la campaña; sin ella, la del manual."""
     bases = bases or _SIZE_BASE
     base = bases.get(_norm_size(size), bases.get("Mediano", 6))
-    encima = [r for r in rows if not r["parent_id"] and r["equipado"]]
+    encima = [r for r in rows if not r["parent_id"]]
     bonus = sum((r["capacity_bonus"] or 0) * (r["cantidad"] or 1) for r in encima)
     usado = sum(_slots_de(r) for r in encima)
     capacidad = base + int(fuerza or 0) + bonus
@@ -1106,6 +1177,7 @@ def character_inventory(conn, ch) -> dict:
     cid = ch["id"]
     bases = _bases_de(conn, ch["campaign_id"])
     rows = _inv_rows(conn, character_id=cid)
+    sheet = json.loads(ch["sheet"] or "{}")
     out = {"character": {"id": cid, "name": ch["name"],
                          "size": ch["size"] if "size" in ch.keys() else "Mediano",
                          "items": _nest(rows),
@@ -1113,6 +1185,8 @@ def character_inventory(conn, ch) -> dict:
                          "guardado": _nest(_inv_rows(conn, character_id=cid,
                                                      stash="personal"))},
            "pets": []}
+    _marcar_expertise(out["character"]["items"], sheet)
+    _marcar_expertise(out["character"]["guardado"], sheet)
 
     def _pet_block(pet, dueno=""):
         prows = _inv_rows(conn, pet_id=pet["id"])
@@ -1239,50 +1313,77 @@ def _inv_entry(conn, cid: int, eid: int):
     return r
 
 
-@router.post("/{cid}/inventory/{eid}/equip")
-def toggle_equipado(cid: int, eid: int, user=Depends(current_user)):
-    """Equipar/desequipar. Lo desequipado (y lo que lleve adentro, si es un
-    contenedor) deja de contar para la capacidad: quedó en el suelo o en la carreta."""
-    with db() as conn:
-        _owned_or_dm(conn, cid, user)
-        r = _inv_entry(conn, cid, eid)
-        val = 0 if r["equipado"] else 1
-        # lo que se deja en el suelo tampoco sigue en la mano
-        conn.execute("UPDATE inventory SET equipado=?, rol=CASE WHEN ?=0 THEN '' ELSE rol END "
-                     "WHERE id=?", (val, val, eid))
-    return {"ok": True, "equipado": bool(val)}
-
-
 _ROLES = {"arma": ("principal", "secundaria"), "armadura": ("puesta",)}
+
+
+def _misma_criatura(conn, r, rol):
+    """La entrada de esa criatura que tiene ese rol (o None)."""
+    return conn.execute(
+        "SELECT * FROM inventory WHERE rol=? AND id<>? AND "
+        "COALESCE(character_id,0)=COALESCE(?,0) AND COALESCE(pet_id,0)=COALESCE(?,0)",
+        (rol, r["id"], r["character_id"], r["pet_id"])).fetchone()
 
 
 @router.post("/{cid}/inventory/{eid}/rol")
 def set_rol(cid: int, eid: int, body: InventoryRol, user=Depends(current_user)):
     """Arma principal, arma secundaria o armadura puesta. Hay uno solo de cada
-    por criatura: darle el rol a otro objeto se lo saca al que lo tenía. Poner
-    algo en la mano lo equipa (no se pelea con una espada que quedó en el suelo)."""
+    por criatura: darle el rol a otro objeto se lo saca al que lo tenía. Un arma
+    Two-Handed ocupa las dos manos: solo puede ser la principal, y con ella en
+    la mano no hay secundaria."""
     rol = (body.rol or "").strip().lower()
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        r = _inv_entry(conn, cid, eid)
+        if not rol:
+            conn.execute("UPDATE inventory SET rol='' WHERE id=?", (eid,))
+            return {"ok": True, "rol": ""}
+        permitidos = _ROLES.get(r["kind"] or "equipo", ())
+        if rol not in permitidos:
+            if not permitidos:
+                raise HTTPException(400, "Eso no es un arma ni una armadura")
+            raise HTTPException(400, "Rol inválido para ese objeto: " + " o ".join(permitidos))
+        if r["parent_id"] or _norm_stash(r["stash"]):
+            raise HTTPException(400, "Primero sacalo del contenedor o del guardado")
+        # la expertise es del personaje: las mascotas no tienen especialidades
+        sheet = json.loads(ch["sheet"] or "{}") if r["character_id"] else None
+        if r["kind"] == "arma":
+            dos = _dos_manos(rasgos_efectivos(json.loads(r["stats"] or "{}"), es_experto(r, sheet)))
+            if rol == "secundaria":
+                if dos:
+                    raise HTTPException(400, "Esa arma necesita las dos manos: solo puede ser la principal")
+                ppal = _misma_criatura(conn, r, "principal")
+                if ppal and _dos_manos(rasgos_efectivos(json.loads(ppal["stats"] or "{}"),
+                                                        es_experto(ppal, sheet))):
+                    raise HTTPException(400, f"Tu arma principal ({ppal['name']}) ocupa las dos manos")
+            elif dos:
+                # con las dos manos ocupadas, la secundaria queda libre
+                conn.execute(
+                    "UPDATE inventory SET rol='' WHERE rol='secundaria' AND "
+                    "COALESCE(character_id,0)=COALESCE(?,0) AND COALESCE(pet_id,0)=COALESCE(?,0)",
+                    (r["character_id"], r["pet_id"]))
+        # el que tenía este rol lo pierde (misma criatura)
+        conn.execute(
+            "UPDATE inventory SET rol='' WHERE rol=? AND id<>? AND "
+            "COALESCE(character_id,0)=COALESCE(?,0) AND COALESCE(pet_id,0)=COALESCE(?,0)",
+            (rol, eid, r["character_id"], r["pet_id"]))
+        conn.execute("UPDATE inventory SET rol=? WHERE id=?", (rol, eid))
+    return {"ok": True, "rol": rol}
+
+
+@router.post("/{cid}/inventory/{eid}/experto")
+def set_experto(cid: int, eid: int, body: InventoryExperto, user=Depends(current_user)):
+    """Marcar a mano la expertise en un arma o armadura (por si el sistema no
+    la dedujo bien de las especialidades de la ficha)."""
+    v = (body.experto or "").strip().lower()
+    if v not in ("", "si", "no"):
+        raise HTTPException(400, "Valor inválido: si, no o vacío (automático)")
     with db() as conn:
         _owned_or_dm(conn, cid, user)
         r = _inv_entry(conn, cid, eid)
-        if rol:
-            permitidos = _ROLES.get(r["kind"] or "equipo", ())
-            if rol not in permitidos:
-                if not permitidos:
-                    raise HTTPException(400, "Eso no es un arma ni una armadura")
-                raise HTTPException(400, "Rol inválido para ese objeto: "
-                                          + " o ".join(permitidos))
-            if r["parent_id"] or _norm_stash(r["stash"]):
-                raise HTTPException(400, "Primero sacalo del contenedor o del guardado")
-            # el que tenía este rol lo pierde (misma criatura)
-            conn.execute(
-                "UPDATE inventory SET rol='' WHERE rol=? AND id<>? AND "
-                "COALESCE(character_id,0)=COALESCE(?,0) AND COALESCE(pet_id,0)=COALESCE(?,0)",
-                (rol, eid, r["character_id"], r["pet_id"]))
-            conn.execute("UPDATE inventory SET rol=?, equipado=1 WHERE id=?", (rol, eid))
-        else:
-            conn.execute("UPDATE inventory SET rol='' WHERE id=?", (eid,))
-    return {"ok": True, "rol": rol}
+        if (r["kind"] or "equipo") not in ("arma", "armadura"):
+            raise HTTPException(400, "La expertise se marca en armas y armaduras")
+        conn.execute("UPDATE inventory SET experto=? WHERE id=?", (v, eid))
+    return {"ok": True, "experto": v}
 
 
 @router.post("/{cid}/inventory/{eid}/combate")

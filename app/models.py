@@ -275,6 +275,12 @@ class InventoryRol(BaseModel):
     rol: str = ""
 
 
+class InventoryExperto(BaseModel):
+    """Marcar a mano si se tiene expertise en un objeto: 'si', 'no' o '' para
+    que lo deduzca el sistema de las especialidades de la ficha."""
+    experto: str = ""
+
+
 class InventoryStash(BaseModel):
     """Mover un objeto entre zonas: encima, el guardado propio o el del grupo."""
     stash: str = ""                 # "" (encima) | personal | grupo

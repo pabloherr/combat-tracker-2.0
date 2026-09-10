@@ -149,18 +149,6 @@ def test_backpack_is_separate_storage(make_client):
     assert mochila["cont_usado"] == 3 and mochila["cont_lleno"] is True
 
 
-def test_unequip_frees_capacity(make_client):
-    dm, pl, cid, chid = party(make_client)
-    dm.post(f"/api/characters/{chid}/inventory", json={"name": "Placa completa", "slots": 6})
-    eid = _inv(pl, chid)["character"]["items"][0]["id"]
-    assert _inv(pl, chid)["character"]["capacity"]["usado"] == 6
-    r = pl.post(f"/api/characters/{chid}/inventory/{eid}/equip").json()
-    assert r["equipado"] is False
-    assert _inv(pl, chid)["character"]["capacity"]["usado"] == 0   # la dejó en el suelo
-    pl.post(f"/api/characters/{chid}/inventory/{eid}/equip")
-    assert _inv(pl, chid)["character"]["capacity"]["usado"] == 6
-
-
 def test_move_in_and_out_of_container(make_client):
     dm, pl, cid, chid = party(make_client)
     dm.post(f"/api/characters/{chid}/inventory", json={"name": "Mochila", "slots": 1,
