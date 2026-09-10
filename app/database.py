@@ -363,6 +363,13 @@ def init_db():
             # Necesario para el guardado del grupo, que no es de nadie en
             # particular: ahí character_id y pet_id van en NULL.
             ("campaign_id", "INTEGER REFERENCES campaigns(id) ON DELETE CASCADE"),
+            # Rol en combate: 'principal' / 'secundaria' (armas) o 'puesta'
+            # (armadura). Uno por rol por criatura; se pierde al guardar,
+            # pasar o dejar el objeto.
+            ("rol", "TEXT DEFAULT ''"),
+            # Si un objeto con dosis o cargas se muestra en la pestaña de
+            # combate del jugador (antisépticos, fabriales…). Él lo decide.
+            ("en_combate", "INTEGER DEFAULT 1"),
         ):
             if col not in vcols:
                 conn.execute(f"ALTER TABLE inventory ADD COLUMN {col} {ddl}")

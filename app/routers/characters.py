@@ -11,7 +11,7 @@ from ..config import CONFIG_DEFAULTS, get_config, size_bases
 from ..database import db
 from ..dnd_pdf import parse_dnd_pdf
 from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
-                      InventoryIn, InventoryMove, InventoryQty, InventoryStash,
+                      InventoryIn, InventoryMove, InventoryQty, InventoryRol, InventoryStash,
                       InventoryTransfer, LiveStat, LiveStatus, MarcosChange, MarcosSet,
                       PetFromEnemy, PetName, PetSheet, SizeIn, SlotsConfigIn,
                       SlotSpend, TakeIn)
@@ -867,6 +867,8 @@ def _inv_serialize(r) -> dict:
     d["contenedor"] = bool(d.get("contenedor"))
     d["equipado"] = bool(d.get("equipado"))
     d["stash"] = _norm_stash(d.get("stash"))
+    d["rol"] = d.get("rol") or ""
+    d["en_combate"] = bool(d.get("en_combate", 1) if d.get("en_combate") is not None else 1)
     return d
 
 
@@ -1020,9 +1022,11 @@ def _place(conn, entry, *, character_id=None, pet_id=None, campaign_id=None,
            stash="", parent_id=None):
     """Deja una entrada en una zona. Lo que hay dentro de un contenedor viaja
     con él: la mochila se guarda llena."""
+    # Al moverse deja de estar en la mano o puesto: la espada guardada en la
+    # mochila, o pasada a otro, no es el arma principal de nadie.
     conn.execute(
-        "UPDATE inventory SET character_id=?, pet_id=?, campaign_id=?, stash=?, parent_id=? "
-        "WHERE id=?",
+        "UPDATE inventory SET character_id=?, pet_id=?, campaign_id=?, stash=?, parent_id=?, "
+        "rol='' WHERE id=?",
         (character_id, pet_id, campaign_id, stash, parent_id, entry["id"]))
     conn.execute(
         "UPDATE inventory SET character_id=?, pet_id=?, campaign_id=?, stash=? "
@@ -1243,8 +1247,54 @@ def toggle_equipado(cid: int, eid: int, user=Depends(current_user)):
         _owned_or_dm(conn, cid, user)
         r = _inv_entry(conn, cid, eid)
         val = 0 if r["equipado"] else 1
-        conn.execute("UPDATE inventory SET equipado=? WHERE id=?", (val, eid))
+        # lo que se deja en el suelo tampoco sigue en la mano
+        conn.execute("UPDATE inventory SET equipado=?, rol=CASE WHEN ?=0 THEN '' ELSE rol END "
+                     "WHERE id=?", (val, val, eid))
     return {"ok": True, "equipado": bool(val)}
+
+
+_ROLES = {"arma": ("principal", "secundaria"), "armadura": ("puesta",)}
+
+
+@router.post("/{cid}/inventory/{eid}/rol")
+def set_rol(cid: int, eid: int, body: InventoryRol, user=Depends(current_user)):
+    """Arma principal, arma secundaria o armadura puesta. Hay uno solo de cada
+    por criatura: darle el rol a otro objeto se lo saca al que lo tenía. Poner
+    algo en la mano lo equipa (no se pelea con una espada que quedó en el suelo)."""
+    rol = (body.rol or "").strip().lower()
+    with db() as conn:
+        _owned_or_dm(conn, cid, user)
+        r = _inv_entry(conn, cid, eid)
+        if rol:
+            permitidos = _ROLES.get(r["kind"] or "equipo", ())
+            if rol not in permitidos:
+                if not permitidos:
+                    raise HTTPException(400, "Eso no es un arma ni una armadura")
+                raise HTTPException(400, "Rol inválido para ese objeto: "
+                                          + " o ".join(permitidos))
+            if r["parent_id"] or _norm_stash(r["stash"]):
+                raise HTTPException(400, "Primero sacalo del contenedor o del guardado")
+            # el que tenía este rol lo pierde (misma criatura)
+            conn.execute(
+                "UPDATE inventory SET rol='' WHERE rol=? AND id<>? AND "
+                "COALESCE(character_id,0)=COALESCE(?,0) AND COALESCE(pet_id,0)=COALESCE(?,0)",
+                (rol, eid, r["character_id"], r["pet_id"]))
+            conn.execute("UPDATE inventory SET rol=?, equipado=1 WHERE id=?", (rol, eid))
+        else:
+            conn.execute("UPDATE inventory SET rol='' WHERE id=?", (eid,))
+    return {"ok": True, "rol": rol}
+
+
+@router.post("/{cid}/inventory/{eid}/combate")
+def toggle_en_combate(cid: int, eid: int, user=Depends(current_user)):
+    """Mostrar u ocultar un objeto con dosis o cargas en la pestaña de combate."""
+    with db() as conn:
+        _owned_or_dm(conn, cid, user)
+        r = _inv_entry(conn, cid, eid)
+        actual = r["en_combate"] if r["en_combate"] is not None else 1
+        val = 0 if actual else 1
+        conn.execute("UPDATE inventory SET en_combate=? WHERE id=?", (val, eid))
+    return {"ok": True, "en_combate": bool(val)}
 
 
 @router.post("/{cid}/inventory/{eid}/move")

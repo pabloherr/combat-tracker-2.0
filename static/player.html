@@ -341,6 +341,25 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .wpn .n{font-family:var(--font-h);color:var(--gold2);font-size:12px;}
 .wpn .dmg{font-family:var(--font-h);color:var(--red);}
 .wpn .t{font-size:12px;color:var(--text3);font-style:italic;}
+.wpn .hit{font-family:var(--font-h);font-size:12px;border:1px solid var(--border2);border-radius:4px;padding:1px 6px;color:var(--gold2);}
+.wpn .hit.mod-up,.wpn .dmg.mod-up{color:var(--green);border-color:var(--green);}
+.wpn .hit.mod-down,.wpn .dmg.mod-down{color:var(--red);}
+.wpn .dmg b{font-weight:500;}
+.rol-tag{font-family:var(--font-h);font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:var(--pill);border:1px solid var(--gold);color:var(--gold);}
+.rol-tag.sec{border-color:var(--blue2);color:var(--blue2);}
+.wpn .sec-nota{width:100%;color:var(--yellow);font-style:normal;}
+/* equipo de combate: defensas, deflect, armas en mano y objetos con cargas */
+.kit{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+.kit-def{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;}
+.kit-box{border:1px solid var(--border2);border-radius:var(--r);background:var(--bg3);padding:4px 4px;text-align:center;}
+.kit-box .l{display:block;font-family:var(--font-h);font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);white-space:nowrap;}
+.kit-box .v{font-family:var(--font-h);font-size:20px;line-height:1.15;color:var(--gold2);}
+.kit-box .v .t{display:block;font-family:var(--font-b);font-size:10px;color:var(--text3);font-style:italic;line-height:1.2;}
+.kit-h{font-family:var(--font-h);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin:8px 0 5px;}
+.kit-carga{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg3);border-radius:var(--r);padding:5px 10px;margin-bottom:5px;font-size:13px;}
+.kit-carga .n{font-family:var(--font-h);color:var(--gold2);font-size:12px;flex:1;min-width:0;}
+.btn-sheet.rol-on{border-color:var(--gold);color:var(--gold2);background:var(--accsoft);}
+@media(max-width:430px){ .kit-def{grid-template-columns:repeat(2,1fr);} }
 /* la ficha de la mascota, embutida en su recuadro */
 .pet-hoja{border-top:1px solid var(--border);padding-top:8px;}
 .pet-hoja .sh-name{font-size:15px;}
@@ -855,7 +874,7 @@ function controlCard(p,tagHTML,turnLabel,isPet,marcosHTML){
     +'</div>';
   // Las mascotas se pliegan también acá, con la misma preferencia que en la
   // ficha. La fila del turno queda siempre: en D&D ahí va la iniciativa.
-  var fold='', nombreCss='', cuerpo=meControls(p)+sheetRow;
+  var fold='', nombreCss='', cuerpo=meControls(p)+(p.kind==='player'?kitCombateHTML(meChar()):'')+sheetRow;
   var nombre=esc(p.name)+(tagHTML||'');
   if(isPet&&p.pet_id){
     var abierta=petAbierta(p.pet_id);
@@ -1234,7 +1253,11 @@ function renderMesa(){
   document.getElementById('phaseBarP').style.display=(activo&&!isDnd)?'':'none';
   var myUid=MY_UID;
   if(activo) myUid=renderMe(COMBAT);
-  else document.getElementById('mePanel').innerHTML='';
+  else{
+    var kit=kitCombateHTML(meChar());
+    document.getElementById('mePanel').innerHTML=kit
+      ? '<div class="section-lbl">Mi equipo de combate</div><div class="me-card">'+kit+'</div>':'';
+  }
 
   var list=entradasAliados(myUid);
   var en=activo?COMBAT.participants.filter(function(p){return p.kind==='enemy'&&!p.hidden;}):[];
@@ -2107,19 +2130,95 @@ function armasDeInv(){
   if(INV&&INV.character) rec(INV.character.items);
   return out;
 }
+function armadurasDeInv(){
+  var out=[];
+  if(INV&&INV.character) (INV.character.items||[]).forEach(function(i){ if(i.kind==='armadura') out.push(i); });
+  return out;
+}
+// Lo que tiene dosis o cargas y se lleva encima (también dentro de la mochila).
+function itemsConCargas(){
+  var out=[];
+  function rec(list,dentro){
+    (list||[]).forEach(function(i){
+      if(i.usos_max&&(i.equipado||dentro)) out.push(i);
+      if(i.children) rec(i.children,true);
+    });
+  }
+  if(INV&&INV.character) rec(INV.character.items,false);
+  return out;
+}
+// Modificador de una habilidad con las condiciones puestas: el mismo cálculo
+// que la ficha. null si no hay atributos cargados.
+function skillMod(c,name,eff){
+  var s=c.sheet||{}, a=s.attributes||{}, at=SK_ATTR[name];
+  if(!at||a[at]==null) return null;
+  var cat=Object.keys(SK_ORDEN).filter(function(k){return SK_ORDEN[k].indexOf(name)>=0;})[0];
+  var x=((s.skills||{})[cat]||[]).filter(function(y){return y.name===name;})[0];
+  var mod=(x&&x.rank!=null)?a[at]+rangoDe(x,a[at]):((x&&x.value!=null)?x.value:a[at]);
+  var delta=(at?(eff.attr[at]||0):0)+eff.tests;
+  return {base:mod,total:mod+delta,delta:delta};
+}
+// Con qué habilidad se pega: la que diga el objeto o, si no, su clase.
+function armaSkill(st){
+  var sk=String(st.skill||'');
+  if(/heavy/i.test(sk)) return 'Heavy Weaponry';
+  if(/light/i.test(sk)) return 'Light Weaponry';
+  if(st.weapon_class==='heavy') return 'Heavy Weaponry';
+  if(st.weapon_class==='light') return 'Light Weaponry';
+  return null;
+}
+function fmtMod(n){ return (n>=0?'+':'')+n; }
+function modCls(d){ return d>0?' mod-up':(d<0?' mod-down':''); }
+function hitHTML(sk,m){
+  if(!m) return sk?'<span class="t">'+sk+'</span>':'<span class="t">sin habilidad asignada</span>';
+  return '<span class="hit'+modCls(m.delta)+'" title="'+escA(sk+' '+fmtMod(m.base)
+    +(m.delta?', '+fmtMod(m.delta)+' por las condiciones':''))+'">ataque '+fmtMod(m.total)+'</span>';
+}
+// "1d6 keen" con +4 → 1d6 + 4 keen. El dado (o el número fijo) va primero.
+function danoHTML(dmgTxt,m,tip){
+  var t=String(dmgTxt||'').trim(), mm=t.match(/^(\d*d\d+|\d+)\s*(.*)$/i);
+  var dado=mm?mm[1]:t, resto=mm?mm[2]:'';
+  var num=m?' '+(m.total>=0?'+ ':'− ')+Math.abs(m.total):'';
+  return '<span class="dmg'+(m?modCls(m.delta):'')+'"'+(tip?' title="'+escA(tip)+'"':'')+'><b>'
+    +esc(dado)+num+'</b>'+(resto?' '+esc(resto):'')+'</span>';
+}
+// Una fila por arma: a qué pega (Heavy o Light Weaponry) y cuánto daño
+// (dado + la misma habilidad). La secundaria recuerda el focus que cuesta.
+function filaArma(it,c,eff){
+  var st=it.stats||{}, tr=(st.traits||[]).concat(st.expert_traits||[]);
+  var sk=armaSkill(st), m=sk?skillMod(c,sk,eff):null;
+  var rol=it.rol==='principal'?'<span class="rol-tag">Principal</span>'
+         :it.rol==='secundaria'?'<span class="rol-tag sec">Secundaria</span>':'';
+  var offhand=tr.some(function(x){return /off\s*-?\s*hand/i.test(x);});
+  var nota=it.rol==='secundaria'
+    ? '<span class="t sec-nota">Pegar con la secundaria cuesta '+(offhand?'1 focus (tiene Offhand)':'2 focus')+'</span>':'';
+  return '<div class="wpn">'+rol+'<span class="n">'+esc(it.name)+'</span>'+hitHTML(sk,m)
+    +(st.damage?danoHTML(st.damage,m,m?('Dado del arma + '+sk+' '+fmtMod(m.total)):''):'')
+    +(st.range?'<span>'+esc(st.range)+'</span>':'')
+    +(tr.length?'<span class="t">'+tr.map(esc).join(', ')+'</span>':'')
+    +(it.equipado?'':'<span class="t">— no la llevás encima</span>')+nota+'</div>';
+}
+// Golpe desarmado: se pega con Athletics y el dado escala con la Fuerza
+// (0-2: 1 impacto sin dado · 3-4: 1d4 · 5-6: 1d8 · 7-8: 2d6 · 9+: 2d10).
+var DESARMADO=['1','1','1d4','1d8','2d6','2d10'];
+function filaDesarmado(c,eff){
+  var a=(c.sheet||{}).attributes||{};
+  if(a.STR==null) return '';
+  var str=a.STR+(eff.attr.STR||0), m=skillMod(c,'Athletics',eff);
+  var dado=DESARMADO[escalon(str)], sinDado=escalon(str)<2;
+  return '<div class="wpn"><span class="n">Golpe desarmado</span>'+hitHTML('Athletics',m)
+    +danoHTML(dado+' impact',m,'Por Fuerza '+str+(sinDado?' (sin dado)':'')+' + Athletics'+(m?' '+fmtMod(m.total):''))
+    +(sinDado?'<span class="t">sin tirar dado</span>':'')+'</div>';
+}
 function armasHTML(){
   var c=meChar();
   if(!c)return '';
-  var s=c.sheet||{}, filas=[];
-  armasDeInv().forEach(function(it){
-    var st=it.stats||{};
-    var tr=(st.traits||[]).concat(st.expert_traits||[]);
-    filas.push('<div class="wpn"><span class="n">'+esc(it.name)+'</span>'
-      +(st.damage?'<span class="dmg">'+esc(st.damage)+'</span>':'')
-      +(st.range?'<span>'+esc(st.range)+'</span>':'')
-      +(tr.length?'<span class="t">'+tr.map(esc).join(', ')+'</span>':'')
-      +(it.equipado?'':'<span class="t">— no la llevás encima</span>')+'</div>');
-  });
+  var s=c.sheet||{}, filas=[], eff=calcEfectos(condActivas(c));
+  // en mano primero, después el resto
+  var arm=armasDeInv().sort(function(x,y){
+    var o={principal:0,secundaria:1}; return (o[x.rol]==null?2:o[x.rol])-(o[y.rol]==null?2:o[y.rol]); });
+  arm.forEach(function(it){ filas.push(filaArma(it,c,eff)); });
+  if(SYSTEM!=='dnd') filas.push(filaDesarmado(c,eff));
   // D&D: los ataques vienen de la hoja rellenable
   (s.attacks||[]).forEach(function(a){
     filas.push('<div class="wpn"><span class="n">'+esc(a.name)+'</span>'
@@ -2135,6 +2234,52 @@ function armasHTML(){
 function renderArmas(){
   var el=document.getElementById('armasPanel');
   if(el) el.innerHTML=armasHTML();
+  renderKit();
+}
+// ── Equipo de combate: lo que hay que tener a mano cuando toca pegar ──
+// Defensas, deflect de la armadura puesta, arma principal y secundaria (con
+// su ataque y daño), el golpe desarmado y los objetos con cargas que el
+// jugador eligió ver acá.
+function kitCombateHTML(c){
+  if(!c||SYSTEM==='dnd') return '';
+  var s=c.sheet||{}, d=s.defenses||{}, eff=calcEfectos(condActivas(c));
+  var armaduras=armadurasDeInv(), puesta=armaduras.filter(function(x){return x.rol==='puesta';})[0];
+  var deflect=puesta
+    ? (puesta.stats||{}).deflect||0
+    : (armaduras.length?0:(parseInt(s.deflect)||0));
+  var deflectNota=puesta?esc(puesta.name):(armaduras.length?'sin armadura puesta':(s.deflect?'de la ficha':'sin armadura'));
+  var h='<div class="kit-def">'
+    +[['Def. física',d.physical],['Def. cognitiva',d.cognitive],['Def. espiritual',d.spiritual]].map(function(x){
+        return '<div class="kit-box"><span class="l">'+x[0]+'</span><span class="v">'+(x[1]==null?'—':x[1])+'</span></div>';
+      }).join('')
+    +'<div class="kit-box" title="Lo que resta al daño que recibís: lo da la armadura puesta"><span class="l">Deflect</span>'
+      +'<span class="v">'+deflect+'<span class="t">'+deflectNota+'</span></span></div></div>';
+  var arm=armasDeInv();
+  var principal=arm.filter(function(x){return x.rol==='principal';})[0];
+  var secundaria=arm.filter(function(x){return x.rol==='secundaria';})[0];
+  h+='<div class="kit-h">Armas en mano</div>';
+  if(principal) h+=filaArma(principal,c,eff);
+  if(secundaria) h+=filaArma(secundaria,c,eff);
+  if(!principal&&!secundaria)
+    h+='<div style="font-size:12px;color:var(--text3);font-style:italic;margin-bottom:5px">'
+      +(arm.length?'Elegí tu arma principal y la secundaria desde el inventario (⚔ principal / 🗡 secundaria).'
+                  :'No tenés armas en el inventario.')+'</div>';
+  h+=filaDesarmado(c,eff);
+  var cargas=itemsConCargas().filter(function(i){return i.en_combate;});
+  if(cargas.length) h+='<div class="kit-h">Objetos con cargas</div>'+cargas.map(function(i){
+    return '<div class="kit-carga"><span class="n">'+esc(i.name)
+      +(i.cantidad>1?' <span style="color:var(--text3)">x'+i.cantidad+'</span>':'')+'</span>'
+      +'<span class="uses-box" title="Dosis o cargas que le quedan">'
+        +'<button class="uses-btn" onclick="invUse('+i.id+',-1)" title="Gastar una">−</button>'
+        +'<span class="uses-n">'+i.usos+'/'+i.usos_max+'</span>'
+        +'<button class="uses-btn" onclick="invUse('+i.id+',1)" title="Reponer una">+</button></span></div>';
+  }).join('');
+  return '<div class="kit" id="kitCombate">'+h+'</div>';
+}
+// El inventario llega aparte del combate: cuando cambia, se repinta solo el kit.
+function renderKit(){
+  var el=document.getElementById('kitCombate'), c=meChar();
+  if(el&&c) el.outerHTML=kitCombateHTML(c);
 }
 function renderRoster(){
   if(!ROSTER)return;
@@ -2789,6 +2934,17 @@ function invItemRow(it,dentro,zona){
     : '<button class="btn-sheet" onclick="openStash('+it.id+',\''+(zona||'')+'\')" title="Mover a otra zona">⇄</button>';
   var pasar=dentro?''
     : '<button class="btn-sheet" onclick="openTransfer('+it.id+')" title="Pasárselo a otro">🤝</button>';
+  // en mano / puesta: solo lo que se lleva encima y no está en un contenedor
+  var rolBtns='';
+  if(!guardado&&!dentro&&it.kind==='arma')
+    rolBtns='<button class="btn-sheet'+(it.rol==='principal'?' rol-on':' off')+'" onclick="invRol('+it.id+',\'principal\')" title="Arma principal">⚔ principal</button>'
+      +'<button class="btn-sheet'+(it.rol==='secundaria'?' rol-on':' off')+'" onclick="invRol('+it.id+',\'secundaria\')" title="Arma secundaria: pegar con ella cuesta 2 focus (1 si tiene Offhand)">🗡 secundaria</button>';
+  if(!guardado&&!dentro&&it.kind==='armadura')
+    rolBtns='<button class="btn-sheet'+(it.rol==='puesta'?' rol-on':' off')+'" onclick="invRol('+it.id+',\'puesta\')" title="Armadura puesta: da tu deflect. Solo una.">🛡 puesta</button>';
+  var verComb=(it.usos_max&&!guardado)
+    ? '<button class="btn-sheet'+(it.en_combate?'':' off')+'" onclick="invCombate('+it.id+')" title="'
+        +(it.en_combate?'Se ve en Grupo y combate: tocá para ocultarlo':'Oculto en Grupo y combate: tocá para mostrarlo')+'">'
+        +(it.en_combate?'👁 en combate':'👁 oculto')+'</button>':'';
   var head='<div class="inv-row"'+(it.equipado||guardado?'':' style="opacity:.55"')+'>'
     +'<span class="inv-info"><b style="color:var(--gold2)">'+esc(it.name)+'</b>'
       +(it.cantidad>1?' <span style="color:var(--text3)">x'+it.cantidad+'</span>':'')
@@ -2798,7 +2954,7 @@ function invItemRow(it,dentro,zona){
       +invDescHTML(it)
     +'</span>'
     +'<span class="inv-btns">'
-    +mover+eq+zonaBtn+pasar
+    +rolBtns+verComb+mover+eq+zonaBtn+pasar
     +'<button class="btn-sheet" onclick="invQty('+it.id+',1)">+</button>'
     +'<button class="btn-sheet" onclick="invQty('+it.id+',-1)">−</button>'
     +'<button class="btn-sheet" style="color:var(--red);border-color:var(--red)" onclick="invDel('+it.id+')">✕</button>'
@@ -2897,6 +3053,23 @@ async function invQty(eid,delta){
 }
 async function invEquip(eid){
   await api('/api/characters/'+MYCHAR+'/inventory/'+eid+'/equip','POST');
+  loadInventory();
+}
+function findInv(eid){
+  var hallado=null;
+  function rec(list){ (list||[]).forEach(function(i){ if(i.id===eid) hallado=i; if(i.children) rec(i.children); }); }
+  if(INV&&INV.character){ rec(INV.character.items); rec(INV.character.guardado); }
+  return hallado;
+}
+// Tocar el rol que ya tiene se lo saca.
+async function invRol(eid,rol){
+  var it=findInv(eid), nuevo=(it&&it.rol===rol)?'':rol;
+  try{ await api('/api/characters/'+MYCHAR+'/inventory/'+eid+'/rol','POST',{rol:nuevo}); }
+  catch(e){ alert('No se pudo cambiar.'); return; }
+  loadInventory();
+}
+async function invCombate(eid){
+  await api('/api/characters/'+MYCHAR+'/inventory/'+eid+'/combate','POST');
   loadInventory();
 }
 async function invUse(eid,delta){

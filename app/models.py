@@ -269,6 +269,12 @@ class InventoryMove(BaseModel):
     parent_id: int | None = None    # null = sacarlo del contenedor
 
 
+class InventoryRol(BaseModel):
+    """Rol de un objeto en combate: 'principal' o 'secundaria' para un arma,
+    'puesta' para una armadura, '' para sacárselo."""
+    rol: str = ""
+
+
 class InventoryStash(BaseModel):
     """Mover un objeto entre zonas: encima, el guardado propio o el del grupo."""
     stash: str = ""                 # "" (encima) | personal | grupo
