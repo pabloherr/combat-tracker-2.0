@@ -353,12 +353,12 @@ async def toggle_status(cid: int, t: StatusToggle, user=Depends(current_user)):
     if not p:
         raise HTTPException(404, "Participante no encontrado")
     _guard_participant(is_dm, p, user)
-    if t.status == "Exhausted":
+    # `add` suma una instancia (condiciones que se acumulan); "Exhausted" pelado
+    # se apilaba desde antes de que las condiciones llevaran corchete.
+    if t.add or t.status == "Exhausted" or t.status not in p["statuses"]:
         p["statuses"].append(t.status)
-    elif t.status in p["statuses"]:
-        p["statuses"].remove(t.status)
     else:
-        p["statuses"].append(t.status)
+        p["statuses"].remove(t.status)
     _persist_participant(p)
     await push_state(cid)
     return {"ok": True}

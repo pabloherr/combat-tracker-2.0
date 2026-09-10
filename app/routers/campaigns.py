@@ -6,7 +6,7 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from .. import roshar
+from .. import conditions, roshar
 from ..access import campaign_or_404, require_access, require_dm
 from ..auth import current_user
 from ..config import (CONFIG_DEFAULTS, VER_MODOS, coerce, get_config,
@@ -769,6 +769,17 @@ def get_config(cid: int, user=Depends(current_user)):
                     "modos": list(VER_MODOS)})
         cfg.update(_cal_fields(conn, cid))
         return cfg
+
+
+@router.get("/campaigns/{cid}/conditions")
+def campaign_conditions(cid: int, user=Depends(current_user)):
+    """Condiciones y heridas que valen en esta campaña.
+
+    Lo consultan la ficha del jugador (para aplicar los efectos a los números) y
+    el panel del DM. Lo puede leer cualquier miembro aceptado."""
+    with db() as conn:
+        require_access(conn, cid, user)
+        return conditions.resolve(_get_config(conn, cid))
 
 
 @router.put("/campaigns/{cid}/config")

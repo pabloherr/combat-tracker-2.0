@@ -458,9 +458,14 @@ def _clamp_stat(row, stat: str, delta: int) -> int:
     return max(0, min(mx, cur + delta))
 
 
-def _toggle_status(st: list, status: str) -> list:
-    # Exhausted es apilable; el resto es on/off.
-    if status == "Exhausted" or status not in st:
+def _toggle_status(st: list, status: str, add: bool = False) -> list:
+    """Prende o apaga una condición.
+
+    Con `add` se suma una instancia sin mirar si ya estaba: es lo que hacen las
+    condiciones que se acumulan (Exhausted [-2], Enhanced [Speed +2], una
+    Afflicted por cada efecto). "Exhausted" pelado se sigue apilando: así se
+    guardaban antes de que las condiciones llevaran corchete."""
+    if add or status == "Exhausted" or status not in st:
         st.append(status)
     else:
         st.remove(status)
@@ -557,7 +562,7 @@ async def character_stat(cid: int, s: LiveStat, user=Depends(current_user)):
 async def character_status(cid: int, s: LiveStatus, user=Depends(current_user)):
     with db() as conn:
         r = _owned(conn, cid, user)
-        st = _toggle_status(json.loads(r["statuses"] or "[]"), s.status)
+        st = _toggle_status(json.loads(r["statuses"] or "[]"), s.status, s.add)
         conn.execute("UPDATE characters SET statuses=? WHERE id=?", (json.dumps(st), cid))
         campaign_id = r["campaign_id"]
     await _sync_combat(campaign_id, {"statuses": st}, char_id=cid)
@@ -594,7 +599,7 @@ async def pet_stat(cid: int, pid: int, s: LiveStat, user=Depends(current_user)):
 async def pet_status(cid: int, pid: int, s: LiveStatus, user=Depends(current_user)):
     with db() as conn:
         r = _owned_pet(conn, cid, pid, user)
-        st = _toggle_status(json.loads(r["statuses"] or "[]"), s.status)
+        st = _toggle_status(json.loads(r["statuses"] or "[]"), s.status, s.add)
         conn.execute("UPDATE pets SET statuses=? WHERE id=?", (json.dumps(st), pid))
         campaign_id = _campaign_of(conn, cid)
     await _sync_combat(campaign_id, {"statuses": st}, pet_id=pid)
@@ -625,7 +630,8 @@ async def add_injury(cid: int, inj: InjuryIn, user=Depends(current_user)):
         r = _owned(conn, cid, user)
         lst = json.loads(r["injuries"] or "[]")
         lst.append({"id": uuid.uuid4().hex[:8], "name": name,
-                    "days": max(0, inj.days), "permanent": bool(inj.permanent)})
+                    "days": max(0, inj.days), "permanent": bool(inj.permanent),
+                    "cond": (inj.cond or "").strip()[:80]})
         conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(lst), cid))
         campaign_id = r["campaign_id"]
     await _sync_combat(campaign_id, {"injuries": lst}, char_id=cid)

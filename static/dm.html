@@ -611,8 +611,11 @@ var API='/api/campaigns/'+CID;
 var SYSTEM='cosmere';   // sistema de la campaña (cosmere | dnd)
 var enemies=[], encounters=[], combat={active:false,participants:[]};
 var PET_OPTS=new Set();     // ids de enemigos habilitados como mascota en esta campaña
-var POS=['Determined','Enhanced','Empowered','Focus'];
-var NEG=['Restrained','Surprised','Stunned','Slowed','Disoriented','Prone','Exhausted','Unconscious','Immobilized','Afflicted'];
+// ─── Condiciones ───
+// El catálogo lo arma el backend (app/conditions.py) con lo que quedó prendido
+// en esta campaña. Los colores de abajo son para lo que ya estaba guardado (o
+// para las condiciones que el DM apagó): así se sigue viendo con el suyo.
+var COND=null, COND_BY={};
 var SC={Determined:'var(--green)',Enhanced:'var(--blue)',Empowered:'var(--yellow)',Focus:'var(--purple)',Restrained:'var(--red)',Surprised:'var(--yellow)',Stunned:'var(--orange)',Slowed:'var(--text3)',Disoriented:'var(--red)',Prone:'var(--red)',Exhausted:'var(--orange)',Unconscious:'var(--red)',Immobilized:'var(--purple)',Afflicted:'var(--green)'};
 
 // ═══════════ API helpers ═══════════
@@ -781,10 +784,12 @@ function memBar(label,cur,mx,color){
 }
 function memChips(m){
   var sc={}; (m.statuses||[]).forEach(function(s){sc[s]=(sc[s]||0)+1;});
-  var chips=Object.keys(sc).map(function(s){var col=SC[s]||'var(--text3)';
-    return '<span class="mem-chip" style="border-color:'+col+';color:'+col+'">'+s+(sc[s]>1?' x'+sc[s]:'')+'</span>';});
+  var chips=Object.keys(sc).map(function(s){var col=condColor(parseCond(s).name);
+    return '<span class="mem-chip" style="border-color:'+col+';color:'+col+'">'+esc(s)+(sc[s]>1?' x'+sc[s]:'')+'</span>';});
   (m.injuries||[]).forEach(function(i){
-    chips.push('<span class="mem-chip" style="border-color:var(--orange);color:var(--orange)">🩹 '+esc(i.name)+(i.permanent?'':' ('+i.days+'d)')+'</span>');});
+    var cn=(i.cond!=null?i.cond:condDeHerida(i.name));
+    chips.push('<span class="mem-chip" style="border-color:var(--orange);color:var(--orange)" title="'
+      +escA(cn?'Impone '+cn:'No cambia ningún número')+'">🩹 '+esc(i.name)+(i.permanent?'':' ('+i.days+'d)')+'</span>');});
   return chips.length?'<div class="mem-chips">'+chips.join('')+'</div>':'';
 }
 function memberCard(m){
@@ -1136,6 +1141,108 @@ function cfgRow(label,id,val,hint,extra){
   return '<label class="cfg-lrow"><span>'+label+(hint?'<br><span class="cfg-hint">'+hint+'</span>':'')+'</span>'
     +'<input class="fi" type="number" id="'+id+'" value="'+val+'" style="width:90px" '+(extra||'')+'/></label>';
 }
+// ─── Ajustes: condiciones y heridas ───
+// Las listas se editan en el acto sobre CFG (no pasan por harvestConfig): así
+// agregar o quitar una fila no le pisa lo que el DM está escribiendo en otra.
+function cfgCondOff(lista,nombre){
+  var off=(CFG[lista]||[]).slice(), i=off.indexOf(nombre);
+  if(i<0) off.push(nombre); else off.splice(i,1);
+  CFG[lista]=off;
+  paintConfig();
+}
+function cfgExtraAdd(lista){
+  CFG[lista]=(CFG[lista]||[]).concat([lista==='cond_extra'
+    ? {name:'',tono:'neg',desc:'',ef:''} : {name:'',cond:''}]);
+  paintConfig();
+}
+function cfgExtraDel(lista,i){
+  var l=(CFG[lista]||[]).slice(); l.splice(i,1); CFG[lista]=l; paintConfig();
+}
+function cfgExtraSet(lista,i,campo,val){
+  var l=(CFG[lista]||[]).slice();
+  if(!l[i])return;
+  l[i]=Object.assign({},l[i]); l[i][campo]=val; CFG[lista]=l;
+}
+// Resumen de lo que una condición le hace a los números (para el ajuste).
+function condEfectoResumen(c){
+  var ef=c.efecto||{}, out=[];
+  if(ef.attr) out.push((ef.attr<0?'baja':'sube')+' un atributo (va entre corchetes)');
+  if(ef.tests) out.push('penaliza todos los tests (va entre corchetes)');
+  if(ef.mov===0) out.push('movimiento en 0');
+  else if(ef.mov==='mitad') out.push('movimiento a la mitad');
+  if(ef.desv==='todos') out.push('desventaja en todos los tests');
+  else if(ef.desv&&ef.desv.length) out.push('desventaja en '+ef.desv.join(', '));
+  return out.length?out.join(' · '):'no cambia ningún número: solo su descripción';
+}
+function cfgCondCuerpo(cfg){
+  var cat=(COND&&COND.catalogo)||[], hcat=(COND&&COND.catalogo_heridas)||[];
+  var off=cfg.cond_off||[], hoff=cfg.her_off||[];
+  var efOpts=(COND&&COND.efectos)||[];
+  var tonos=[['neg','Mala'],['pos','Buena'],['neutro','Neutra']];
+  var h='<div class="cfg-sec">Condiciones del manual</div>'
+    +'<div class="import-hint">Lo que apagues desaparece de la ficha de los jugadores y de tus '
+      +'tarjetas de combate. Si alguien ya la tenía puesta, se le sigue viendo pero deja de '
+      +'aplicar su efecto.</div>'
+    +cat.map(function(c){
+      return '<label class="cfg-lrow"><span>'+esc(c.name)
+        +'<br><span class="cfg-hint">'+esc(condEfectoResumen(c))+'</span></span>'
+        +'<input type="checkbox"'+(off.indexOf(c.name)<0?' checked':'')
+        +' onchange="cfgCondOff(\'cond_off\',\''+escA(c.name)+'\')"'
+        +' style="width:18px;height:18px;accent-color:var(--gold);cursor:pointer"/></label>';
+    }).join('');
+  h+='<div class="cfg-sec">Condiciones tuyas</div>'
+    +'<div class="import-hint">Las que inventes para tu mesa. El efecto que elijas es el que se '
+      +'aplica a la ficha; con “ninguno” queda solo la descripción.</div>'
+    +(cfg.cond_extra||[]).map(function(x,i){
+      return '<div class="ed-entry"><div class="ed-en-top">'
+        +'<input class="fi ed-en-name" placeholder="Nombre" value="'+escA(x.name||'')+'" '
+          +'oninput="cfgExtraSet(\'cond_extra\','+i+',\'name\',this.value)"/>'
+        +'<select class="fi" style="width:auto" onchange="cfgExtraSet(\'cond_extra\','+i+',\'tono\',this.value)">'
+          +tonos.map(function(t){return '<option value="'+t[0]+'"'
+            +((x.tono||'neg')===t[0]?' selected':'')+'>'+t[1]+'</option>';}).join('')+'</select>'
+        +'<select class="fi" style="width:auto" onchange="cfgExtraSet(\'cond_extra\','+i+',\'ef\',this.value)">'
+          +efOpts.map(function(e){return '<option value="'+esc(e.k)+'"'
+            +((x.ef||'')===e.k?' selected':'')+'>'+esc(e.n)+'</option>';}).join('')+'</select>'
+        +'<button class="btn sm danger" onclick="cfgExtraDel(\'cond_extra\','+i+')" title="Quitar">✕</button>'
+        +'</div>'
+        +'<textarea class="fi ed-en-desc" placeholder="Qué hace (se le muestra al jugador en su ficha)" '
+          +'oninput="cfgExtraSet(\'cond_extra\','+i+',\'desc\',this.value)">'+esc(x.desc||'')+'</textarea>'
+        +'</div>';
+    }).join('')
+    +'<button class="btn ghost sm" onclick="cfgExtraAdd(\'cond_extra\')">+ Agregar condición</button>';
+
+  // Heridas: cada tipo puede imponer una condición mientras dure
+  var condOpts='<option value="">— ninguna —</option>'
+    +((COND&&COND.condiciones)||[]).map(function(c){
+      return '<option value="'+escA(c.name)+'">'+esc(c.name)+'</option>';}).join('');
+  h+='<div class="cfg-sec">Heridas del manual</div>'
+    +'<div class="import-hint">Son los tipos que el jugador puede elegir al anotarse una herida. '
+      +'La condición que imponga queda fijada hasta que la herida se cure.</div>'
+    +hcat.map(function(x){
+      return '<label class="cfg-lrow"><span>'+esc(x.name)
+        +'<br><span class="cfg-hint">'+(x.cond?'impone '+esc(x.cond):'no cambia ningún número')+'</span></span>'
+        +'<input type="checkbox"'+(hoff.indexOf(x.name)<0?' checked':'')
+        +' onchange="cfgCondOff(\'her_off\',\''+escA(x.name)+'\')"'
+        +' style="width:18px;height:18px;accent-color:var(--gold);cursor:pointer"/></label>';
+    }).join('')
+    +'<div class="cfg-sec">Heridas tuyas</div>'
+    +'<div class="import-hint">Poné el nombre y, si corresponde, la condición que impone. Para las '
+      +'que llevan corchete escribilo a mano en el campo de al lado: <b>Diminished [Speed −2]</b>, '
+      +'<b>Exhausted [−3]</b>.</div>'
+    +(cfg.her_extra||[]).map(function(x,i){
+      return '<div class="ed-entry"><div class="ed-en-top">'
+        +'<input class="fi ed-en-name" placeholder="Nombre de la herida" value="'+escA(x.name||'')+'" '
+          +'oninput="cfgExtraSet(\'her_extra\','+i+',\'name\',this.value)"/>'
+        +'<input class="fi" list="condNames" placeholder="Condición que impone" '
+          +'value="'+escA(x.cond||'')+'" '
+          +'oninput="cfgExtraSet(\'her_extra\','+i+',\'cond\',this.value)"/>'
+        +'<button class="btn sm danger" onclick="cfgExtraDel(\'her_extra\','+i+')" title="Quitar">✕</button>'
+        +'</div></div>';
+    }).join('')
+    +'<button class="btn ghost sm" onclick="cfgExtraAdd(\'her_extra\')">+ Agregar herida</button>'
+    +'<datalist id="condNames">'+condOpts+'</datalist>';
+  return h;
+}
 function cfgSwitch(label,id,val,hint){
   return '<label class="cfg-lrow"><span>'+label+(hint?'<br><span class="cfg-hint">'+hint+'</span>':'')+'</span>'
     +'<input type="checkbox" id="'+id+'"'+(val?' checked':'')+' style="width:18px;height:18px;accent-color:var(--gold);cursor:pointer"/></label>';
@@ -1211,6 +1318,8 @@ function paintConfig(){
                  'La barra del ciclo y la descarga de marcos por día')
       +cfgSwitch('Calendario rosharano','cfg-mcal',cfg.modulo_calendario,
                  'En qué día están, con notas y pines (se ajusta en la solapa Calendario)');
+  }else if(CFG_TAB==='condiciones'){
+    cuerpo=cfgCondCuerpo(cfg);
   }else if(CFG_TAB==='calendario'){
     var d=cfg.cal_date||{};
     var meses=(cfg.cal_months||CAL_MONTHS).map(function(m,i){
@@ -1280,7 +1389,8 @@ function paintConfig(){
       +cfgRow('Cae el día','cfg-starget',cfg.storm_target)
       +'<label class="cfg-lrow"><span>Momento</span><select class="fi" id="cfg-smoment" style="min-width:150px">'+moments+'</select></label>';
   }
-  var tabs=[['modulos','Módulos'],['carga','Capacidad de carga'],
+  var tabs=[['modulos','Módulos'],['condiciones','Condiciones y heridas'],
+            ['carga','Capacidad de carga'],
             ['ver','Qué ven los jugadores'],['tormentas','Tormentas y marcos'],
             ['calendario','Calendario']];
   document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
@@ -1317,9 +1427,14 @@ async function saveConfig(){
   harvestConfig();
   var body={};
   CFG_CAMPOS.forEach(function(f){ if(CFG[f[1]]!==undefined) body[f[1]]=CFG[f[1]]; });
+  // las listas de condiciones y heridas se editan sueltas, no con CFG_CAMPOS
+  ['cond_off','cond_extra','her_off','her_extra'].forEach(function(k){
+    if(CFG[k]!==undefined) body[k]=CFG[k];
+  });
   await api(API+'/config','PUT',body);
   closeModal();
   aplicarModulos(CFG);
+  loadConditions().then(renderCombat);   // el catálogo puede haber cambiado
   loadStorm();
   loadCalendar();
   // las bases de carga cambian todas las barras: si estás mirándolas, refrescá
@@ -2207,8 +2322,6 @@ async function chStat(uid,stat,sign,inputEl){
   var val=Math.max(1,parseInt(inputEl.value)||1);
   await api(API+'/combat/stat','POST',{uid:uid,stat:stat,delta:sign*val});
 }
-async function chStatus(uid,status){await api(API+'/combat/status','POST',{uid:uid,status:status});}
-async function rmStatus(uid,status){await api(API+'/combat/status/remove_one','POST',{uid:uid,status:status});}
 async function chTurn(uid,turn){await api(API+'/combat/turn','POST',{uid:uid,turn:turn});}
 async function chActed(uid,slow){await api(API+'/combat/acted/'+uid+(slow?'?slow=true':''),'POST');}
 async function chHidden(uid){await api(API+'/combat/hidden/'+uid,'POST');}
@@ -2299,14 +2412,132 @@ function colorRow(p){
   return '<div class="color-row">'+sw+custom+'</div>';
 }
 
-// Heridas que imponen un estado mientras duran: [estado, cargas]. Mismo criterio
-// que en la ficha del jugador; el estado fijado no se saca hasta curar la herida.
-var INJURY_STATUS={'Exhausted [−1]':['Exhausted',1],'Exhausted [−2]':['Exhausted',2],
-  'Slowed':['Slowed',1],'Disoriented':['Disoriented',1],'Surprised':['Surprised',1]};
-function lockedCounts(injuries){
-  var m={};
-  (injuries||[]).forEach(function(it){var e=INJURY_STATUS[it.name];if(e)m[e[0]]=(m[e[0]]||0)+e[1];});
-  return m;
+// ─── Condiciones: catálogo, instancias y panel ───
+// Mismo criterio que en la ficha del jugador: una condición se guarda como
+// texto con su corchete ("Exhausted [−2]", "Enhanced [Speed +2]"), y las que
+// impone una herida no se sacan hasta curarla.
+async function loadConditions(){
+  try{ COND=await api(API+'/conditions'); }catch(e){ return; }
+  COND_BY={};
+  (COND.condiciones||[]).forEach(function(c){ COND_BY[c.name]=c; });
+}
+function condColor(name){
+  var d=COND_BY[name];
+  if(d) return d.tono==='pos'?'var(--green)':(d.tono==='neutro'?'var(--text2)':'var(--red)');
+  return SC[name]||'var(--text3)';
+}
+function parseCond(raw){
+  var s=String(raw==null?'':raw);
+  var m=s.match(/^\s*([^\[]*?)\s*(?:\[\s*([\s\S]*?)\s*\])?\s*$/);
+  var name=m?m[1]:s;
+  return {raw:s,name:name,param:(m&&m[2])?m[2]:'',def:COND_BY[name]||null};
+}
+function condDeHerida(nombre){
+  var hs=(COND&&COND.heridas)||[];
+  for(var i=0;i<hs.length;i++){ if(hs[i].name===nombre) return hs[i].cond; }
+  return '';
+}
+function condActivas(o){
+  if(!o) return [];
+  var out=(o.statuses||[]).map(parseCond);
+  (o.injuries||[]).forEach(function(it){
+    var cn=(it.cond!=null?it.cond:condDeHerida(it.name));
+    if(cn){ var x=parseCond(cn); x.herida=it.name; out.push(x); }
+  });
+  return out;
+}
+var COND_UI={};   // uid → instancias dibujadas, para los onclick por índice
+function condPanel(uid,p){
+  var insts=condActivas(p);
+  COND_UI[uid]=insts;
+  var chips=insts.map(function(x,i){
+    var col=condColor(x.name);
+    var lbl=esc(x.name)+(x.param?' <span style="opacity:.85">['+esc(x.param)+']</span>':'');
+    var quitar=x.herida
+      ? '<span class="spill-minus" style="color:'+col+';cursor:help" title="'
+        +escA('La fija la herida "'+x.herida+'": se va al curarla')+'">🔒</span>'
+      : '<button class="spill-minus" style="color:'+col+'" onclick="quitarCond(\''+uid+'\','+i+')" title="Quitar">✕</button>';
+    return '<span class="spill-group" style="border-color:'+col+'">'
+      +'<button class="spill on" style="background:'+col+'22;color:'+col+'" '
+        +'onclick="verCond(\''+uid+'\','+i+')" title="Ver qué hace">'+lbl+'</button>'+quitar+'</span>';
+  }).join('');
+  var add=((COND&&COND.condiciones)||[]).map(function(d,i){
+    var puesta=insts.some(function(x){return x.name===d.name;});
+    if(puesta&&!d.apila) return '';
+    var col=condColor(d.name);
+    return '<button class="spill" style="border-color:'+col+'55" '
+      +'onclick="agregarCond(\''+uid+'\','+i+')" title="'+escA(d.desc||'')+'">'
+      +'<span style="color:'+col+'">+</span> '+esc(d.name)+(d.param?' […]':'')+'</button>';
+  }).join('');
+  return chips+add;
+}
+function verCond(uid,i){
+  var x=(COND_UI[uid]||[])[i]; if(!x)return;
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cname" style="font-size:18px">'+esc(x.name)
+      +(x.param?' <span style="color:var(--text3)">['+esc(x.param)+']</span>':'')+'</div>'
+    +(x.herida?'<div class="cmeta">La fija la herida “'+esc(x.herida)+'”: se va al curarla.</div>':'')
+    +'<div style="font-size:14px;color:var(--text2);margin-top:10px">'
+      +((x.def&&x.def.desc)?esc(x.def.desc):'Sin descripción.')+'</div>';
+  document.getElementById('overlay').classList.add('on');
+}
+var COND_PEND=null;
+function agregarCond(uid,i){
+  var d=((COND&&COND.condiciones)||[])[i];
+  if(!d) return;
+  if(!d.param){ condAdd(uid,d.name,!!d.apila); return; }
+  COND_PEND={uid:uid,d:d};
+  var cuerpo;
+  if(d.param==='attr'){
+    var opts=((COND&&COND.attr_labels)||[]).map(function(a){
+      return '<option value="'+esc(a.n)+'">'+esc(a.n)+'</option>';}).join('');
+    var baja=(d.efecto&&d.efecto.attr<0);
+    cuerpo='<label style="display:flex;gap:8px;align-items:center"><span>Atributo</span>'
+      +'<select class="fi" id="cpAttr" style="width:auto">'+opts+'</select>'
+      +'<span style="color:var(--text3)">'+(baja?'−':'+')+'</span>'
+      +'<input class="fi" type="number" min="1" max="9" id="cpNum" value="1" style="width:74px"/></label>';
+  }else if(d.param==='penal'){
+    cuerpo='<label style="display:flex;gap:8px;align-items:center"><span>Penalización</span>'
+      +'<span style="color:var(--text3)">−</span>'
+      +'<input class="fi" type="number" min="1" max="20" id="cpNum" value="1" style="width:84px"/></label>';
+  }else{
+    cuerpo='<label style="display:flex;gap:8px;align-items:center"><span>Detalle</span>'
+      +'<input class="fi" id="cpTxt" placeholder="'+escA(d.ph||'')+'"/></label>';
+  }
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cname" style="font-size:18px">'+esc(d.name)+'</div>'
+    +(d.desc?'<div class="cmeta" style="margin-bottom:10px">'+esc(d.desc)+'</div>':'')
+    +cuerpo
+    +'<div class="form-actions" style="margin-top:14px">'
+      +'<button class="btn ghost" onclick="closeModal()">Cancelar</button>'
+      +'<button class="btn accent" onclick="confirmarCond()">Aplicar</button></div>';
+  document.getElementById('overlay').classList.add('on');
+}
+function confirmarCond(){
+  if(!COND_PEND)return;
+  var d=COND_PEND.d, uid=COND_PEND.uid, raw=d.name, n;
+  if(d.param==='attr'){
+    n=Math.max(1,parseInt(document.getElementById('cpNum').value)||1);
+    raw=d.name+' ['+document.getElementById('cpAttr').value
+      +' '+((d.efecto&&d.efecto.attr<0)?'−':'+')+n+']';
+  }else if(d.param==='penal'){
+    n=Math.max(1,parseInt(document.getElementById('cpNum').value)||1);
+    raw=d.name+' [−'+n+']';
+  }else{
+    var t=(document.getElementById('cpTxt').value||'').trim();
+    if(t) raw=d.name+' ['+t+']';
+  }
+  COND_PEND=null;
+  closeModal();
+  condAdd(uid,raw,!!d.apila);
+}
+async function condAdd(uid,raw,apila){
+  await api(API+'/combat/status','POST',{uid:uid,status:raw,add:!!apila});
+}
+async function quitarCond(uid,i){
+  var x=(COND_UI[uid]||[])[i];
+  if(!x||x.herida)return;
+  await api(API+'/combat/status/remove_one','POST',{uid:uid,status:x.raw});
 }
 // Qué desplegables dejó abiertos el DM, por participante. Vive acá y no en el
 // DOM porque cada cambio de stat rearma las tarjetas: si no, al pegarle a un
@@ -2326,30 +2557,7 @@ function togglePanel(el,uid,tipo){
   el.textContent=(on?'▾ ':'▸ ')+el.dataset.lbl;
 }
 function participantCard(p){
-  var statusBtns='';
-  var locked=lockedCounts(p.injuries);
-  POS.concat(NEG).forEach(function(s){
-    var manual=p.statuses.filter(function(x){return x===s;}).length;
-    var lk=locked[s]||0, cnt=manual+lk;
-    var on=cnt>0; var col=SC[s];
-    // Exhausted apilable: botón "−" para quitar una carga (funciona con tap en el celu)
-    if(s==='Exhausted'&&cnt>0){
-      var lbl='Exhausted'+(cnt>1?' x'+cnt:'');
-      var minus=manual>0
-        ? '<button class="spill-minus" style="color:'+col+'" onclick="rmStatus(\''+p.uid+'\',\'Exhausted\')" title="Quitar una carga">−</button>'
-        : '<span class="spill-minus" style="color:'+col+';cursor:default" title="Fijado por una herida">🔒</span>';
-      statusBtns+='<span class="spill-group" style="border-color:'+col+'">'
-        +'<button class="spill on" style="background:'+col+'22;color:'+col+'" onclick="chStatus(\''+p.uid+'\',\'Exhausted\')" title="Sumar una carga">'+lbl+'</button>'
-        +minus+'</span>';
-      return;
-    }
-    if(lk>0){
-      statusBtns+='<button class="spill on" style="background:'+col+'22;color:'+col+';border-color:'+col+';cursor:default" title="Fijado por una herida (se quita al curarla)">'+s+' 🔒</button>';
-      return;
-    }
-    statusBtns+='<button class="spill'+(on?' on':'')+'" style="'+(on?'background:'+col+'22;color:'+col+';border-color:'+col:'')+'" '
-      +'onclick="chStatus(\''+p.uid+'\',\''+s+'\')">'+s+'</button>';
-  });
+  var statusBtns=condPanel(p.uid,p);
   var acciones='';
   if(p.acciones&&p.acciones.length){
     acciones=panelToggle(p.uid,'acciones','Ver acciones ('+p.acciones.length+')')
@@ -2416,7 +2624,9 @@ function participantCard(p){
 function injuryChips(inj){
   if(!inj||!inj.length)return '';
   return '<div class="spills" style="margin-top:-2px">'+inj.map(function(i){
-    return '<span class="spill on" style="border-color:var(--orange);color:var(--orange);background:var(--orange)22;cursor:default">🩹 '
+    var cn=(i.cond!=null?i.cond:condDeHerida(i.name));
+    return '<span class="spill on" style="border-color:var(--orange);color:var(--orange);background:var(--orange)22;cursor:help" title="'
+      +escA(cn?'Impone '+cn:'No cambia ningún número')+'">🩹 '
       +esc(i.name)+(i.permanent?' (permanente)':' ('+i.days+'d)')+'</span>';
   }).join('')+'</div>';
 }
@@ -2975,6 +3185,7 @@ async function toggleCreateItems(uid){
 
 // init
 loadCampaign().then(function(){ if(SYSTEM!=='dnd'){ loadStorm(); loadCalendar(); } });
+loadConditions().then(renderCombat);   // el catálogo, antes de dibujar los estados
 connectWS();
 renderCombatSetup();
 loadEnemies();

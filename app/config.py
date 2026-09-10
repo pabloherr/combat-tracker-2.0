@@ -54,6 +54,13 @@ CONFIG_DEFAULTS = {
     "ver_focus_aliados": "color",
     "ver_inv_aliados": "color",
     "ver_estados_aliados": True,
+
+    # ── Condiciones y heridas (ver app/conditions.py) ──
+    # El catálogo no se copia por campaña: acá va solo lo que el DM cambió.
+    "cond_off": [],      # nombres del catálogo que apagó
+    "cond_extra": [],    # condiciones propias: {name, tono, desc, ef, ph}
+    "her_off": [],       # heridas del catálogo que apagó
+    "her_extra": [],     # heridas propias: {name, cond}
 }
 
 # Tamaño de la criatura → clave con su base de carga. La capacidad final es
@@ -69,6 +76,10 @@ BOOL_KEYS = {"modulo_catalogo", "modulo_inventario", "modulo_tormentas",
              "modulo_calendario", "calendario_visible", "calendario_editable",
              "ver_estados_enemigos", "ver_estados_aliados"}
 MODO_KEYS = {k for k in CONFIG_DEFAULTS if k.startswith("ver_") and k not in BOOL_KEYS}
+# Listas: las dos de nombres apagados y las dos de entradas propias.
+STR_LIST_KEYS = {"cond_off", "her_off"}
+DICT_LIST_KEYS = {"cond_extra", "her_extra"}
+LIST_KEYS = STR_LIST_KEYS | DICT_LIST_KEYS
 
 # Claves que los jugadores necesitan saber (el resto es cosa del DM).
 PLAYER_KEYS = ("modulo_catalogo", "modulo_inventario", "modulo_tormentas",
@@ -78,6 +89,14 @@ PLAYER_KEYS = ("modulo_catalogo", "modulo_inventario", "modulo_tormentas",
 def coerce(key: str, value):
     """Lleva un valor al tipo de su clave. Si no se entiende, el default."""
     try:
+        if key in STR_LIST_KEYS:
+            if not isinstance(value, list):
+                return []
+            return [str(x).strip()[:80] for x in value if str(x).strip()][:200]
+        if key in DICT_LIST_KEYS:
+            if not isinstance(value, list):
+                return []
+            return [x for x in value if isinstance(x, dict)][:200]
         if key in BOOL_KEYS:
             if isinstance(value, str):
                 return value.strip().lower() not in ("", "0", "false", "no")
@@ -89,7 +108,8 @@ def coerce(key: str, value):
             return int(value)
         return float(value)
     except (TypeError, ValueError):
-        return CONFIG_DEFAULTS[key]
+        d = CONFIG_DEFAULTS[key]
+        return list(d) if isinstance(d, list) else d
 
 
 def sane(cfg: dict) -> dict:
@@ -112,7 +132,8 @@ def size_bases(cfg: dict) -> dict:
 
 def get_config(conn, cid: int) -> dict:
     row = conn.execute("SELECT config FROM campaigns WHERE id=?", (cid,)).fetchone()
-    cfg = dict(CONFIG_DEFAULTS)
+    # las listas se copian: si no, una campaña sin ajustes comparte el objeto
+    cfg = {k: (list(v) if isinstance(v, list) else v) for k, v in CONFIG_DEFAULTS.items()}
     if row and row["config"]:
         try:
             saved = json.loads(row["config"])

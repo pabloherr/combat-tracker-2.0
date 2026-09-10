@@ -112,6 +112,11 @@ class ConfigIn(BaseModel):
     ver_focus_aliados: str | None = None
     ver_inv_aliados: str | None = None
     ver_estados_aliados: bool | None = None
+    # Condiciones y heridas: qué apagó del catálogo y qué agregó de su cosecha
+    cond_off: list[str] | None = None
+    cond_extra: list[dict] | None = None
+    her_off: list[str] | None = None
+    her_extra: list[dict] | None = None
 
 
 # ── Personajes ─────────────────────────────────────────────
@@ -163,12 +168,19 @@ class LiveStat(BaseModel):
 
 class LiveStatus(BaseModel):
     status: str
+    # True = sumar una instancia (condiciones que se acumulan: Exhausted [-2],
+    # Enhanced [Speed +2]...). False = prender/apagar, como siempre.
+    add: bool = False
 
 
 class InjuryIn(BaseModel):
     name: str
     days: int = 0            # días restantes (0 = se cura en el próximo descanso largo)
     permanent: bool = False
+    # Condición que impone mientras dure (ver app/conditions.py). Se guarda con
+    # la herida: si el DM después cambia su lista, la herida sigue haciendo lo
+    # que hacía cuando se sacó.
+    cond: str = ""
 
 
 class DaysChange(BaseModel):
@@ -339,6 +351,7 @@ class VidaMaxIn(BaseModel):
 class StatusToggle(BaseModel):
     uid: str
     status: str
+    add: bool = False        # ver LiveStatus.add
 
 
 class TurnChange(BaseModel):
