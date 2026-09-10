@@ -817,7 +817,8 @@ function memberCard(m){
     +memChips(m)
     +(SYSTEM==='dnd'?dndDmBlock(m):marcosDmBlock(m))
     +'<div class="card-actions" style="margin-top:10px">'
-      +'<button class="btn sm" onclick="viewMemberSheet('+m.user_id+')">Ver ficha</button>'
+      +'<button class="btn sm" onclick="viewMemberSheet('+m.user_id+')">Vista rápida</button>'
+      +'<a class="btn sm accent" href="/campaign/'+CID+'/jugador/'+m.user_id+'" title="La misma pestaña “Mi personaje” que ve el jugador, con todos sus controles">Ficha completa</a>'
       +(m.has_pdf?'<a class="btn sm" href="/api/characters/'+m.character_id+'/pdf" target="_blank">PDF</a>':'')
       +(SYSTEM==='dnd'?'':'<button class="btn sm" onclick="openGive('+m.user_id+','+m.character_id+',\''+escA(m.character_name)+'\')">🎁 Dar objeto</button>'
         +'<button class="btn sm'+(m.can_create_items?' accent':'')+'" onclick="toggleCreateItems('+m.user_id+')" '

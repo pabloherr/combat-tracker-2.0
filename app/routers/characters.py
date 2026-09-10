@@ -38,6 +38,7 @@ def _serialize(r) -> dict:
 
 
 def _owned(conn, cid: int, user: dict):
+    """Solo el dueño: lo que ni el DM hace por él (borrar el personaje)."""
     r = conn.execute("SELECT * FROM characters WHERE id=?", (cid,)).fetchone()
     if not r or r["owner_id"] != user["id"]:
         raise HTTPException(404, "Personaje no encontrado")
@@ -197,7 +198,7 @@ def create_character(c: CharacterIn, user=Depends(current_user)):
 async def update_character(cid: int, c: CharacterIn, user=Depends(current_user)):
     name = c.name.strip() or "Personaje"
     with db() as conn:
-        row = _owned(conn, cid, user)
+        row = _owned_or_dm(conn, cid, user)
         # Valor actual: usa el que mandó el jugador (si vino), si no el guardado;
         # siempre topeado al máximo nuevo y sin bajar de 0.
         def _cur(sent, stored, mx):
@@ -227,14 +228,14 @@ async def reimport_pdf(cid: int, file: UploadFile = File(...), user=Depends(curr
     """Reemplaza la ficha PDF de un personaje existente y re-extrae sus datos."""
     data = await file.read()
     with db() as conn:
-        r = _owned(conn, cid, user)
+        r = _owned_or_dm(conn, cid, user)
         system = _campaign_system(conn, r["campaign_id"])
     try:
         p = _parse_sheet_pdf(system, data)
     except ValueError as e:
         raise HTTPException(400, str(e))
     with db() as conn:
-        _owned(conn, cid, user)
+        _owned_or_dm(conn, cid, user)
         conn.execute(
             "UPDATE characters SET name=?, vida_max=?, focus_max=?, inv_max=?, "
             "vida=?, focus=?, inv=?, sheet=?, has_pdf=1 WHERE id=?",
@@ -331,7 +332,7 @@ def _pet_serialize(r) -> dict:
 @router.get("/{cid}/pets")
 def list_pets(cid: int, user=Depends(current_user)):
     with db() as conn:
-        _owned(conn, cid, user)
+        _owned_or_dm(conn, cid, user)
         rows = conn.execute("SELECT * FROM pets WHERE character_id=? ORDER BY name", (cid,)).fetchall()
         return [_pet_serialize(r) for r in rows]
 
@@ -343,7 +344,7 @@ def add_pet_from_enemy(cid: int, payload: PetFromEnemy, user=Depends(current_use
     Se copia una foto (snapshot) de la ficha: si el DM edita el enemigo después,
     la mascota ya agregada no cambia."""
     with db() as conn:
-        ch = _owned(conn, cid, user)
+        ch = _owned_or_dm(conn, cid, user)
         # El enemigo tiene que estar habilitado como mascota en la campaña del PJ.
         e = conn.execute(
             "SELECT e.* FROM campaign_pet_options po JOIN enemies e ON e.id = po.enemy_id "
@@ -365,7 +366,7 @@ def add_pet_from_enemy(cid: int, payload: PetFromEnemy, user=Depends(current_use
 @router.delete("/{cid}/pets/{pid}")
 def delete_pet(cid: int, pid: int, user=Depends(current_user)):
     with db() as conn:
-        _owned(conn, cid, user)
+        _owned_or_dm(conn, cid, user)
         conn.execute("DELETE FROM pets WHERE id=? AND character_id=?", (pid, cid))
     return {"ok": True}
 
@@ -545,7 +546,7 @@ async def character_stat(cid: int, s: LiveStat, user=Depends(current_user)):
     if s.stat not in _STATS:
         raise HTTPException(400, "Stat inválido")
     with db() as conn:
-        r = _owned(conn, cid, user)
+        r = _owned_or_dm(conn, cid, user)
         val = _clamp_stat(r, s.stat, s.delta)
         conn.execute(f"UPDATE characters SET {s.stat}=? WHERE id=?", (val, cid))
         light = r["marcos_light"] or 0
@@ -564,7 +565,7 @@ async def character_stat(cid: int, s: LiveStat, user=Depends(current_user)):
 @router.post("/{cid}/status")
 async def character_status(cid: int, s: LiveStatus, user=Depends(current_user)):
     with db() as conn:
-        r = _owned(conn, cid, user)
+        r = _owned_or_dm(conn, cid, user)
         st = _toggle_status(json.loads(r["statuses"] or "[]"), s.status, s.add)
         conn.execute("UPDATE characters SET statuses=? WHERE id=?", (json.dumps(st), cid))
         campaign_id = r["campaign_id"]
@@ -575,7 +576,7 @@ async def character_status(cid: int, s: LiveStatus, user=Depends(current_user)):
 @router.post("/{cid}/status/remove_one")
 async def character_status_remove(cid: int, s: LiveStatus, user=Depends(current_user)):
     with db() as conn:
-        r = _owned(conn, cid, user)
+        r = _owned_or_dm(conn, cid, user)
         st = json.loads(r["statuses"] or "[]")
         if s.status in st:
             st.remove(s.status)
@@ -630,7 +631,7 @@ async def add_injury(cid: int, inj: InjuryIn, user=Depends(current_user)):
     if not name:
         raise HTTPException(400, "Poné el tipo de herida")
     with db() as conn:
-        r = _owned(conn, cid, user)
+        r = _owned_or_dm(conn, cid, user)
         lst = json.loads(r["injuries"] or "[]")
         lst.append({"id": uuid.uuid4().hex[:8], "name": name,
                     "days": max(0, inj.days), "permanent": bool(inj.permanent),
@@ -644,7 +645,7 @@ async def add_injury(cid: int, inj: InjuryIn, user=Depends(current_user)):
 @router.post("/{cid}/injuries/{iid}/days")
 async def injury_days(cid: int, iid: str, ch: DaysChange, user=Depends(current_user)):
     with db() as conn:
-        r = _owned(conn, cid, user)
+        r = _owned_or_dm(conn, cid, user)
         lst = json.loads(r["injuries"] or "[]")
         for it in lst:
             if it["id"] == iid and not it.get("permanent"):
@@ -658,7 +659,7 @@ async def injury_days(cid: int, iid: str, ch: DaysChange, user=Depends(current_u
 @router.delete("/{cid}/injuries/{iid}")
 async def delete_injury(cid: int, iid: str, user=Depends(current_user)):
     with db() as conn:
-        r = _owned(conn, cid, user)
+        r = _owned_or_dm(conn, cid, user)
         lst = [it for it in json.loads(r["injuries"] or "[]") if it["id"] != iid]
         conn.execute("UPDATE characters SET injuries=? WHERE id=?", (json.dumps(lst), cid))
         campaign_id = r["campaign_id"]
@@ -797,7 +798,7 @@ def _adjust_marcos_total(conn, char_id: int, marcos: int, light: int, delta: int
 @router.post("/{cid}/marcos")
 def character_marcos(cid: int, ch: MarcosChange, user=Depends(current_user)):
     with db() as conn:
-        r = _owned(conn, cid, user)
+        r = _owned_or_dm(conn, cid, user)
         total, light = _adjust_marcos_total(conn, cid, r["marcos"] or 0, r["marcos_light"] or 0, ch.delta)
     return {"ok": True, "marcos": total, "marcos_light": light}
 
@@ -808,7 +809,7 @@ def character_marcos_set(cid: int, s: MarcosSet, user=Depends(current_user)):
     cargados = max(0, s.cargados)
     opacos = max(0, s.opacos)
     with db() as conn:
-        _owned(conn, cid, user)
+        _owned_or_dm(conn, cid, user)
         conn.execute("UPDATE characters SET marcos=?, marcos_light=? WHERE id=?",
                      (cargados + opacos, cargados, cid))
     return {"ok": True, "marcos": cargados + opacos, "marcos_light": cargados}
@@ -1514,7 +1515,7 @@ def set_size(cid: int, s: SizeIn, user=Depends(current_user)):
 async def character_charge_inv(cid: int, user=Depends(current_user)):
     """Cargar investidura: llena el medidor 1:1 apagando marcos cargados."""
     with db() as conn:
-        r = _owned(conn, cid, user)
+        r = _owned_or_dm(conn, cid, user)
         light = r["marcos_light"] or 0
         inv = r["inv"] if r["inv"] is not None else r["inv_max"]
         amount = max(0, min(r["inv_max"] - inv, light))
@@ -1538,7 +1539,7 @@ async def upload_image(cid: int, file: UploadFile = File(...), user=Depends(curr
     if not mime.startswith("image/"):
         raise HTTPException(400, "El archivo no es una imagen")
     with db() as conn:
-        _owned(conn, cid, user)
+        _owned_or_dm(conn, cid, user)
         conn.execute(
             "INSERT INTO character_images (character_id, image, mime) VALUES (?,?,?) "
             "ON CONFLICT(character_id) DO UPDATE SET image=excluded.image, mime=excluded.mime",
@@ -1576,7 +1577,7 @@ def get_image(cid: int, user=Depends(current_user)):
 @router.delete("/{cid}/image")
 def delete_image(cid: int, user=Depends(current_user)):
     with db() as conn:
-        _owned(conn, cid, user)
+        _owned_or_dm(conn, cid, user)
         conn.execute("DELETE FROM character_images WHERE character_id=?", (cid,))
         conn.execute("UPDATE characters SET has_image=0 WHERE id=?", (cid,))
     return {"ok": True}

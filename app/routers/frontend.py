@@ -74,6 +74,19 @@ def login_page():
     return _page("login.html")
 
 
+@router.get("/campaign/{cid}/jugador/{uid}")
+def dm_player_page(cid: int, uid: int, request: Request):
+    """La misma página del jugador, para que el DM vea (y toque) la ficha de
+    uno de los suyos. Los permisos los pone la API: cada endpoint acepta al DM
+    de la campaña."""
+    u = optional_user(request)
+    if not u:
+        return RedirectResponse("/login")
+    if u.get("role") == "player":
+        return RedirectResponse("/jugar")
+    return _page("player.html")
+
+
 @router.get("/campaign/{cid}")
 def dm_page(cid: int, request: Request):
     u = optional_user(request)

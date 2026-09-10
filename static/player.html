@@ -18,6 +18,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
    como se lee bien. En el teléfono no cambia nada. */
 @media(min-width:900px){ body.pj-ancho .app{max-width:1080px;} }
 .header{text-align:center;padding-bottom:.9rem;margin-bottom:1rem;border-bottom:.5px solid var(--border2);}
+.dm-view{font-family:var(--font-h);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);
+  background:var(--accsoft);border:1px solid var(--gold);border-radius:var(--r);padding:7px 12px;margin-bottom:12px;text-align:center;}
 .title{font-family:var(--font-h);font-size:18px;color:var(--gold);letter-spacing:.12em;text-transform:uppercase;}
 .round-block{display:inline-flex;align-items:center;gap:8px;margin-top:10px;background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--pill);padding:5px 16px;}
 .round-label{font-size:11px;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;}
@@ -796,7 +798,12 @@ var CONFIG={};     // ajustes de la campaña que le tocan al jugador (qué módu
 // El catálogo y el inventario se prenden y se apagan por separado.
 function MODULO(n){ return SYSTEM!=='dnd' && CONFIG['modulo_'+n]!==false; }
 var MY_UID=null;   // id de mi usuario (para reconocer mi personaje en el combate)
-var CID=parseInt(location.pathname.split('/').filter(Boolean).pop());
+// /play/<cid> para el jugador; /campaign/<cid>/jugador/<uid> para el DM, que
+// ve la ficha de ese jugador tal cual la ve él.
+var _segs=location.pathname.split('/').filter(Boolean);
+var VER_UID=(_segs[0]==='campaign'&&_segs[2]==='jugador')?parseInt(_segs[3]):null;
+var DM_VIEW=VER_UID!=null;
+var CID=DM_VIEW?parseInt(_segs[1]):parseInt(_segs[_segs.length-1]);
 var API='/api/campaigns/'+CID;
 var _qtab=(new URLSearchParams(location.search).get('tab')||'').toLowerCase();
 // 'grupo' y 'combate' quedaron como una sola pestaña: los links viejos siguen andando.
@@ -1376,9 +1383,9 @@ function render(combat){
   renderMesa();
   if(PREV_ACTIVE===null){
     // primera carga: si no pidieron pestaña y ya hay combate, abrí la mesa
-    if(!TAB_EXPLICIT && active) setTab('mesa');
+    if(!TAB_EXPLICIT && active && !DM_VIEW) setTab('mesa');
   }else{
-    if(active && !PREV_ACTIVE) setTab('mesa');   // arrancó el combate
+    if(active && !PREV_ACTIVE && !DM_VIEW) setTab('mesa');   // arrancó el combate
     if(!active && PREV_ACTIVE) loadRoster();     // terminó: refrescá la ficha
   }
   PREV_ACTIVE=active;
@@ -2381,6 +2388,9 @@ function invCambio(){
 function renderRoster(){
   if(!ROSTER)return;
   var meM=ROSTER.members.find(function(m){return m.user_id===MY_UID;});
+  var dv=document.getElementById('dmView');
+  if(dv) dv.textContent='Vista de DM · '+(meM?(meM.character?meM.character.name+' ('+meM.username+')':meM.username):'ese jugador no está en la campaña')
+    +' · lo que toques acá le cambia la ficha a él';
   MYCHAR=(meM&&meM.character)?meM.character.id:null;
   indexarMascotas();
   var mp=document.getElementById('ocMe');
@@ -3593,6 +3603,16 @@ function connect(){
 async function init(){
   try{ var me=await api('/api/auth/me'); MY_UID=me.id; }
   catch(e){ return; }   // 401 ya redirige a /login
+  if(DM_VIEW){
+    // el DM mira la ficha de un jugador: la página cree que es él, y solo
+    // muestra "Mi personaje"
+    MY_UID=VER_UID; TAB='pj';
+    document.querySelector('.tabbar').style.display='none';
+    var back=document.querySelector('.header a');
+    if(back){ back.href='/campaign/'+CID; back.textContent='← Volver a la campaña'; }
+    document.querySelector('.tabbar').insertAdjacentHTML('beforebegin',
+      '<div class="dm-view" id="dmView">Vista de DM · ficha del jugador</div>');
+  }
   setTab(TAB);
   connect();
   await loadConditions();           // el catálogo de la campaña, antes de dibujar la ficha
