@@ -23,12 +23,9 @@ router = APIRouter(prefix="/api/campaigns/{cid}", tags=["items"])
 
 
 def _require_cosmere(conn, cid: int, modulo="modulo_catalogo"):
-    """Los objetos son una regla de Cosmere, y además el DM puede apagar el
-    catálogo y el inventario por separado desde los ajustes de la campaña."""
+    """El catálogo y el inventario valen en los dos sistemas; el DM los puede
+    apagar por separado desde los ajustes de la campaña."""
     c = campaign_or_404(conn, cid)
-    system = (c["system"] if "system" in c.keys() else None) or "cosmere"
-    if system != "cosmere":
-        raise HTTPException(400, "Los objetos son solo para campañas de Cosmere")
     if modulo and not get_config(conn, cid)[modulo]:
         que = "el catálogo" if modulo == "modulo_catalogo" else "el inventario"
         raise HTTPException(400, f"El DM apagó {que} en esta campaña")

@@ -259,7 +259,8 @@ async function borrarSuelto(id,nameEnc){
 function openSolo(){
   var dnd=document.getElementById('soloSystem').value==='dnd';
   var blankPdf=dnd
-    ? '<a class="btn" href="/static/5e_sheet.pdf" download="Ficha_DnD_5e.pdf">⭱ Descargar ficha vacía</a>'
+    ? '<a class="btn" href="/static/5e_2024_sheet.pdf" download="Ficha_DnD_2024.pdf">⭱ Ficha 2024</a>'
+      +'<a class="btn" href="/static/5e_sheet.pdf" download="Ficha_DnD_5e.pdf">⭱ Ficha clásica</a>'
     : '<a class="btn" href="/static/cosmere_sheet.pdf" download="Ficha_Cosmere.pdf">⭱ Descargar ficha vacía</a>';
   var statInputs='<input class="fi" id="j-vida" type="number" value="20" title="Vida máx" style="width:70px"/>'
     +(dnd?'':'<input class="fi" id="j-focus" type="number" value="10" title="Focus máx" style="width:70px"/>'
@@ -333,10 +334,11 @@ function openJoin(cid){
   var name=iv?iv.name:'';
   var dnd=iv&&iv.system==='dnd';
   var blankPdf=dnd
-    ? '<a class="btn" href="/static/5e_sheet.pdf" download="Ficha_DnD_5e.pdf">⭱ Descargar ficha vacía</a>'
+    ? '<a class="btn" href="/static/5e_2024_sheet.pdf" download="Ficha_DnD_2024.pdf">⭱ Ficha 2024</a>'
+      +'<a class="btn" href="/static/5e_sheet.pdf" download="Ficha_DnD_5e.pdf">⭱ Ficha clásica</a>'
     : '<a class="btn" href="/static/cosmere_sheet.pdf" download="Ficha_Cosmere.pdf">⭱ Descargar ficha vacía</a>';
   var pdfHint=dnd
-    ? 'Descargá la ficha rellenable de D&D 5e, completala (con Adobe/lector de PDF) y subila: se leen tus stats, vida y spell slots.'
+    ? 'Descargá la ficha rellenable que prefieras (la de 2024 o la clásica), completala con un lector de PDF y subila: se leen tus características, competencias, vida, ataques y espacios de conjuro. Las dos sirven, también para actualizarla después.'
     : 'Descargá la ficha rellenable de Cosmere RPG, completala (con Adobe/lector de PDF) y subila: se leen tus stats, vida, focus e investidura.';
   // sueltos del mismo sistema: se pueden usar en vez de crear otro
   var sueltos=(CHARS||[]).filter(function(c){return !c.campaign_id&&(c.system||'cosmere')===(dnd?'dnd':'cosmere');});

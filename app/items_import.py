@@ -108,10 +108,22 @@ def _build_from_data(data: dict) -> dict:
                  "traits": _norm_list(data.get("traits")),
                  "expert_traits": _norm_list(data.get("expert_traits")),
                  "skill": _s(data.get("skill"))}
+        # D&D 5e: con qué característica se ataca (vacío = la deduce por los
+        # rasgos) y si se es competente con ella.
+        if data.get("ability"):
+            stats["ability"] = _s(data.get("ability")).upper()[:3]
+        if data.get("prof") is not None:
+            stats["prof"] = bool(data.get("prof"))
     elif kind == "armadura":
         stats = {"deflect": _to_int(data.get("deflect")),
                  "traits": _norm_list(data.get("traits")),
                  "expert_traits": _norm_list(data.get("expert_traits"))}
+        # D&D 5e: CA base de la armadura y tope al modificador de Destreza
+        # (armadura media 2, pesada 0; vacío = sin tope).
+        if data.get("ac") is not None:
+            stats["ac"] = _to_int(data.get("ac"))
+        if data.get("dex_max") is not None:
+            stats["dex_max"] = _to_int(data.get("dex_max"))
     elif kind == "alojamiento":
         stats = {"per_night": _to_int(data.get("price", data.get("precio")))}
     elif kind == "vehiculo":
@@ -189,14 +201,19 @@ def item_to_yaml(it: dict) -> dict:
     d = {"kind": it.get("kind", "equipo"), "name": it.get("name", "")}
     if it["kind"] == "arma":
         d["weapon_class"] = s.get("weapon_class", "light")
-        for k in ("skill", "damage", "range"):
+        for k in ("skill", "damage", "range", "ability"):
             if s.get(k):
                 d[k] = s[k]
+        if s.get("prof") is not None:
+            d["prof"] = s["prof"]
         for k in ("traits", "expert_traits"):
             if s.get(k):
                 d[k] = list(s[k])
     elif it["kind"] == "armadura":
         d["deflect"] = s.get("deflect", 0)
+        for k in ("ac", "dex_max"):
+            if s.get(k) is not None:
+                d[k] = s[k]
         for k in ("traits", "expert_traits"):
             if s.get(k):
                 d[k] = list(s[k])

@@ -161,6 +161,26 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .ed-sk .sh-sk-n{font-size:10px;}
 .ed-sk .sh-sk-b{min-width:34px;}
 .sh-pips.ed .sh-pip{width:13px;height:13px;cursor:pointer;}
+/* hoja 5e: seis características, competencia de salvaciones y habilidades */
+.sh-at6{grid-template-columns:repeat(3,1fr);}
+.sh-ab-score{display:block;font-size:11px;color:var(--text3);font-family:var(--font-b);}
+.ed-ab6{grid-template-columns:repeat(6,1fr);}
+.ed5-mod{text-align:center;font-family:var(--font-h);font-size:13px;color:var(--gold2);margin-top:2px;}
+.ed5-sv{display:block;text-align:center;font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;}
+.ed-sk5{grid-template-columns:repeat(2,1fr);}
+/* hoja 5e ordenada como la de 2024: un recuadro por característica */
+.sh3-dnd{align-items:start;}
+.sh-col3-wrap{display:flex;flex-direction:column;gap:10px;min-width:0;}
+.ab5{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;box-shadow:var(--shadow);}
+.ab5-h{display:flex;align-items:center;gap:8px;background:var(--bg4);padding:6px 10px;border-bottom:1px solid var(--border2);}
+.ab5-n{font-family:var(--font-h);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold2);flex:1;min-width:0;}
+.ab5-mod{font-family:var(--font-h);font-size:20px;color:var(--gold2);}
+.ab5-score{font-size:11px;color:var(--text3);border:1px solid var(--border2);border-radius:var(--pill);padding:1px 7px;}
+.ab5-sk{padding:5px 10px 8px;}
+.sh-sk-sv{border-bottom:1px solid var(--border);padding-bottom:4px;margin-bottom:3px;}
+.sh-sk-sv .sh-sk-n{color:var(--gold);}
+.hp-temp{font-size:11px;color:var(--blue2);border:1px solid var(--blue2);border-radius:var(--pill);padding:1px 6px;}
+@media(max-width:620px){ .ed-ab6{grid-template-columns:repeat(3,1fr) !important;} .ed-sk5{grid-template-columns:1fr;} }
 .sh-pips.ed .sh-pip:hover{border-color:var(--gold);}
 .ed-deriv{font-size:12px;color:var(--text2);background:var(--bg3);border-radius:var(--r);padding:6px 10px;margin-top:6px;}
 .ed-deriv b{font-family:var(--font-h);color:var(--gold2);font-weight:500;}
@@ -615,10 +635,21 @@ function condDeHerida(nombre){
 }
 // Lo que esas condiciones le hacen a los números de la ficha.
 function calcEfectos(insts){
-  var e={attr:{},tests:0,mov:null,desvTodos:false,desvSk:{}};
+  var e={attr:{},tests:0,mov:null,desvTodos:false,desvSk:{},atq:'',recibe:'',agot:0};
   (insts||[]).forEach(function(x){
     var d=x.def; if(!d) return;
     var ef=d.efecto||{};
+    // 5e: el agotamiento va por niveles y sus efectos se acumulan
+    if(ef.agot){
+      var n=Math.max(1,Math.min(6,parseInt(normNum(x.param))||1));
+      if(n>e.agot) e.agot=n;
+      if(n>=1) e.desvTodos=true;
+      if(n>=2&&e.mov!==0) e.mov='mitad';
+      if(n>=3) e.atq=e.atq==='vent'?'':'desv';
+      if(n>=5) e.mov=0;
+    }
+    if(ef.atq) e.atq=(e.atq&&e.atq!==ef.atq)?'':ef.atq;      // ventaja y desventaja se cancelan
+    if(ef.recibe) e.recibe=(e.recibe&&e.recibe!==ef.recibe)?'':ef.recibe;
     if(ef.attr){
       var p=parseAttrParam(x.param);
       if(p) e.attr[p.key]=(e.attr[p.key]||0)+(ef.attr<0?-p.n:p.n);
@@ -650,8 +681,15 @@ function efectoTexto(x){
   }
   if(ef.mov===0) out.push('movimiento en 0');
   else if(ef.mov==='mitad') out.push('movimiento a la mitad');
-  if(ef.desv==='todos') out.push('desventaja en todos los tests');
+  if(ef.desv==='todos') out.push(SYSTEM==='dnd'?'desventaja en las pruebas de característica':'desventaja en todos los tests');
   else if(ef.desv&&ef.desv.length) out.push('desventaja en '+ef.desv.join(', '));
+  if(ef.atq) out.push((ef.atq==='vent'?'ventaja':'desventaja')+' en las tiradas de ataque');
+  if(ef.recibe) out.push('los ataques contra vos tienen '+(ef.recibe==='vent'?'ventaja':'desventaja'));
+  if(ef.agot){
+    var n=Math.max(1,Math.min(6,parseInt(normNum(x.param))||1));
+    var acum=((COND&&COND.agotamiento)||[]).filter(function(a){return a.n<=n;}).map(function(a){return a.d;});
+    out.push('nivel '+n+(acum.length?': '+acum.join(', '):''));
+  }
   return out.join(' · ');
 }
 
@@ -797,8 +835,10 @@ var COMBAT=null;
 var CONFIG={};     // ajustes de la campaña que le tocan al jugador (qué módulos hay)
 // El catálogo y el inventario se prenden y se apagan por separado.
 function MODULO(n){
-  if(SOLO&&n==='catalogo') return false;      // suelto no hay DM que arme catálogo
-  return SYSTEM!=='dnd' && CONFIG['modulo_'+n]!==false;
+  // Sin campaña no hay catálogo (nadie lo arma), pero el inventario es del
+  // jugador: lo maneja él, con los objetos que se cargue.
+  if(SOLO) return n==='inventario';
+  return CONFIG['modulo_'+n]!==false;
 }
 var MY_UID=null;   // id de mi usuario (para reconocer mi personaje en el combate)
 // /play/<cid> para el jugador; /campaign/<cid>/jugador/<uid> para el DM, que
@@ -1411,6 +1451,7 @@ async function loadRoster(){
   document.querySelectorAll('.cosmere-only').forEach(function(el){
     var m=el.dataset.mod;
     el.style.display=(m?MODULO(m):SYSTEM!=='dnd')?'':'none';
+    if(m) el.style.display=MODULO(m)?'':'none';
   });
   if(SOLO&&TAB==='mesa') setTab('pj');
   // si el DM apagó un módulo, su pestaña no existe: no te quedes mirando la nada
@@ -2169,10 +2210,425 @@ function cosmere3HTML(c){
     +(a.STR==null?'<div class="sh-meta" style="margin-top:10px">Sin ficha cargada: subí tu PDF con '
        +'“⭳ Actualizar PDF”, o cargá atributos y habilidades a mano con “✎ Editar”.</div>':'');
 }
+// ═══════════ D&D 5e ═══════════
+// Mismo criterio que la hoja de Cosmere: lo que se puede calcular se calcula
+// (modificadores, competencia, percepción pasiva, carga) y lo que una condición
+// cambia se muestra en verde o en rojo.
+var AB5=[['STR','Fuerza'],['DEX','Destreza'],['CON','Constitución'],
+         ['INT','Inteligencia'],['WIS','Sabiduría'],['CHA','Carisma']];
+var SK5={Acrobatics:'DEX','Animal Handling':'WIS',Arcana:'INT',Athletics:'STR',
+  Deception:'CHA',History:'INT',Insight:'WIS',Intimidation:'CHA',Investigation:'INT',
+  Medicine:'WIS',Nature:'INT',Perception:'WIS',Performance:'CHA',Persuasion:'CHA',
+  Religion:'INT','Sleight of Hand':'DEX',Stealth:'DEX',Survival:'WIS'};
+var SK5_ORDEN=Object.keys(SK5).sort();
+var SK5_ES={Acrobatics:'Acrobacias','Animal Handling':'T. con animales',Arcana:'Arcanos',
+  Athletics:'Atletismo',Deception:'Engaño',History:'Historia',Insight:'Perspicacia',
+  Intimidation:'Intimidación',Investigation:'Investigación',Medicine:'Medicina',
+  Nature:'Naturaleza',Perception:'Percepción',Performance:'Interpretación',
+  Persuasion:'Persuasión',Religion:'Religión','Sleight of Hand':'Juego de manos',
+  Stealth:'Sigilo',Survival:'Supervivencia'};
+function nivel5(s){ var m=String(s.level||'').match(/\d+/); return m?Math.max(1,Math.min(20,parseInt(m[0]))):1; }
+function comp5(s){ return s.prof_bonus!=null?parseInt(s.prof_bonus)||2:2+Math.floor((nivel5(s)-1)/4); }
+function mod5(score){ return score==null||score===''?null:Math.floor((parseInt(score)-10)/2); }
+function fmt5(n){ return n==null?'—':((n>=0?'+':'')+n); }
+// Competencia en una habilidad: 0 nada, 1 competente, 2 experto.
+function skProf5(s,n){ return Math.max(0,Math.min(2,parseInt((s.skill_prof||{})[n])||0)); }
+function skMod5(s,n){
+  var m=mod5((s.abilities||{})[SK5[n]]);
+  if(m==null) return null;
+  return m+comp5(s)*skProf5(s,n);
+}
+function save5(s,k){
+  var m=mod5((s.abilities||{})[k]);
+  if(m==null) return null;
+  return m+((s.save_prof||{})[k]?comp5(s):0);
+}
+function pasiva5(s){ var p=skMod5(s,'Perception'); return p==null?null:10+p; }
+// CA: la de la armadura puesta (base + Destreza, con su tope) o, sin armadura,
+// la que diga la ficha.
+function ca5(c){
+  var s=c.sheet||{}, dex=mod5((s.abilities||{}).DEX);
+  var puesta=armadurasDeInv().filter(function(x){return x.rol==='puesta';})[0];
+  if(puesta){
+    var st=puesta.stats||{};
+    if(st.ac!=null&&st.ac!==''){
+      var base=parseInt(st.ac)||0, tope=(st.dex_max==null||st.dex_max==='')?null:parseInt(st.dex_max);
+      return {v:base+((dex==null)?0:(tope==null?dex:Math.min(dex,tope))), de:puesta.name};
+    }
+  }
+  return {v:(s.ac===''||s.ac==null)?null:s.ac, de:armadurasDeInv().length?'sin armadura puesta':'de la ficha'};
+}
+function carga5(s){ var v=(s.abilities||{}).STR; return v==null?null:parseInt(v)*15; }
+// Velocidad con las condiciones aplicadas (Prone la parte, Grappled la deja en 0).
+function vel5(s,eff){
+  var txt=String(s.speed||'30 ft.'), m=txt.match(/-?\d+/);
+  if(!m||eff.mov===null) return {txt:txt,cls:'',tip:''};
+  var base=parseInt(m[0]), v=(eff.mov===0)?0:Math.floor(base/2);
+  if(v===base) return {txt:txt,cls:'',tip:''};
+  return {txt:txt.replace(/-?\d+/,String(v)),cls:' mod-down',tip:'Sin condiciones: '+txt};
+}
+// Máximo de PG: el agotamiento 4 lo parte al medio.
+function pgMax5(c,eff){
+  var mx=c.vida_max||0;
+  return eff.agot>=4?{v:Math.floor(mx/2),cls:' mod-down',tip:'Sin agotamiento: '+mx}:{v:mx,cls:'',tip:''};
+}
+function d20Marca(eff,tipo){
+  var v=tipo==='atq'?eff.atq:(eff.desvTodos?'desv':'');
+  if(!v) return '';
+  var vent=v==='vent';
+  return '<span class="sh-desv" style="color:'+(vent?'var(--green)':'var(--red)')+'" title="'
+    +escA((vent?'Ventaja':'Desventaja')+' por una condición')+'">'+(vent?'▲':'▼')+'</span>';
+}
+function shAb5(k,lbl,score,eff){
+  var m=mod5(score);
+  return '<div class="sh-atbox"><span class="l">'+lbl+'</span>'
+    +'<span class="v">'+fmt5(m)+'</span>'
+    +'<span class="sh-ab-score">'+(score==null||score===''?'—':score)+'</span></div>';
+}
+// Las habilidades que cuelgan de cada característica, como en la hoja de 2024.
+var SK5_POR_AB={STR:['Athletics'],DEX:['Acrobatics','Sleight of Hand','Stealth'],CON:[],
+  INT:['Arcana','History','Investigation','Nature','Religion'],
+  WIS:['Animal Handling','Insight','Medicine','Perception','Survival'],
+  CHA:['Deception','Intimidation','Performance','Persuasion']};
+var AB5_ES={STR:'Fuerza',DEX:'Destreza',CON:'Constitución',INT:'Inteligencia',WIS:'Sabiduría',CHA:'Carisma'};
+// Un bloque: la característica con su modificador y su puntuación, la
+// salvación y sus habilidades, cada una con el puntito de competencia.
+function ab5Bloque(c,k,eff){
+  var s=c.sheet||{}, score=(s.abilities||{})[k], m=mod5(score);
+  var sv=save5(s,k), pro=!!(s.save_prof||{})[k];
+  var filas='<div class="sh-sk sh-sk-sv"><span class="sh-sk-b">'+fmt5(sv)+'</span>'
+    +'<span class="sh-sk-n">Salvación</span>'
+    +'<span class="sh-pips"><span class="sh-pip'+(pro?' on':'')+'" title="'
+      +(pro?'Competente':'Sin competencia')+'"></span></span></div>';
+  filas+=SK5_POR_AB[k].map(function(n){
+    var val=skMod5(s,n), p=skProf5(s,n), pips='';
+    for(var i=0;i<2;i++) pips+='<span class="sh-pip'+(i<p?' on':'')+'"></span>';
+    return '<div class="sh-sk"><span class="sh-sk-b">'+fmt5(val)+'</span>'
+      +'<span class="sh-sk-n">'+esc(SK5_ES[n]||n)+'</span>'+d20Marca(eff,'chk')
+      +'<span class="sh-pips" title="'+(p===2?'Experto':(p===1?'Competente':'Sin competencia'))+'">'+pips+'</span></div>';
+  }).join('');
+  return '<div class="ab5">'
+    +'<div class="ab5-h"><span class="ab5-n">'+AB5_ES[k]+'</span>'
+      +'<span class="ab5-mod">'+fmt5(m)+'</span>'
+      +'<span class="ab5-score" title="Puntuación">'+(score==null||score===''?'—':score)+'</span></div>'
+    +'<div class="ab5-sk">'+filas+'</div></div>';
+}
+// La columna de combate: lo que se mira cuando toca tirar.
+function combate5HTML(c,eff){
+  var s=c.sheet||{}, pg=pgMax5(c,eff), v=vel5(s,eff), ca=ca5(c);
+  var cur=(c.vida==null?pg.v:c.vida);
+  var temp=_i5(s.hp_temp);
+  var caja=function(l,val,cls,tip,extra){
+    return '<div class="sh-atbox'+(extra||'')+'"'+(tip?' title="'+escA(tip)+'"':'')+'>'
+      +'<span class="l">'+l+'</span><span class="v'+(cls||'')+'">'+esc(String(val))+'</span></div>';
+  };
+  return '<div class="sh-col3"><div class="sh-col3-h">Combate</div>'
+    +'<div class="sh-at3">'
+      +caja('CA',ca.v==null?'—':ca.v,'',ca.de,' def')
+      +caja('Iniciativa',fmt5(mod5((s.abilities||{}).DEX)))
+      +caja('Competencia','+'+comp5(s))
+    +'</div>'
+    +'<div class="sh-res3">'
+      +'<div class="sh-res3-row"><span class="sh-res3-l">Puntos de golpe</span>'
+        +'<span class="res-cur" style="font-size:20px;color:'+hl(pg.v>0?Math.round(cur/pg.v*100):0).c+'" '
+          +'onclick="editRes(this,\'c\',\'vida\','+cur+')" title="Tocá para escribir el valor exacto">'+cur+'</span>'
+        +'<span class="res-max'+pg.cls+'"'+(pg.tip?' title="'+escA(pg.tip)+'"':'')+'>/ '+pg.v+'</span>'
+        +(temp?'<span class="hp-temp" title="Puntos de golpe temporales">+'+temp+' temp</span>':'')
+        +'<span class="dmg-box">'
+          +'<button class="dmg-btn d" onclick="golpe(-1)" title="Quitar ese daño">Dmg</button>'
+          +'<input class="dmg-amt" type="number" min="1" id="dmgAmt" placeholder="1"/>'
+          +'<button class="dmg-btn h" onclick="golpe(1)" title="Curar esa cantidad">Heal</button>'
+        +'</span></div>'
+      +'<div class="sh-res3-row"><span class="sh-res3-l">Velocidad</span>'
+        +'<span class="sh-res3-v'+v.cls+'"'+(v.tip?' title="'+escA(v.tip)+'"':'')+'>'+esc(v.txt)+'</span></div>'
+      +'<div class="sh-res3-row"><span class="sh-res3-l">Percepción pasiva</span>'
+        +'<span class="sh-res3-v">'+(pasiva5(s)==null?'—':pasiva5(s))+'</span></div>'
+      +'<div class="sh-res3-row"><span class="sh-res3-l">Dados de golpe</span>'
+        +'<span class="sh-res3-v">'+(s.hd?esc(s.hd):'—')
+          +(s.hd_spent?' <span style="font-size:11px;color:var(--text3)">('+esc(s.hd_spent)+' gastados)</span>':'')+'</span></div>'
+      +(s.size?'<div class="sh-res3-row"><span class="sh-res3-l">Tamaño</span>'
+        +'<span class="sh-res3-v">'+esc(s.size)+'</span></div>':'')
+      +'<div class="sh-res3-row"><span class="sh-res3-l">Carga máxima</span>'
+        +'<span class="sh-res3-v">'+(carga5(s)==null?'—':carga5(s)+' lb')+'</span></div>'
+    +'</div>'
+    +(eff.atq||eff.recibe?'<div class="sh-sk3">'
+      +(eff.atq?'<div class="sh-sk"><span class="sh-sk-b '+(eff.atq==='vent'?'mod-up':'mod-down')+'">'+(eff.atq==='vent'?'▲':'▼')+'</span><span class="sh-sk-n">'+(eff.atq==='vent'?'Ventaja':'Desventaja')+' al atacar</span></div>':'')
+      +(eff.recibe?'<div class="sh-sk"><span class="sh-sk-b '+(eff.recibe==='vent'?'mod-down':'mod-up')+'">'+(eff.recibe==='vent'?'▲':'▼')+'</span><span class="sh-sk-n">Te atacan con '+(eff.recibe==='vent'?'ventaja':'desventaja')+'</span></div>':'')
+      +'</div>':'')
+    +'</div>';
+}
+function _i5(v){ var n=parseInt(v); return isNaN(n)?0:n; }
+function dnd3HTML(c){
+  var s=c.sheet||{}, eff=calcEfectos(condActivas(c));
+  // tres columnas, como la hoja de 2024: Fuerza/Destreza/Constitución,
+  // Inteligencia/Sabiduría, y Carisma con el recuadro de combate debajo
+  function col(ks,extra){
+    return '<div class="sh-col3-wrap">'+ks.map(function(k){return ab5Bloque(c,k,eff);}).join('')+(extra||'')+'</div>';
+  }
+  return '<div class="sh3 sh3-dnd">'+col(['STR','DEX','CON'])+col(['INT','WIS'])
+    +col(['CHA'],combate5HTML(c,eff))+'</div>'
+    +((s.abilities||{}).STR==null
+      ? '<div class="sh-meta" style="margin-top:10px">Sin ficha cargada: subí tu PDF con “⭳ Actualizar PDF” (vale la clásica o la de 2024), o cargá características y habilidades a mano con “✎ Editar”.</div>'
+      : '');
+}
+// ── Ataques 5e ──
+// El bono es competencia + la característica del arma (Fuerza, o Destreza si es
+// finesse o a distancia) y el daño suma esa misma característica.
+function armaAb5(it){
+  var st=it.stats||{}, tr=(rasgosEfectivos(it)||[]).join(' ').toLowerCase();
+  var a=c5sheet();
+  var fin=/finesse|sutil/.test(tr), dist=/ranged|a distancia|thrown|arrojadiza/.test(tr)||/ranged/i.test(st.range||'');
+  if(st.ability) return String(st.ability).toUpperCase();
+  if(dist&&!fin) return 'DEX';
+  if(!fin) return 'STR';
+  var str=mod5((a.abilities||{}).STR), dex=mod5((a.abilities||{}).DEX);
+  return (dex!=null&&(str==null||dex>str))?'DEX':'STR';
+}
+function c5sheet(){ var c=meChar(); return c?(c.sheet||{}):{}; }
+function filaArma5(it,c,eff){
+  var s=c.sheet||{}, st=it.stats||{}, tr=rasgosEfectivos(it);
+  var ab=armaAb5(it), m=mod5((s.abilities||{})[ab]);
+  var comp=(st.prof===false)?0:comp5(s);
+  var bono=(m==null)?null:m+comp;
+  var rol=it.rol==='principal'?'<span class="rol-tag">'+(dosManos(it)?'Ambas manos':'Principal')+'</span>'
+         :it.rol==='secundaria'?'<span class="rol-tag sec">Secundaria</span>':'';
+  var nota=it.rol==='secundaria'
+    ? '<span class="t sec-nota">Atacar con la secundaria es una acción adicional, y sin el estilo Two-Weapon Fighting no le sumás la característica al daño</span>':'';
+  return '<div class="wpn">'+rol+'<span class="n">'+esc(it.name)+'</span>'
+    +(bono==null?'<span class="t">sin características cargadas</span>'
+      :'<span class="hit" title="'+escA('Competencia +'+comp+' y '+ab+' '+fmt5(m))+'">ataque '+fmt5(bono)+'</span>')
+    +d20Marca(eff,'atq')
+    +(st.damage?danoHTML(st.damage,m==null?null:{total:m,delta:0},'Dado del arma + '+ab+' '+fmt5(m)):'')
+    +(st.range?'<span>'+esc(st.range)+'</span>':'')
+    +(tr.length?'<span class="t">'+tr.map(esc).join(', ')+'</span>':'')+nota+'</div>';
+}
+function filaDesarmado5(c,eff){
+  var s=c.sheet||{}, m=mod5((s.abilities||{}).STR);
+  if(m==null) return '';
+  return '<div class="wpn"><span class="n">Golpe desarmado</span>'
+    +'<span class="hit" title="'+escA('Competencia +'+comp5(s)+' y STR '+fmt5(m))+'">ataque '+fmt5(m+comp5(s))+'</span>'
+    +d20Marca(eff,'atq')
+    +danoHTML(String(1+m)+' contundente',null,'1 + Fuerza '+fmt5(m))+'</div>';
+}
+// ── Equipo de combate 5e ──
+function kit5HTML(c){
+  var s=c.sheet||{}, eff=calcEfectos(condActivas(c));
+  var dex=mod5((s.abilities||{}).DEX), ca=ca5(c);
+  var v=vel5(s,eff), pg=pgMax5(c,eff);
+  var h='<div class="kit-def">'
+    +'<div class="kit-box"><span class="l">CA</span><span class="v">'+(ca.v==null?'—':esc(String(ca.v)))
+      +'<span class="t">'+esc(ca.de)+'</span></span></div>'
+    +'<div class="kit-box"><span class="l">Iniciativa</span><span class="v">'+fmt5(dex)+'</span></div>'
+    +'<div class="kit-box"><span class="l">Velocidad</span><span class="v'+v.cls+'"'+(v.tip?' title="'+escA(v.tip)+'"':'')+'>'+esc(v.txt)+'</span></div>'
+    +'<div class="kit-box"><span class="l">PG máx</span><span class="v'+pg.cls+'">'+pg.v+'</span></div></div>';
+  var arm=armasDeInv();
+  var principal=arm.filter(function(x){return x.rol==='principal';})[0];
+  var secundaria=arm.filter(function(x){return x.rol==='secundaria';})[0];
+  h+='<div class="kit-h">Armas en mano</div>';
+  if(principal) h+=filaArma5(principal,c,eff);
+  if(secundaria) h+=filaArma5(secundaria,c,eff);
+  if(!principal&&!secundaria)
+    h+='<div style="font-size:12px;color:var(--text3);font-style:italic;margin-bottom:5px">'
+      +(arm.length?'Elegí tu arma principal y la secundaria desde el inventario.':'No tenés armas en el inventario.')+'</div>';
+  // ataques escritos en el PDF
+  (s.attacks||[]).forEach(function(a){
+    h+='<div class="wpn"><span class="n">'+esc(a.name)+'</span>'
+      +(a.bonus?'<span class="hit">'+esc(a.bonus)+'</span>':'')
+      +(a.damage?'<span class="dmg"><b>'+esc(a.damage)+'</b></span>':'')
+      +'<span class="t">de la ficha</span></div>';
+  });
+  h+=filaDesarmado5(c,eff);
+  var cargas=itemsConCargas().filter(function(i){return i.en_combate;});
+  if(cargas.length) h+='<div class="kit-h">Objetos con cargas</div>'+cargas.map(function(i){
+    return '<div class="kit-carga"><span class="n">'+esc(i.name)
+      +(i.cantidad>1?' <span style="color:var(--text3)">x'+i.cantidad+'</span>':'')+'</span>'
+      +'<span class="uses-box"><button class="uses-btn" onclick="invUse('+i.id+',-1)">−</button>'
+      +'<span class="uses-n">'+i.usos+'/'+i.usos_max+'</span>'
+      +'<button class="uses-btn" onclick="invUse('+i.id+',1)">+</button></span></div>';
+  }).join('');
+  return '<div class="kit" id="kitCombate">'+h+'</div>';
+}
+// ── Editor de la hoja 5e ──
+var CH5=null;   // {sk:{}, sv:{}} mientras el editor está abierto
+function ed5AbHTML(s){
+  return '<div class="ed-attrs ed-ab6">'+AB5.map(function(a){
+    return '<div class="sh-col"><div class="sh-col-h">'+a[1]+'</div>'
+      +'<input class="fi" type="number" id="edAb'+a[0]+'" value="'+((s.abilities||{})[a[0]]==null?'':(s.abilities||{})[a[0]])+'" '
+        +'style="padding:4px 6px;text-align:center" oninput="ed5Preview()"/>'
+      +'<div class="ed5-mod" id="edMod'+a[0]+'">—</div>'
+      +'<label class="ed5-sv"><input type="checkbox" id="edSv'+a[0]+'"'+((s.save_prof||{})[a[0]]?' checked':'')+' onchange="ed5Preview()"/> salv.</label>'
+      +'</div>';
+  }).join('')+'</div>';
+}
+function ed5SkHTML(){
+  return '<div class="ed-sk3 ed-sk5">'+SK5_ORDEN.map(function(n,i){
+    return '<div class="ed-sk"><span class="sh-sk-b" id="ed5mod-'+i+'">—</span>'
+      +'<span class="sh-sk-n">'+esc(SK5_ES[n]||n)+'</span><span class="sh-sk-a">'+SK5[n]+'</span>'
+      +'<span class="sh-pips ed" id="ed5pips-'+i+'" title="Una vez competente, dos veces experto">'
+        +'<span class="sh-pip" onclick="ed5Rank('+i+',0)"></span>'
+        +'<span class="sh-pip" onclick="ed5Rank('+i+',1)"></span></span></div>';
+  }).join('')+'</div>';
+}
+function ed5Rank(i,j){
+  if(!CH5)return;
+  var n=SK5_ORDEN[i], r=CH5.sk[n]||0;
+  CH5.sk[n]=(r===j+1)?j:j+1;
+  ed5Preview();
+}
+function ed5Sheet(){
+  var s={abilities:{},save_prof:{},skill_prof:CH5?CH5.sk:{}};
+  AB5.forEach(function(a){
+    var v=edNum('edAb'+a[0]); if(v!=null) s.abilities[a[0]]=v;
+    if(document.getElementById('edSv'+a[0]).checked) s.save_prof[a[0]]=true;
+  });
+  s.level=edVal('edLevel');
+  return s;
+}
+function ed5Preview(){
+  if(!CH5)return;
+  var s=ed5Sheet();
+  AB5.forEach(function(a){ document.getElementById('edMod'+a[0]).textContent=fmt5(mod5(s.abilities[a[0]])); });
+  SK5_ORDEN.forEach(function(n,i){
+    var pips=document.getElementById('ed5pips-'+i).children, r=CH5.sk[n]||0;
+    for(var j=0;j<2;j++) pips[j].classList.toggle('on',j<r);
+    document.getElementById('ed5mod-'+i).textContent=fmt5(skMod5(s,n));
+  });
+  document.getElementById('edDeriv5').innerHTML=
+     'Competencia <b>+'+comp5(s)+'</b> · Percepción pasiva <b>'+(pasiva5(s)==null?'—':pasiva5(s))+'</b>'
+    +' · Iniciativa <b>'+fmt5(mod5(s.abilities.DEX))+'</b> · Carga máxima <b>'+(carga5(s)==null?'—':carga5(s)+' lb')+'</b>';
+}
+function openEditCharDnd(){
+  var c=meChar(); if(!c)return; var s=c.sheet||{};
+  CH5={sk:{}};
+  SK5_ORDEN.forEach(function(n){ CH5.sk[n]=skProf5(s,n); });
+  var modal=document.getElementById('modal');
+  modal.classList.add('wide');
+  modal.innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="sh-name">✎ Editar '+esc(c.name)+'</div>'
+    +'<div class="sh-meta" style="margin-bottom:10px">Editá lo que quieras a mano. “Actualizar PDF” vuelve a leer la ficha entera y pisa esto; valen la ficha clásica y la de 2024.</div>'
+    +'<div class="ed-row" style="grid-template-columns:2fr 1fr 1fr">'
+      +edFld('Nombre',edInp('edName',c.name))
+      +edFld('Clase',edInp('edPaths',s.paths,'Pícaro'))
+      +edFld('Nivel',edInp('edLevel',s.level,'3'))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr 1fr">'
+      +edFld('Especie',edInp('edRace',s.race,'Mediano'))
+      +edFld('Subclase',edInp('edSubclass',s.subclass,'Ladrón'))
+      +edFld('Trasfondo',edInp('edBackground',s.background,'Criminal'))
+      +edFld('XP',edInp('edXP',s.xp,'6500'))+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr">'
+      +edFld('Alineamiento',edInp('edAlignment',s.alignment))
+      +edFld('Tamaño',edInp('edSize',s.size,'Mediano'))+'</div>'
+    +'<div class="ed-sec">Puntos de golpe</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr 1fr">'
+      +edRes(c,true)
+      +edFld('PG temporales',edInp('edTempHP',s.hp_temp,'0'))
+      +edFld('CA',edInp('edAC',s.ac,'15'))
+      +edFld('Velocidad',edInp('edSpeed',s.speed,'30 ft.'))+'</div>'
+    +'<div class="ed-sec">Características y salvaciones</div>'
+    +ed5AbHTML(s)
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 2fr;margin-top:8px">'
+      +edFld('Dados de golpe',edInp('edHD',s.hd,'5d8'))
+      +edFld('Gastados',edInp('edHDSpent',s.hd_spent,'0'))
+      +'<div><div class="fl">Sale de la ficha</div><div class="ed-deriv" id="edDeriv5"></div></div></div>'
+    +'<div class="ed-sec">Habilidades <span style="text-transform:none;letter-spacing:0;color:var(--text3);font-family:inherit;font-size:11px">(un punto competente, dos experto)</span></div>'
+    +ed5SkHTML()
+    +'<div class="ed-sec">Conjuros</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr 1fr">'
+      +edFld('Característica',edInp('edScAbility',(s.spellcasting||{}).ability,'INT'))
+      +edFld('Modificador',edInp('edScMod',(s.spellcasting||{}).mod,'+4'))
+      +edFld('CD de salvación',edInp('edScDC',(s.spellcasting||{}).dc,'15'))
+      +edFld('Ataque',edInp('edScAtk',(s.spellcasting||{}).atk,'+7'))+'</div>'
+    +'<div class="ed-hint">Los espacios de conjuro se editan desde “✨ Conjuros y recursos” en la ficha.</div>'
+    +'<div class="ed-sec">Rasgos, competencias y notas</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr">'
+      +edFld('Rasgos de clase y aptitudes','<textarea class="fi ed-lines" id="edFeatures">'+esc(s.features||'')+'</textarea>')
+      +edFld('Rasgos de especie y dotes','<textarea class="fi ed-lines" id="edFeatures2">'+esc(s.features2||'')+'</textarea>')+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr">'
+      +edFld('Entrenamiento y competencias','<textarea class="fi ed-lines" id="edProfLang">'+esc(s.prof_lang||'')+'</textarea>')
+      +edFld('Idiomas','<textarea class="fi ed-lines" id="edLanguages">'+esc(s.languages||'')+'</textarea>')+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr">'
+      +edFld('Equipo escrito en la ficha','<textarea class="fi ed-lines" id="edEquipTxt">'+esc(s.equipment||'')+'</textarea>')
+      +edFld('Objetos sintonizados','<textarea class="fi ed-lines" id="edAttune">'+esc(s.attunement||'')+'</textarea>')+'</div>'
+    +'<div class="ed-row" style="grid-template-columns:1fr 1fr">'
+      +edFld('Apariencia','<textarea class="fi ed-lines" id="edAppearance">'+esc(s.appearance||'')+'</textarea>')
+      +edFld('Historia y personalidad','<textarea class="fi ed-lines" id="edBackstory">'+esc(s.backstory||'')+'</textarea>')+'</div>'
+    +'<div class="ed-sec">Monedas</div>'
+    +'<div class="ed-row" style="grid-template-columns:repeat(5,1fr)">'
+      +[['pp','Platino'],['gp','Oro'],['ep','Electro'],['sp','Plata'],['cp','Cobre']].map(function(x){
+        return edFld(x[1],edInp('edCoin'+x[0],(s.coins||{})[x[0]],'0','number'));}).join('')+'</div>'
+    +'<div class="form-actions" style="margin-top:16px">'
+      +'<button class="btn-sheet" onclick="closeModal()">Cancelar</button>'
+      +'<button class="btn-sheet" style="background:var(--gold);color:var(--onacc);border-color:var(--gold)" onclick="saveEditCharDnd()">Guardar</button></div>';
+  ed5Preview();
+  document.getElementById('overlay').classList.add('on');
+}
+async function saveEditCharDnd(){
+  var c=meChar(); if(!c||!CH5)return;
+  var name=edVal('edName');
+  if(!name){ alert('Poné un nombre.'); return; }
+  var vidaM=edNum('edVidaM')||0;
+  if(vidaM<1){ alert('Los puntos de golpe máximos tienen que ser al menos 1.'); return; }
+  var s=Object.assign({},c.sheet||{},ed5Sheet());
+  s.dnd=true;
+  s.paths=edVal('edPaths'); s.race=edVal('edRace');
+  s.background=edVal('edBackground'); s.alignment=edVal('edAlignment');
+  s.subclass=edVal('edSubclass'); s.xp=edVal('edXP'); s.size=edVal('edSize');
+  s.ac=edVal('edAC'); s.speed=edVal('edSpeed'); s.hd=edVal('edHD');
+  s.hd_spent=edVal('edHDSpent'); s.hp_temp=edVal('edTempHP');
+  s.features=edVal('edFeatures'); s.features2=edVal('edFeatures2');
+  s.prof_lang=edVal('edProfLang'); s.languages=edVal('edLanguages');
+  s.equipment=edVal('edEquipTxt'); s.attunement=edVal('edAttune');
+  s.appearance=edVal('edAppearance'); s.backstory=edVal('edBackstory');
+  s.spellcasting=Object.assign({},s.spellcasting||{},{
+    ability:edVal('edScAbility').toUpperCase(), mod:edVal('edScMod'),
+    dc:edVal('edScDC'), atk:edVal('edScAtk')});
+  var co={};
+  ['pp','gp','ep','sp','cp'].forEach(function(k){ var v=edNum('edCoin'+k); if(v) co[k]=v; });
+  if(Object.keys(co).length) s.coins=co; else delete s.coins;
+  try{
+    await api('/api/characters/'+MYCHAR,'PUT',{
+      name:name, vida_max:vidaM, focus_max:0, inv_max:0,
+      vida:edNum('edVida'), focus:0, inv:0, sheet:s});
+  }catch(e){ alert('No se pudo guardar la ficha.'); return; }
+  CH5=null;
+  closeModal(); loadRoster();
+}
+// Lo que no entra en las tres columnas de la hoja 5e.
+function dnd5eRestoHTML(s){
+  function block(t){ return esc(t).replace(/\n/g,'<br>'); }
+  var h='', sc=s.spellcasting||{};
+  if(sc.class||sc.dc||Object.keys(s.spells||{}).length){
+    h+='<div class="sh-h">Conjuros</div>';
+    var scl=[sc.class,(sc.ability?'('+sc.ability+')':''),(sc.dc?'CD '+sc.dc:''),(sc.atk?'ataque '+sc.atk:'')].filter(Boolean).join(' · ');
+    if(scl) h+='<div class="sh-line">'+esc(scl)+'</div>';
+    Object.keys(s.spells||{}).sort(function(a,b){return a-b;}).forEach(function(l){
+      h+='<div class="sh-line"><span class="l">'+(l==='0'?'Trucos':'Nivel '+l)+':</span> '+(s.spells[l]||[]).map(esc).join(', ')+'</div>';});
+  }
+  if(s.features) h+='<div class="sh-h">Rasgos y aptitudes</div><div class="sh-item">'+block(s.features)+'</div>';
+  if(s.features2) h+='<div class="sh-item">'+block(s.features2)+'</div>';
+  if(s.prof_lang) h+='<div class="sh-h">Entrenamiento y competencias</div><div class="sh-item">'+block(s.prof_lang)+'</div>';
+  if((s.armor_training||[]).length) h+='<div class="sh-h">Entrenamiento en armadura</div><div class="chips">'
+    +s.armor_training.map(function(x){return '<span class="chip">'+esc(x)+'</span>';}).join('')+'</div>';
+  if(s.languages) h+='<div class="sh-h">Idiomas</div><div class="sh-item">'+block(s.languages)+'</div>';
+  if(s.equipment) h+='<div class="sh-h">Equipo de la ficha</div><div class="sh-item">'+block(s.equipment)+'</div>';
+  if(s.attunement) h+='<div class="sh-h">Objetos mágicos sintonizados</div><div class="sh-item">'+block(s.attunement)+'</div>';
+  var co=s.coins||{};
+  var mon=[['pp','PO'],['gp','MO'],['ep','ME'],['sp','MP'],['cp','MC']]
+    .filter(function(x){return co[x[0]];})
+    .map(function(x){return '<span class="chip">'+x[1]+' '+co[x[0]]+'</span>';}).join('');
+  if(mon) h+='<div class="sh-h">Monedas</div><div class="chips">'+mon+'</div>';
+  if(s.appearance) h+='<div class="sh-h">Apariencia</div><div class="sh-item">'+block(s.appearance)+'</div>';
+  if(s.backstory) h+='<div class="sh-h">Historia y personalidad</div><div class="sh-item">'+block(s.backstory)+'</div>';
+  return h||'<div class="sh-meta">Todavía no hay rasgos ni conjuros en la ficha.</div>';
+}
 // Cabecera: retrato, nombre, ascendencia y sendas, nivel/tier y condiciones.
 function shHeroHTML(c){
   var s=c.sheet||{};
-  var sub=[s.ancestry,s.paths].filter(Boolean).map(esc).join(' · ');
+  var esDnd=(SYSTEM==='dnd')||!!s.dnd;
+  var sub=esDnd
+    ? [s.race,(s.paths||'')+(s.subclass?' ('+s.subclass+')':''),s.background]
+        .filter(Boolean).map(esc).join(' · ')
+    : [s.ancestry,s.paths].filter(Boolean).map(esc).join(' · ');
   var m=String(s.level||'').match(/\d+/), lvl=m?parseInt(m[0]):0;
   var tier=lvl?Math.floor((lvl-1)/5)+1:0;
   var portrait=c.has_image
@@ -2189,7 +2645,10 @@ function shHeroHTML(c){
     +(SYSTEM==='dnd'?'':marcosWidget(c))
     +'<div class="sh-lvl">'
       +'<div><span class="l">Nivel</span><span class="v">'+(lvl||'—')+'</span></div>'
-      +'<div><span class="l">Tier</span><span class="v">'+(tier||'—')+'</span></div>'
+      +(esDnd
+        ? '<div><span class="l">Competencia</span><span class="v">+'+comp5(s)+'</span></div>'
+          +(s.xp?'<div><span class="l">XP</span><span class="v" style="font-size:14px">'+esc(s.xp)+'</span></div>':'')
+        : '<div><span class="l">Tier</span><span class="v">'+(tier||'—')+'</span></div>')
     +'</div></div>';
 }
 // Lo que no entra en las tres columnas: talentos, armas, equipo y contactos.
@@ -2323,6 +2782,7 @@ function armasHTML(){
     var o={principal:0,secundaria:1}; return (o[x.rol]==null?2:o[x.rol])-(o[y.rol]==null?2:o[y.rol]); });
   arm.forEach(function(it){ filas.push(filaArma(it,c,eff)); });
   if(SYSTEM!=='dnd') filas.push(filaDesarmado(c,eff));
+  else filas.push(filaDesarmado5(c,eff));
   // D&D: los ataques vienen de la hoja rellenable
   (s.attacks||[]).forEach(function(a){
     filas.push('<div class="wpn"><span class="n">'+esc(a.name)+'</span>'
@@ -2345,7 +2805,8 @@ function renderArmas(){
 // su ataque y daño), el golpe desarmado y los objetos con cargas que el
 // jugador eligió ver acá.
 function kitCombateHTML(c){
-  if(!c||SYSTEM==='dnd') return '';
+  if(!c) return '';
+  if(SYSTEM==='dnd'||(c.sheet||{}).dnd) return kit5HTML(c);
   var s=c.sheet||{}, d=s.defenses||{}, eff=calcEfectos(condActivas(c));
   var armaduras=armadurasDeInv(), puesta=armaduras.filter(function(x){return x.rol==='puesta';})[0];
   var deflect=puesta
@@ -2412,16 +2873,12 @@ function renderRoster(){
         +'<button class="btn-sheet" onclick="openPets()">🐾 Mascotas</button>'
         +'<label class="btn-sheet" style="cursor:pointer">🖼 Imagen<input type="file" accept="image/*" hidden onchange="uploadImg(this)"/></label>'
         +(c.has_image?'<button class="btn-sheet" onclick="removeImg()">Quitar imagen</button>':'')
-        +'<label class="btn-sheet" style="cursor:pointer">⭳ Actualizar PDF<input type="file" accept="application/pdf" hidden onchange="reimportPDF(this)"/></label>'
+        +'<label class="btn-sheet" style="cursor:pointer" title="'
+          +((SYSTEM==='dnd')?'Vale la ficha de 2024 o la clásica':'La ficha rellenable de Cosmere RPG')
+          +'">⭳ Actualizar PDF<input type="file" accept="application/pdf" hidden onchange="reimportPDF(this)"/></label>'
         +(c.has_pdf?'<a class="btn-sheet" href="/api/characters/'+c.id+'/pdf" target="_blank">Ver PDF</a>':'')
       +'</div>';
-    if(esDnd){
-      // D&D: la hoja rellenable tiene otra forma, así que va como venía.
-      html+='<div class="res-grid">'+resCell('c',c,'vida','Vida','var(--red)')+'</div>'
-        +'<div class="me-card">'+dnd5eSheetHTML({name:c.name,stats:s,vida_max:c.vida_max})+'</div>';
-    }else{
-      html+=cosmere3HTML(c);
-    }
+    html+=esDnd?dnd3HTML(c):cosmere3HTML(c);
     var activas=condActivas(c);
     html+=foldHead('sec:estados','Condiciones y heridas',
                    activas.length+(c.injuries||[]).length);
@@ -2436,16 +2893,14 @@ function renderRoster(){
     }
     html+=foldHead('sec:armas','⚔ Armas y ataques');
     if(abierto('sec:armas')) html+='<div class="me-card" id="armasPanel"></div>';
-    if(SOLO&&!esDnd){
+    if(SOLO){
       // sin pestaña de combate, el equipo de combate va acá
       html+=foldHead('sec:kit','🛡 Equipo de combate');
       if(abierto('sec:kit')) html+='<div class="me-card">'+kitCombateHTML(c)+'</div>';
     }
-    if(!esDnd){
-      // lo que no entra en las tres columnas
-      html+=foldHead('sec:resto','📜 Talentos y equipo');
-      if(abierto('sec:resto')) html+='<div class="me-card">'+shRestoHTML(s)+'</div>';
-    }
+    html+=foldHead('sec:resto',esDnd?'📜 Rasgos y conjuros':'📜 Talentos y equipo');
+    if(abierto('sec:resto'))
+      html+='<div class="me-card">'+(esDnd?dnd5eRestoHTML(s):shRestoHTML(s))+'</div>';
     // Las mascotas van al final y se pliegan: enteras de una, o de a una.
     var mias=(meM.pets||[]).map(function(p){return {p:p,mia:true};})
       .concat(PETS_GRUPO.map(function(p){return {p:p,mia:false};}));
@@ -2624,38 +3079,6 @@ async function saveEditChar(){
     });
   }catch(e){ alert('No se pudo guardar la ficha.'); return; }
   CH_ED=null;
-  closeModal(); loadRoster();
-}
-// D&D: la hoja rellenable tiene otra forma, así que el editor sigue siendo el corto.
-function openEditCharDnd(){
-  var c=meChar(); if(!c)return; var s=c.sheet||{};
-  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
-    +'<div class="sh-name">✎ Editar '+esc(c.name)+'</div>'
-    +'<div class="sh-meta" style="margin-bottom:10px">Editá los datos a mano. Para releer la ficha completa, usá Actualizar PDF.</div>'
-    +'<div style="display:flex;flex-direction:column;gap:9px">'
-    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nombre</span><input class="oc-fi" id="ec-name" value="'+esc(c.name)+'" style="flex:1;max-width:260px"/></label>'
-    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Clase / senda</span><input class="oc-fi" id="ec-class" value="'+esc(s.paths||'')+'" style="flex:1;max-width:260px"/></label>'
-    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nivel</span><input class="oc-fi" id="ec-level" value="'+esc(s.level||'')+'" style="width:90px"/></label>'
-    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Vida (actual / máx)</span><span style="display:flex;gap:6px">'+_num('ec-vida',c.vida)+'<span style="color:var(--text3)">/</span>'+_num('ec-vidam',c.vida_max)+'</span></label>'
-    +(SYSTEM==='dnd'?'':'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Focus (actual / máx)</span><span style="display:flex;gap:6px">'+_num('ec-focus',c.focus)+'<span style="color:var(--text3)">/</span>'+_num('ec-focusm',c.focus_max)+'</span></label>'
-    +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Investidura (actual / máx)</span><span style="display:flex;gap:6px">'+_num('ec-inv',c.inv)+'<span style="color:var(--text3)">/</span>'+_num('ec-invm',c.inv_max)+'</span></label>')
-    +'</div>'
-    +'<div class="me-sheet-row" style="justify-content:flex-end;border:none;margin-top:16px"><button class="btn-sheet" onclick="closeModal()">Cancelar</button>'
-    +'<button class="btn-sheet" style="background:var(--gold);color:var(--onacc);border-color:var(--gold)" onclick="saveEditCharDnd()">Guardar</button></div>';
-  document.getElementById('overlay').classList.add('on');
-}
-function _iv(id){var v=parseInt(document.getElementById(id).value);return isNaN(v)?null:v;}
-async function saveEditCharDnd(){
-  var c=meChar(); if(!c)return; var s=Object.assign({},c.sheet||{});
-  s.paths=document.getElementById('ec-class').value.trim();
-  s.level=document.getElementById('ec-level').value.trim();
-  var dnd=SYSTEM==='dnd';
-  await api('/api/characters/'+MYCHAR,'PUT',{
-    name:document.getElementById('ec-name').value.trim()||'Personaje',
-    vida_max:_iv('ec-vidam')||0,
-    focus_max:dnd?0:(_iv('ec-focusm')||0), inv_max:dnd?0:(_iv('ec-invm')||0),
-    vida:_iv('ec-vida'), focus:dnd?0:_iv('ec-focus'), inv:dnd?0:_iv('ec-inv'), sheet:s
-  });
   closeModal(); loadRoster();
 }
 async function reimportPDF(input){
@@ -3023,7 +3446,10 @@ function invStatsHTML(it){
   }
   if(it.kind==='armadura'){
     var ra=rasgosHTML(it);
-    return '<div style="font-size:12px;color:var(--text3)">Deflect '+(s.deflect||0)+(ra?' · '+ra:'')+'</div>';
+    var base=(SYSTEM==='dnd'&&s.ac!=null&&s.ac!=='')
+      ? 'CA '+s.ac+(s.dex_max?' + DES (máx '+s.dex_max+')':(s.dex_max===0?'':' + DES'))
+      : 'Deflect '+(s.deflect||0);
+    return '<div style="font-size:12px;color:var(--text3)">'+base+(ra?' · '+ra:'')+'</div>';
   }
   if(it.kind==='vehiculo')
     return '<div style="font-size:12px;color:var(--text3)">'

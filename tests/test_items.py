@@ -87,11 +87,28 @@ def test_player_catalog_shows_prices_but_hides_the_hidden(make_client):
     assert len(dcat) == 2
 
 
-def test_items_rejected_in_dnd_campaign(make_client):
+def test_items_also_work_in_a_dnd_campaign(make_client):
     dm = make_user(make_client, "dm", "dm")
     cid = create_campaign(dm, "DnD", "dnd")
+    assert dm.get(f"/api/campaigns/{cid}/items").status_code == 200
+    # un arma 5e: la característica del ataque y la CA de la armadura
+    r = dm.post(f"/api/campaigns/{cid}/items", json={
+        "name": "Rapier", "kind": "arma",
+        "stats": {"damage": "1d8 perforante", "traits": ["Finesse"], "ability": "DEX"}})
+    assert r.status_code == 200, r.text
+    dm.post(f"/api/campaigns/{cid}/items", json={
+        "name": "Cota de escamas", "kind": "armadura", "stats": {"ac": 14, "dex_max": 2}})
+    it = {i["name"]: i for i in dm.get(f"/api/campaigns/{cid}/items").json()}
+    assert it["Rapier"]["stats"]["ability"] == "DEX"
+    assert it["Cota de escamas"]["stats"]["ac"] == 14
+    assert it["Cota de escamas"]["stats"]["dex_max"] == 2
+
+
+def test_the_dm_can_still_turn_the_catalog_off(make_client):
+    dm = make_user(make_client, "dm", "dm")
+    cid = create_campaign(dm, "DnD", "dnd")
+    dm.put(f"/api/campaigns/{cid}/config", json={"modulo_catalogo": False})
     assert dm.get(f"/api/campaigns/{cid}/items").status_code == 400
-    assert dm.post(f"/api/campaigns/{cid}/items", json={"name": "X"}).status_code == 400
 
 
 def test_player_cannot_touch_catalog(make_client):

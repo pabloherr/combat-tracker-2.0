@@ -54,3 +54,8 @@ def cosmere_pdf():
 @pytest.fixture
 def dnd_pdf():
     return (database.STATIC / "5e_sheet.pdf").read_bytes()
+
+
+@pytest.fixture
+def dnd2024_pdf():
+    return (database.STATIC / "5e_2024_sheet.pdf").read_bytes()

@@ -141,3 +141,57 @@ def test_one_instance_can_be_removed_leaving_the_others(make_client):
 
     st = pl.get(f"/api/campaigns/{cid}/roster").json()["members"][0]["character"]["statuses"]
     assert st.count("Exhausted [−1]") == 1
+
+
+# ── D&D 5e: su propio catálogo ─────────────────────────────
+
+def test_a_dnd_campaign_gets_the_5e_conditions(make_client):
+    dm, pl, cid, chid = party(make_client, system="dnd")
+    cat = _cat(pl, cid)
+
+    assert cat["system"] == "dnd"
+    nombres = _nombres(cat)
+    assert "Blinded" in nombres and "Grappled" in nombres and "Exhaustion" in nombres
+    assert "Enhanced" not in nombres          # eso es de Cosmere
+    assert len(nombres) == 15
+
+    ceg = [c for c in cat["condiciones"] if c["name"] == "Blinded"][0]
+    assert ceg["efecto"] == {"atq": "desv", "recibe": "vent"}
+    assert ceg["es"] == "Cegado"
+
+    # el agotamiento va por niveles y se acumula
+    agot = [c for c in cat["condiciones"] if c["name"] == "Exhaustion"][0]
+    assert agot["efecto"] == {"agot": True} and agot["apila"] is True
+    assert [a["n"] for a in cat["agotamiento"]] == [1, 2, 3, 4, 5, 6]
+    assert cat["agotamiento"][4]["d"] == "velocidad a 0"
+
+    # y las heridas son las de 5e
+    heridas = {h["name"]: h["cond"] for h in cat["heridas"]}
+    assert heridas["Ojo perdido"] == "Blinded"
+    assert "Diminished [Speed −1]" not in heridas
+
+
+def test_each_system_keeps_its_own_effect_menu(make_client):
+    dm, pl, cid, chid = party(make_client, system="dnd")
+    ks = [e["k"] for e in _cat(pl, cid)["efectos"]]
+    assert "atq_desv" in ks and "recibe_vent" in ks
+    assert "attr_mas" not in ks               # los atributos son de Cosmere
+
+    # el mismo DM abre además una campaña de Cosmere
+    from helpers import create_campaign, create_character, invite
+    cid2 = create_campaign(dm, "C2", "cosmere")
+    invite(dm, cid2, "pl")
+    create_character(pl, cid2, "Kal2")
+    ks2 = [e["k"] for e in _cat(pl, cid2)["efectos"]]
+    assert "attr_mas" in ks2 and "atq_desv" not in ks2
+
+
+def test_the_dm_of_a_dnd_campaign_edits_their_list(make_client):
+    dm, pl, cid, chid = party(make_client, system="dnd")
+    _cfg(dm, cid, cond_off=["Charmed"],
+         cond_extra=[{"name": "Maldito", "tono": "neg", "ef": "atq_desv",
+                      "desc": "Todo te sale mal."}])
+    cat = _cat(pl, cid)
+    assert "Charmed" not in _nombres(cat)
+    prop = [c for c in cat["condiciones"] if c["name"] == "Maldito"][0]
+    assert prop["efecto"] == {"atq": "desv"}

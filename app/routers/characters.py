@@ -12,6 +12,7 @@ from ..auth import current_user
 from .. import conditions
 from ..config import CONFIG_DEFAULTS, get_config, player_config, sane, size_bases
 from ..database import db
+from ..dnd2024_pdf import parse_dnd2024_pdf
 from ..dnd_pdf import parse_dnd_pdf
 from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
                       InventoryExperto, InventoryIn, InventoryMove, InventoryQty, InventoryRol,
@@ -115,7 +116,17 @@ def _parse_sheet_pdf(system: str, data: bytes) -> dict:
     """Parsea la ficha según el sistema. Devuelve el mismo shape para ambos:
     name, vida_max, vida, focus_max, focus, inv_max, inv, sheet y slots (dnd)."""
     if system == "dnd":
-        p = parse_dnd_pdf(data)
+        # Valen las dos fichas rellenables: la clásica y la de 2024. Se prueba
+        # la clásica (campos con nombre) y, si no es esa, la de 2024 (que los
+        # trae generados y se mapea por posición).
+        try:
+            p = parse_dnd_pdf(data)
+        except ValueError:
+            try:
+                p = parse_dnd2024_pdf(data)
+            except ValueError:
+                raise ValueError("El PDF no parece una ficha de D&D 5e "
+                                 "(ni la clásica ni la de 2024).")
         return {"name": p["name"], "vida_max": p["vida_max"], "vida": p["vida"],
                 "focus_max": 0, "focus": 0, "inv_max": 0, "inv": 0,
                 "sheet": p["sheet"], "slots": p["slots"]}

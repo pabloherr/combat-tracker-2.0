@@ -778,8 +778,8 @@ def campaign_conditions(cid: int, user=Depends(current_user)):
     Lo consultan la ficha del jugador (para aplicar los efectos a los números) y
     el panel del DM. Lo puede leer cualquier miembro aceptado."""
     with db() as conn:
-        require_access(conn, cid, user)
-        return conditions.resolve(_get_config(conn, cid))
+        c, _ = require_access(conn, cid, user)
+        return conditions.resolve(_get_config(conn, cid), c["system"] or "cosmere")
 
 
 @router.put("/campaigns/{cid}/config")

@@ -1445,8 +1445,10 @@ async function saveConfig(){
 // inventario se prenden y se apagan por separado.
 function aplicarModulos(cfg){
   var cosmere=SYSTEM!=='dnd';
-  var on={catalogo:cosmere&&cfg.modulo_catalogo!==false,
-          inventario:cosmere&&cfg.modulo_inventario!==false};
+  // el catálogo y el inventario valen en los dos sistemas; el resto (tormentas,
+  // calendario, esferas) sigue siendo de Cosmere
+  var on={catalogo:cfg.modulo_catalogo!==false,
+          inventario:cfg.modulo_inventario!==false};
   document.querySelectorAll('.cosmere-only').forEach(function(el){
     var m=el.dataset.mod;
     el.style.display=(m?on[m]:cosmere)?'':'none';
@@ -2913,13 +2915,24 @@ function renderKindFields(kind,it){
       +_f('Habilidad','itSkill',s.skill,'','Light Weaponry')
       +_f('Rasgos','itTraits',(s.traits||[]).join(', '),'','Two-Handed')
       +_f('Rasgos de experto','itExpert',(s.expert_traits||[]).join(', '),'','Deadly')
-      +'</div>';
+      +'</div>'
+      +(SYSTEM==='dnd'?'<div class="fg" style="grid-template-columns:1fr 2fr">'
+        +_f('Característica','itAbility',s.ability,'','STR / DEX (vacío: la deduce)')
+        +'<div class="import-hint">Sin característica se usa Fuerza, o Destreza si el arma '
+          +'es <b>Finesse</b> o a distancia. El ataque suma la competencia del personaje.</div>'
+        +'</div>':'');
   }else if(kind==='armadura'){
-    h='<div class="fg" style="grid-template-columns:1fr 2fr 2fr">'
-      +_f('Deflect','itDeflect',s.deflect||0,'number')
-      +_f('Rasgos','itTraits',(s.traits||[]).join(', '),'','Cumbersome [3]')
-      +_f('Rasgos de experto','itExpert',(s.expert_traits||[]).join(', '))
-      +'</div>';
+    h=(SYSTEM==='dnd'
+      ? '<div class="fg" style="grid-template-columns:1fr 1fr 2fr">'
+        +_f('CA base','itAC',s.ac==null?'':s.ac,'number','14')
+        +_f('Tope de DES','itDexMax',s.dex_max==null?'':s.dex_max,'number','2 (media) / 0 (pesada)')
+        +_f('Rasgos','itTraits',(s.traits||[]).join(', '),'','Sigilo con desventaja')
+        +'</div>'
+      : '<div class="fg" style="grid-template-columns:1fr 2fr 2fr">'
+        +_f('Deflect','itDeflect',s.deflect||0,'number')
+        +_f('Rasgos','itTraits',(s.traits||[]).join(', '),'','Cumbersome [3]')
+        +_f('Rasgos de experto','itExpert',(s.expert_traits||[]).join(', '))
+        +'</div>');
   }else if(kind==='alojamiento'){
     h='<div class="import-hint">El precio de arriba es <b>por persona por noche</b>.</div>';
   }else if(kind==='vehiculo'){
@@ -2980,11 +2993,16 @@ function _n(id){ var el=_el(id); return el?(parseInt(el.value)||0):0; }
 function _list(id){ return _v(id).split(/,(?![^\[\(]*[\]\)])/).map(function(s){return s.trim();}).filter(Boolean); }
 function _itemBody(){
   var kind=_v('itKind'), stats={};
-  if(kind==='arma') stats={weapon_class:_v('itWc'),
-    damage:_v('itDamage'), range:_v('itRange'), skill:_v('itSkill'),
-    traits:_list('itTraits'), expert_traits:_list('itExpert')};
-  else if(kind==='armadura') stats={deflect:_n('itDeflect'),
-    traits:_list('itTraits'), expert_traits:_list('itExpert')};
+  if(kind==='arma'){
+    stats={weapon_class:_v('itWc'),
+      damage:_v('itDamage'), range:_v('itRange'), skill:_v('itSkill'),
+      traits:_list('itTraits'), expert_traits:_list('itExpert')};
+    if(_el('itAbility')&&_v('itAbility')) stats.ability=_v('itAbility').toUpperCase();
+  }else if(kind==='armadura'){
+    stats={deflect:_n('itDeflect'),
+      traits:_list('itTraits'), expert_traits:_list('itExpert')};
+    if(_el('itAC')){ stats.ac=_n('itAC'); stats.dex_max=_n('itDexMax'); }
+  }
   else if(kind==='alojamiento') stats={per_night:_n('itPrice')};
   else if(kind==='vehiculo') stats={vehicle_type:_v('itVtype'), speed:_v('itSpeed'), rental:_n('itRental')};
   else if(kind==='fabrial') stats={charges:_n('itCharges')};
