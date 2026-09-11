@@ -179,7 +179,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .ab5-sk{padding:5px 10px 8px;}
 .sh-sk-sv{border-bottom:1px solid var(--border);padding-bottom:4px;margin-bottom:3px;}
 .sh-sk-sv .sh-sk-n{color:var(--gold);}
-.hp-temp{font-size:11px;color:var(--blue2);border:1px solid var(--blue2);border-radius:var(--pill);padding:1px 6px;}
+.temp-v{font-size:18px;color:var(--blue2);}
+.temp-v.cero{color:var(--text3);}
 @media(max-width:620px){ .ed-ab6{grid-template-columns:repeat(3,1fr) !important;} .ed-sk5{grid-template-columns:1fr;} }
 .sh-pips.ed .sh-pip:hover{border-color:var(--gold);}
 .ed-deriv{font-size:12px;color:var(--text2);background:var(--bg3);border-radius:var(--r);padding:6px 10px;margin-top:6px;}
@@ -971,7 +972,7 @@ function statCtl(p,stat,label,color){
     +'</div></div>';
 }
 function meControls(p){
-  if(SYSTEM==='dnd') return statCtl(p,'vida','Vida','var(--red)')+statusPanel(p);
+  if(SYSTEM==='dnd') return statCtl(p,'vida','Vida','var(--red)')+tempCtlCombate(p)+statusPanel(p);
   return statCtl(p,'vida','Vida','var(--red)')
     +statCtl(p,'focus','Focus','var(--blue)')
     +(p.inv_max>0?statCtl(p,'inv','Investidura','var(--purple)'):'')
@@ -1670,6 +1671,7 @@ function pasoRes(target,stat,monto,sign){
     var el=document.getElementById('monto-'+monto+'-'+stat);
     n=Math.max(1,parseInt(el&&el.value)||1);
   }
+  if(stat==='vida'&&sign<0) return aplicarDano(target,n);
   aplicarDelta(target,stat,sign*n);
 }
 function editRes(el,target,stat,actual){
@@ -2104,8 +2106,22 @@ function shVidaRow(c){
     +'</span></div>';
 }
 function golpe(sign){
-  var el=document.getElementById('dmgAmt');
-  aplicarDelta('c','vida',sign*Math.max(1,parseInt(el&&el.value)||1));
+  var el=document.getElementById('dmgAmt'), n=Math.max(1,parseInt(el&&el.value)||1);
+  if(sign<0) return aplicarDano('c',n);
+  aplicarDelta('c','vida',n);
+}
+// Quitar vida no es lo mismo que escribir un número: si hay PG temporales, el
+// daño se los come primero (regla de 5e). La cuenta la hace el servidor, en la
+// ficha o en el combate según de dónde venga el golpe.
+async function aplicarDano(target,n){
+  if(n<=0)return;
+  if(target==='c'&&SYSTEM==='dnd'&&MYCHAR!=null){
+    await api('/api/characters/'+MYCHAR+'/damage','POST',{amount:n});
+    loadRoster();
+    return;
+  }
+  await aplicarDelta(target,'vida',-n);
+  if(SYSTEM==='dnd') loadRoster();    // el golpe pudo gastar temporales
 }
 function shPuntoRow(c,stat,label,color){
   var mx=c[stat+'_max']||0, v=(c[stat]==null?mx:c[stat]);
@@ -2313,11 +2329,70 @@ function ab5Bloque(c,k,eff){
       +'<span class="ab5-score" title="Puntuación">'+(score==null||score===''?'—':score)+'</span></div>'
     +'<div class="ab5-sk">'+filas+'</div></div>';
 }
+// ── PG temporales (5e) ──
+// No suben el máximo ni se curan: absorben el daño antes que los PG y se van con
+// un descanso largo. Se tocan de a un clic, sin abrir el editor de la ficha.
+var TEMP_TIP='Absorben el daño antes que tus PG. No se suman entre dos fuentes '
+  +'(te quedás con el mayor), no se curan y se van con un descanso largo.';
+function tempDe(c){ return _i5(((c||{}).sheet||{}).hp_temp); }
+async function tempSet(v){
+  await api('/api/characters/'+MYCHAR+'/temp-hp','POST',{value:Math.max(0,v)});
+  loadRoster();
+}
+async function tempPaso(d){
+  if(!d)return;
+  await api('/api/characters/'+MYCHAR+'/temp-hp','POST',{delta:d});
+  loadRoster();
+}
+function tempMonto(uid,sign){
+  var el=document.getElementById('monto-'+uid+'-temp');
+  tempPaso(sign*Math.max(1,parseInt(el&&el.value)||1));
+}
+function editTemp(el,actual){
+  if(el.querySelector('input'))return;
+  var cancelado=false;
+  el.innerHTML='<input class="res-inp" type="number" min="0" value="'+actual+'"/>';
+  var inp=el.firstChild; inp.focus(); inp.select();
+  inp.onkeydown=function(e){ if(e.key==='Enter'){inp.blur();} else if(e.key==='Escape'){cancelado=true;inp.blur();} };
+  inp.onblur=function(){
+    var v=parseInt(inp.value);
+    if(cancelado||isNaN(v)||v===actual){ repaintMe(); return; }
+    tempSet(v);
+  };
+}
+// La fila de la ficha, debajo de los PG.
+function tempRow(c){
+  var t=tempDe(c);
+  return '<div class="sh-res3-row"><span class="sh-res3-l" title="'+escA(TEMP_TIP)+'">PG temporales</span>'
+    +'<span class="res-cur temp-v'+(t?'':' cero')+'" onclick="editTemp(this,'+t+')" '
+      +'title="Tocá para escribir cuántos te dieron">'+t+'</span>'
+    +'<span class="res-btns">'
+      +'<button class="res-btn minus" onclick="tempPaso(-1)" title="Uno menos">−</button>'
+      +'<button class="res-btn plus" onclick="tempPaso(1)" title="Uno más">+</button>'
+      +(t?'<button class="res-btn" onclick="tempSet(0)" title="Se terminaron">✕</button>':'')
+    +'</span></div>';
+}
+// Y en combate, con los mismos controles grandes que la vida: se cargan de una
+// cuando te los dan y bajan solos cuando te pegan.
+function tempCtlCombate(p){
+  if(SYSTEM!=='dnd'||p.kind!=='player'||p.char_id!==MYCHAR) return '';
+  // el combate lleva su propia copia: es la que baja cuando te pegan
+  var t=(p.hp_temp==null?tempDe(meChar()):_i5(p.hp_temp));
+  return '<div class="mstat">'
+    +'<div class="mstat-head"><span class="mstat-l" title="'+escA(TEMP_TIP)+'">PG temporales</span>'
+    +'<span class="mstat-v"><span class="res-cur temp-v'+(t?'':' cero')+'" '
+      +'onclick="editTemp(this,'+t+')" title="Tocá para escribir el valor exacto">'+t+'</span></span></div>'
+    +'<div class="madj">'
+      +'<button class="madj-btn minus" onclick="tempMonto(\''+p.uid+'\',-1)">−</button>'
+      +'<input type="number" id="monto-'+p.uid+'-temp" value="1" min="1"/>'
+      +'<button class="madj-btn plus" onclick="tempMonto(\''+p.uid+'\',1)">+</button>'
+      +(t?'<button class="madj-btn" onclick="tempSet(0)" title="Se terminaron">✕</button>':'')
+    +'</div></div>';
+}
 // La columna de combate: lo que se mira cuando toca tirar.
 function combate5HTML(c,eff){
   var s=c.sheet||{}, pg=pgMax5(c,eff), v=vel5(s,eff), ca=ca5(c);
   var cur=(c.vida==null?pg.v:c.vida);
-  var temp=_i5(s.hp_temp);
   var caja=function(l,val,cls,tip,extra){
     return '<div class="sh-atbox'+(extra||'')+'"'+(tip?' title="'+escA(tip)+'"':'')+'>'
       +'<span class="l">'+l+'</span><span class="v'+(cls||'')+'">'+esc(String(val))+'</span></div>';
@@ -2333,12 +2408,12 @@ function combate5HTML(c,eff){
         +'<span class="res-cur" style="font-size:20px;color:'+hl(pg.v>0?Math.round(cur/pg.v*100):0).c+'" '
           +'onclick="editRes(this,\'c\',\'vida\','+cur+')" title="Tocá para escribir el valor exacto">'+cur+'</span>'
         +'<span class="res-max'+pg.cls+'"'+(pg.tip?' title="'+escA(pg.tip)+'"':'')+'>/ '+pg.v+'</span>'
-        +(temp?'<span class="hp-temp" title="Puntos de golpe temporales">+'+temp+' temp</span>':'')
         +'<span class="dmg-box">'
           +'<button class="dmg-btn d" onclick="golpe(-1)" title="Quitar ese daño">Dmg</button>'
           +'<input class="dmg-amt" type="number" min="1" id="dmgAmt" placeholder="1"/>'
           +'<button class="dmg-btn h" onclick="golpe(1)" title="Curar esa cantidad">Heal</button>'
         +'</span></div>'
+    +tempRow(c)
       +'<div class="sh-res3-row"><span class="sh-res3-l">Velocidad</span>'
         +'<span class="sh-res3-v'+v.cls+'"'+(v.tip?' title="'+escA(v.tip)+'"':'')+'>'+esc(v.txt)+'</span></div>'
       +'<div class="sh-res3-row"><span class="sh-res3-l">Percepción pasiva</span>'

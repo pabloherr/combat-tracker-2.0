@@ -13,6 +13,7 @@ from ..database import db
 from ..models import (AddEnemyIn, ColorChange, InitiativeIn, StatChange,
                       StatusToggle, TurnChange, VidaMaxIn)
 from ..state import combats, player_view
+from .. import temp_hp
 from ..ws import push_state
 
 router = APIRouter(prefix="/api/campaigns/{cid}/combat", tags=["combat"])
@@ -39,7 +40,7 @@ def _mk_participant(kind, name, vida, focus, inv, acciones=None, notas="", facti
                     tipo="", stats=None, clase="rival", cur_vida=None, cur_focus=None,
                     cur_inv=None, statuses=None, char_id=None, user_id=None, pet_id=None,
                     owner_name="", has_pdf=False, system="cosmere", injuries=None,
-                    shared=False):
+                    shared=False, hp_temp=0):
     # Enemigos y mascotas toman turno al azar; los jugadores lo eligen.
     turn = _roll_enemy_turn(clase) if kind in ("enemy", "pet") else "slow"
     # D&D: los enemigos y mascotas tiran iniciativa solos (d20 + mod de DEX);
@@ -63,6 +64,7 @@ def _mk_participant(kind, name, vida, focus, inv, acciones=None, notas="", facti
         "name": name,
         "tipo": tipo,
         "vida": cur_vida, "vida_max": vida,
+        "hp_temp": hp_temp,          # PG temporales (D&D): absorben el daño primero
         "focus": cur_focus, "focus_max": focus,
         "inv": cur_inv, "inv_max": inv,
         "statuses": statuses or [],
@@ -135,6 +137,7 @@ def _build_participants(conn, cid: int, encounter_id: int, system: str = "cosmer
             injuries=json.loads(ch["injuries"] or "[]"),
             stats=json.loads(ch["sheet"] or "{}"),
             char_id=ch["id"], user_id=ch["user_id"], has_pdf=bool(ch["has_pdf"]),
+            hp_temp=temp_hp.leer(json.loads(ch["sheet"] or "{}")),
             system=system,
         ))
         # Mascotas del personaje: entran como aliados que el jugador controla.
@@ -308,7 +311,14 @@ async def change_stat(cid: int, c: StatChange, user=Depends(current_user)):
     _guard_participant(is_dm, p, user)
     mx = p[f"{c.stat}_max"]
     old = p[c.stat]
-    p[c.stat] = max(0, min(mx, old + c.delta))
+    delta = c.delta
+    if c.stat == "vida" and delta < 0 and p.get("kind") == "player" and p.get("char_id"):
+        # el daño se lo comen primero los PG temporales del jugador (D&D). En
+        # Cosmere no hay temporales: `absorber` devuelve el daño entero.
+        with db() as conn:
+            delta = -temp_hp.absorber(conn, p["char_id"], -delta)
+        p["hp_temp"] = max(0, p.get("hp_temp", 0) - (delta - c.delta))
+    p[c.stat] = max(0, min(mx, old + delta))
     if c.stat == "vida":
         p["defeated"] = p["vida"] == 0
     _persist_participant(p)

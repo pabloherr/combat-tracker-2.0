@@ -6,7 +6,7 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from .. import conditions, roshar
+from .. import conditions, roshar, temp_hp
 from ..access import campaign_or_404, require_access, require_dm
 from ..auth import current_user
 from ..config import (CONFIG_DEFAULTS, VER_MODOS, coerce, get_config,
@@ -545,6 +545,10 @@ def long_rest(cid: int, payload: LongRestIn, user=Depends(current_user)):
                         k["cur"] = k.get("max", 0)
                 conn.execute("UPDATE characters SET dnd_resources=? WHERE id=?",
                              (json.dumps(d), ch["id"]))
+                # los PG temporales no sobreviven a un descanso largo
+                sh = json.loads(ch["sheet"] or "{}")
+                if temp_hp.leer(sh):
+                    temp_hp.escribir(conn, ch["id"], sh, 0)
             else:
                 # El descanso ya NO recarga investidura: el jugador la carga cuando quiere
                 # desde sus marcos. Sí cura vida/focus y limpia estados.

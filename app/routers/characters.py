@@ -14,14 +14,15 @@ from ..config import CONFIG_DEFAULTS, get_config, player_config, sane, size_base
 from ..database import db
 from ..dnd2024_pdf import parse_dnd2024_pdf
 from ..dnd_pdf import parse_dnd_pdf
-from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
+from ..models import (CharacterIn, CounterIn, CounterValue, Damage, DaysChange, InjuryIn,
                       InventoryExperto, InventoryIn, InventoryMove, InventoryQty, InventoryRol,
                       InventoryStash, LinkIn,
                       InventoryTransfer, LiveStat, LiveStatus, MarcosChange, MarcosSet,
                       PetFromEnemy, PetName, PetSheet, SizeIn, SlotsConfigIn,
-                      SlotSpend, TakeIn)
+                      SlotSpend, TakeIn, TempHP)
 from ..pdf_import import extract_pdf_image, parse_character_pdf
 from ..state import combats
+from .. import temp_hp
 from ..ws import push_state
 
 router = APIRouter(prefix="/api/characters", tags=["characters"])
@@ -678,6 +679,45 @@ async def character_stat(cid: int, s: LiveStat, user=Depends(current_user)):
         campaign_id = r["campaign_id"]
     await _sync_combat(campaign_id, {s.stat: val}, char_id=cid)
     return {"ok": True, "value": val, "marcos_light": light}
+
+
+# ── PG temporales (D&D) ──
+# La cuenta está en app/temp_hp.py, porque el combate hace la misma.
+
+
+@router.post("/{cid}/temp-hp")
+async def character_temp_hp(cid: int, t: TempHP, user=Depends(current_user)):
+    """Pone (`value`) o mueve (`delta`) los PG temporales."""
+    if t.value is None and t.delta is None:
+        raise HTTPException(400, "Falta el valor o el delta")
+    with db() as conn:
+        r = _owned_or_dm(conn, cid, user)
+        if _system_of(conn, r) != "dnd":
+            raise HTTPException(400, "Los PG temporales son de D&D")
+        sheet = json.loads(r["sheet"] or "{}")
+        n = t.value if t.value is not None else temp_hp.leer(sheet) + t.delta
+        n = temp_hp.escribir(conn, cid, sheet, n)
+        campaign_id = r["campaign_id"]
+    await _sync_combat(campaign_id, {"hp_temp": n}, char_id=cid)
+    return {"ok": True, "hp_temp": n}
+
+
+@router.post("/{cid}/damage")
+async def character_damage(cid: int, d: Damage, user=Depends(current_user)):
+    """Daño desde la ficha: primero se gastan los temporales y solo el resto
+    baja la vida. Curar no pasa por acá (la cura nunca devuelve temporales):
+    eso sigue siendo un delta normal de vida."""
+    pedido = max(0, d.amount)
+    with db() as conn:
+        r = _owned_or_dm(conn, cid, user)
+        antes = temp_hp.leer(json.loads(r["sheet"] or "{}"))
+        resto = temp_hp.absorber(conn, cid, pedido)
+        val = _clamp_stat(r, "vida", -resto)
+        conn.execute("UPDATE characters SET vida=? WHERE id=?", (val, cid))
+        campaign_id = r["campaign_id"]
+    queda = antes - (pedido - resto)
+    await _sync_combat(campaign_id, {"vida": val, "hp_temp": queda}, char_id=cid)
+    return {"ok": True, "vida": val, "hp_temp": queda, "absorbed": pedido - resto}
 
 
 @router.post("/{cid}/status")

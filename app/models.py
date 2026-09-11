@@ -172,6 +172,17 @@ class LiveStat(BaseModel):
     delta: int
 
 
+class TempHP(BaseModel):
+    """PG temporales (D&D): `value` los fija, `delta` los mueve."""
+    value: int | None = None
+    delta: int | None = None
+
+
+class Damage(BaseModel):
+    """Daño: lo absorben primero los PG temporales y el resto baja la vida."""
+    amount: int
+
+
 class LiveStatus(BaseModel):
     status: str
     # True = sumar una instancia (condiciones que se acumulan: Exhausted [-2],

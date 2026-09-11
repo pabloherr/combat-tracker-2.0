@@ -49,6 +49,8 @@ def mask_stats(p: dict, cfg: dict, grupo: str) -> dict:
         actual = d.get(stat)
         d[stat] = None
         d[f"{stat}_max"] = None
+        if stat == "vida":
+            d.pop("hp_temp", None)     # los temporales son parte de la vida
         if maximo and modo == "abstracto":
             d[f"{stat}_pct"] = _pct(actual or 0, maximo)
         elif maximo and modo == "color":

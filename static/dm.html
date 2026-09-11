@@ -635,7 +635,7 @@ async function loadCampaign(){
     SYSTEM=c.system||'cosmere';
     if(SYSTEM==='dnd'){
       document.getElementById('shortRestBtn').style.display='';
-      document.getElementById('restHint').textContent='Largo: cura vida a full, limpia estados, baja heridas y recupera conjuros y contadores. Corto: solo recupera los contadores de descanso corto.';
+      document.getElementById('restHint').textContent='Largo: cura vida a full, limpia estados y PG temporales, baja heridas y recupera conjuros y contadores. Corto: solo recupera los contadores de descanso corto.';
       // import/export en formato D&D 5e (YAML propio, distinto del de Cosmere)
       document.getElementById('importHint').textContent='Pegá el statblock en formato D&D 5e (YAML) y el sistema arma la ficha completa. Tocá "Pegar ejemplo completo" para ver todos los campos.';
       document.getElementById('bulkHint').innerHTML='Pegá varias fichas separadas por una línea <b>---</b> (o subí un archivo .yaml/.txt). Cada ficha usa el mismo formato D&D 5e que la importación individual.';
@@ -898,7 +898,7 @@ async function _restModal(title,desc,applyFn){
 }
 function longRest(){
   var desc=SYSTEM==='dnd'
-    ?'Cura vida a full, limpia estados, baja 1 día las heridas (las permanentes no cambian) y recupera todos los spell slots y los contadores de descanso largo y corto.'
+    ?'Cura vida a full, limpia estados y PG temporales, baja 1 día las heridas (las permanentes no cambian) y recupera todos los spell slots y los contadores de descanso largo y corto.'
     :'Cura vida y focus a full y limpia estados a los jugadores elegidos y sus mascotas, y baja 1 día sus heridas (las permanentes no cambian). La investidura ya no se recarga: la cargan con sus marcos.';
   _restModal('🛌 Descanso largo',desc,'doLongRest');
 }
@@ -2387,8 +2387,10 @@ function statBlock(p,stat,color,lblPlus,lblMinus,clsPlus,clsMinus){
   var maxPart=(stat==='vida'&&p.kind==='enemy')
     ? '<span class="vmax-edit" onclick="editVidaMax(this,\''+p.uid+'\')" title="Editar vida máxima (solo este combate)">/ '+mx+'</span>'
     : '<span style="font-size:11px;color:var(--text3)">/ '+mx+'</span>';
+  var temp=(stat==='vida'&&p.kind==='player'&&p.hp_temp)
+    ? '<span class="def-chip" title="PG temporales: se comen el daño antes que la vida">+'+p.hp_temp+' temp</span>' : '';
   return '<div class="stat-line"><span class="stat-lbl">'
-    +(stat==='vida'?'Vida':stat==='focus'?'Focus':'Investidura')+defChip(p,stat)+'</span>'
+    +(stat==='vida'?'Vida':stat==='focus'?'Focus':'Investidura')+defChip(p,stat)+temp+'</span>'
     +'<span class="stat-val" style="color:'+color+'">'+p[stat]+' '+maxPart+'</span></div>'
     +'<div class="bar"><div class="bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div>'
     +'<div class="adj">'
