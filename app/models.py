@@ -123,7 +123,8 @@ class ConfigIn(BaseModel):
 
 class CharacterIn(BaseModel):
     name: str
-    campaign_id: int | None = None   # requerido al crear: el PJ pertenece a una campaña
+    campaign_id: int | None = None   # al crear: la campaña, o None para un PJ suelto
+    system: str = "cosmere"          # solo para un PJ suelto: cosmere | dnd
     vida_max: int = 20
     focus_max: int = 10
     inv_max: int = 0
@@ -133,6 +134,11 @@ class CharacterIn(BaseModel):
     vida: int | None = None
     focus: int | None = None
     inv: int | None = None
+
+
+class LinkIn(BaseModel):
+    """Enganchar un personaje suelto a una campaña donde te invitaron."""
+    campaign_id: int
 
 
 class PetFromEnemy(BaseModel):

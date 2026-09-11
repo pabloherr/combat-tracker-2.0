@@ -179,6 +179,12 @@ def init_db():
         if "email" not in ucols:
             conn.execute("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''")
 
+        # Migración: un personaje suelto (sin campaña) lleva su propio sistema;
+        # el de una campaña usa el de ella y deja esto vacío.
+        chcols = {r["name"] for r in conn.execute("PRAGMA table_info(characters)")}
+        if "system" not in chcols:
+            conn.execute("ALTER TABLE characters ADD COLUMN system TEXT DEFAULT ''")
+
         # Migración: agrega campaign_id a bestiario/encuentros de bases existentes.
         ecols = {r["name"] for r in conn.execute("PRAGMA table_info(enemies)")}
         if "campaign_id" not in ecols:

@@ -9,12 +9,13 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 
 from ..auth import current_user
-from ..config import CONFIG_DEFAULTS, get_config, size_bases
+from .. import conditions
+from ..config import CONFIG_DEFAULTS, get_config, player_config, sane, size_bases
 from ..database import db
 from ..dnd_pdf import parse_dnd_pdf
 from ..models import (CharacterIn, CounterIn, CounterValue, DaysChange, InjuryIn,
                       InventoryExperto, InventoryIn, InventoryMove, InventoryQty, InventoryRol,
-                      InventoryStash,
+                      InventoryStash, LinkIn,
                       InventoryTransfer, LiveStat, LiveStatus, MarcosChange, MarcosSet,
                       PetFromEnemy, PetName, PetSheet, SizeIn, SlotsConfigIn,
                       SlotSpend, TakeIn)
@@ -33,8 +34,16 @@ def _serialize(r) -> dict:
     d["dnd"] = json.loads(d.get("dnd_resources") or "{}")
     d["has_pdf"] = bool(d.get("has_pdf"))
     d["has_image"] = bool(d.get("has_image"))
+    d["system"] = _system_de(d)
     d.pop("dnd_resources", None)
     return d
+
+
+def _system_de(d) -> str:
+    """Sistema del personaje: el de su campaña, o el propio si anda suelto."""
+    if d.get("campaign_system"):
+        return d["campaign_system"]
+    return (d.get("system") or "cosmere") if not d.get("campaign_id") else "cosmere"
 
 
 def _owned(conn, cid: int, user: dict):
@@ -89,6 +98,17 @@ def _campaign_system(conn, campaign_id) -> str:
         return "cosmere"
     c = conn.execute("SELECT system FROM campaigns WHERE id=?", (campaign_id,)).fetchone()
     return (c["system"] if c else None) or "cosmere"
+
+
+def _system_of(conn, ch) -> str:
+    """Sistema con el que juega este personaje: el de su campaña o, suelto, el suyo."""
+    if ch["campaign_id"]:
+        return _campaign_system(conn, ch["campaign_id"])
+    return (ch["system"] if "system" in ch.keys() else "") or "cosmere"
+
+
+def _norm_system(s) -> str:
+    return "dnd" if (s or "").strip().lower() == "dnd" else "cosmere"
 
 
 def _parse_sheet_pdf(system: str, data: bytes) -> dict:
@@ -170,8 +190,8 @@ def _store_extracted_image(conn, char_id: int, pdf_bytes: bytes):
 def list_characters(user=Depends(current_user)):
     with db() as conn:
         rows = conn.execute(
-            "SELECT ch.*, camp.name AS campaign_name FROM characters ch "
-            "LEFT JOIN campaigns camp ON camp.id=ch.campaign_id "
+            "SELECT ch.*, camp.name AS campaign_name, camp.system AS campaign_system "
+            "FROM characters ch LEFT JOIN campaigns camp ON camp.id=ch.campaign_id "
             "WHERE ch.owner_id=? ORDER BY ch.name",
             (user["id"],),
         ).fetchall()
@@ -182,16 +202,95 @@ def list_characters(user=Depends(current_user)):
 def create_character(c: CharacterIn, user=Depends(current_user)):
     name = c.name.strip() or "Personaje"
     with db() as conn:
-        _joinable_membership(conn, c.campaign_id, user)
+        if c.campaign_id:
+            _joinable_membership(conn, c.campaign_id, user)
+        # Sin campaña queda suelto: lo usa por su cuenta y después, si lo
+        # invitan, lo engancha (ver /link).
+        system = "" if c.campaign_id else _norm_system(c.system)
         cur = conn.execute(
-            "INSERT INTO characters (owner_id, campaign_id, name, vida_max, focus_max, inv_max, vida, focus, inv, statuses, sheet, has_pdf) "
-            "VALUES (?,?,?,?,?,?,?,?,?,'[]',?,0)",
+            "INSERT INTO characters (owner_id, campaign_id, name, vida_max, focus_max, inv_max, vida, focus, inv, statuses, sheet, has_pdf, system) "
+            "VALUES (?,?,?,?,?,?,?,?,?,'[]',?,0,?)",
             (user["id"], c.campaign_id, name, c.vida_max, c.focus_max, c.inv_max,
-             c.vida_max, c.focus_max, c.inv_max, json.dumps(c.sheet)),
+             c.vida_max, c.focus_max, c.inv_max, json.dumps(c.sheet), system),
         )
         new_id = cur.lastrowid
-        _link_membership(conn, c.campaign_id, user, new_id)
+        if c.campaign_id:
+            _link_membership(conn, c.campaign_id, user, new_id)
         return {"id": new_id, "name": name}
+
+
+@router.post("/{cid}/link")
+def link_character(cid: int, body: LinkIn, user=Depends(current_user)):
+    """Engancha un personaje suelto a una campaña donde te invitaron (del
+    mismo sistema). Desde ahí es un personaje de esa campaña como cualquiera."""
+    with db() as conn:
+        ch = _owned(conn, cid, user)
+        if ch["campaign_id"]:
+            raise HTTPException(400, "Ese personaje ya está en una campaña")
+        _joinable_membership(conn, body.campaign_id, user)
+        if _campaign_system(conn, body.campaign_id) != _system_of(conn, ch):
+            raise HTTPException(400, "Ese personaje es de otro sistema de juego")
+        conn.execute("UPDATE characters SET campaign_id=?, system='' WHERE id=?",
+                     (body.campaign_id, cid))
+        _link_membership(conn, body.campaign_id, user, cid)
+    return {"ok": True}
+
+
+def _char_view(conn, r) -> dict:
+    """La ficha como la manda el roster de una campaña (misma forma, para que
+    la página del jugador la lea igual con o sin campaña)."""
+    def _act(v, mx):
+        return mx if v is None else v
+    return {
+        "id": r["id"], "name": r["name"],
+        "vida": _act(r["vida"], r["vida_max"]), "vida_max": r["vida_max"],
+        "focus": _act(r["focus"], r["focus_max"]), "focus_max": r["focus_max"],
+        "inv": _act(r["inv"], r["inv_max"]), "inv_max": r["inv_max"],
+        "statuses": json.loads(r["statuses"] or "[]"),
+        "injuries": json.loads(r["injuries"] or "[]"),
+        "sheet": json.loads(r["sheet"] or "{}"),
+        "has_pdf": bool(r["has_pdf"]),
+        "has_image": bool(r["has_image"]),
+        "marcos": r["marcos"] or 0,
+        "marcos_light": r["marcos_light"] or 0,
+        "dnd": json.loads(r["dnd_resources"] or "{}"),
+    }
+
+
+@router.get("/{cid}/roster")
+def solo_roster(cid: int, user=Depends(current_user)):
+    """Un personaje suelto no tiene campaña ni roster: esto devuelve lo mismo
+    que el roster de una campaña, con él como único miembro, para que la
+    página del jugador funcione igual."""
+    with db() as conn:
+        ch = _owned(conn, cid, user)
+        if ch["campaign_id"]:
+            raise HTTPException(400, "Ese personaje está en una campaña: usá su roster")
+        pets = [
+            {"id": p["id"], "name": p["name"], "char_id": cid,
+             "compartida": bool(p["compartida"]),
+             "vida": p["vida"] if p["vida"] is not None else p["vida_max"], "vida_max": p["vida_max"],
+             "focus": p["focus"] if p["focus"] is not None else p["focus_max"], "focus_max": p["focus_max"],
+             "inv": p["inv"] if p["inv"] is not None else p["inv_max"], "inv_max": p["inv_max"],
+             "statuses": json.loads(p["statuses"] or "[]"),
+             "stats": json.loads(p["stats"] or "{}"),
+             "acciones": json.loads(p["acciones"] or "[]")}
+            for p in conn.execute("SELECT * FROM pets WHERE character_id=? ORDER BY name", (cid,))
+        ]
+        return {"system": _system_of(conn, ch), "solo": True,
+                "members": [{"user_id": user["id"], "username": user["username"],
+                             "can_create_items": True,
+                             "character": _char_view(conn, ch), "pets": pets}],
+                "config": player_config(sane(dict(CONFIG_DEFAULTS)))}
+
+
+@router.get("/{cid}/conditions")
+def solo_conditions(cid: int, user=Depends(current_user)):
+    """Catálogo de condiciones y heridas para un personaje suelto: el del
+    manual de su sistema, sin ajustes de DM."""
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        return conditions.resolve({}, _system_of(conn, ch))
 
 
 @router.put("/{cid}")
@@ -229,7 +328,7 @@ async def reimport_pdf(cid: int, file: UploadFile = File(...), user=Depends(curr
     data = await file.read()
     with db() as conn:
         r = _owned_or_dm(conn, cid, user)
-        system = _campaign_system(conn, r["campaign_id"])
+        system = _system_of(conn, r)
     try:
         p = _parse_sheet_pdf(system, data)
     except ValueError as e:
@@ -265,30 +364,38 @@ def delete_character(cid: int, user=Depends(current_user)):
 
 
 @router.post("/import-pdf")
-async def import_pdf(campaign_id: int, file: UploadFile = File(...), user=Depends(current_user)):
-    """Crea un personaje para una campaña a partir de la ficha PDF
-    (Cosmere o la ficha rellenable de D&D 5e, según el sistema de la campaña)."""
+async def import_pdf(campaign_id: int | None = None, system: str = "cosmere",
+                     file: UploadFile = File(...), user=Depends(current_user)):
+    """Crea un personaje a partir de la ficha PDF (Cosmere o la ficha rellenable
+    de D&D 5e). Con `campaign_id` es para esa campaña y usa su sistema; sin
+    campaña queda suelto, con el `system` que se pida."""
     data = await file.read()
     with db() as conn:
-        _joinable_membership(conn, campaign_id, user)
-        system = _campaign_system(conn, campaign_id)
+        if campaign_id:
+            _joinable_membership(conn, campaign_id, user)
+            system = _campaign_system(conn, campaign_id)
+        else:
+            system = _norm_system(system)
     try:
         p = _parse_sheet_pdf(system, data)
     except ValueError as e:
         raise HTTPException(400, str(e))
     with db() as conn:
-        _joinable_membership(conn, campaign_id, user)
+        if campaign_id:
+            _joinable_membership(conn, campaign_id, user)
         cur = conn.execute(
-            "INSERT INTO characters (owner_id, campaign_id, name, vida_max, focus_max, inv_max, vida, focus, inv, statuses, sheet, has_pdf) "
-            "VALUES (?,?,?,?,?,?,?,?,?,'[]',?,1)",
+            "INSERT INTO characters (owner_id, campaign_id, name, vida_max, focus_max, inv_max, vida, focus, inv, statuses, sheet, has_pdf, system) "
+            "VALUES (?,?,?,?,?,?,?,?,?,'[]',?,1,?)",
             (user["id"], campaign_id, p["name"], p["vida_max"], p["focus_max"], p["inv_max"],
-             p["vida"], p["focus"], p["inv"], json.dumps(p["sheet"])),
+             p["vida"], p["focus"], p["inv"], json.dumps(p["sheet"]),
+             "" if campaign_id else system),
         )
         cid = cur.lastrowid
         conn.execute("INSERT INTO character_pdfs (character_id, pdf) VALUES (?,?)", (cid, data))
         _apply_pdf_slots(conn, cid, p["slots"])
         _seed_from_pdf(conn, cid, p, system)
-        _link_membership(conn, campaign_id, user, cid)
+        if campaign_id:
+            _link_membership(conn, campaign_id, user, cid)
         _store_extracted_image(conn, cid, data)
     return {"id": cid, "name": p["name"]}
 
@@ -1018,7 +1125,10 @@ def _require_modulo(conn, ch, modulo="modulo_inventario"):
 
 
 def _can_create_items(conn, ch, user) -> bool:
-    """Permiso que el DM le da a un jugador para crear objetos propios."""
+    """Permiso que el DM le da a un jugador para crear objetos propios. Un
+    personaje suelto no tiene DM: su dueño crea lo que quiera."""
+    if not ch["campaign_id"]:
+        return ch["owner_id"] == user["id"]
     m = conn.execute(
         "SELECT can_create_items FROM campaign_members WHERE campaign_id=? AND user_id=?",
         (ch["campaign_id"], user["id"]),

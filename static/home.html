@@ -101,9 +101,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
   <!-- ═══════ COMO JUGADOR ═══════ -->
   <div class="section">
     <div class="section-h">Como jugador — tus personajes</div>
-    <div class="section-sub">Cada personaje pertenece a una campaña. Hacé clic para entrar a su ficha dentro de la partida.</div>
+    <div class="section-sub">Los de una campaña se abren dentro de la partida. Los sueltos son tuyos para usar la herramienta por tu cuenta, y cuando te inviten a una campaña los podés enganchar.</div>
+    <div class="row" style="margin-bottom:12px">
+      <select class="fi" id="soloSystem" title="Sistema de juego">
+        <option value="cosmere">Cosmere RPG</option>
+        <option value="dnd">D&amp;D 5e</option>
+      </select>
+      <button class="btn accent" onclick="openSolo()">+ Crear personaje suelto</button>
+    </div>
     <div class="pj-gallery" id="charGrid"></div>
-    <div class="empty" id="charEmpty" style="display:none">Todavía no tenés personajes. Aceptá una invitación para crear uno.</div>
+    <div class="empty" id="charEmpty" style="display:none">Todavía no tenés personajes. Creá uno suelto o aceptá una invitación.</div>
   </div>
 
   <div class="section">
@@ -216,29 +223,92 @@ async function delCampaign(id){
 // ─── Jugador: galería de personajes (uno por campaña) ───
 async function loadCharacters(){
   CHARS=await api('/api/characters');
-  var mine=CHARS.filter(function(c){return c.campaign_id;});
+  var mine=CHARS;
   document.getElementById('charEmpty').style.display=mine.length?'none':'block';
   document.getElementById('charGrid').innerHTML=mine.map(function(c){
-    var s=c.sheet||{};
+    var s=c.sheet||{}, suelto=!c.campaign_id;
     var cls=s.paths?esc(s.paths):'<span style="color:var(--text3);font-style:italic">Sin clase</span>';
     var lvl=s.level?'<span class="pj-lvl">Nivel '+esc(s.level)+'</span>':'';
     var img=c.has_image
       ? '<img class="pj-portrait" src="/api/characters/'+c.id+'/image" alt=""/>'
       : '<div class="pj-portrait-ph">'+(c.has_pdf?'📜':'🛡')+'</div>';
+    var url=suelto?'/personaje/'+c.id:'/play/'+c.campaign_id+'?tab=pj';
+    var camp=suelto?'🛡 Suelto · '+(c.system==='dnd'?'D&amp;D 5e':'Cosmere'):'⚔ '+esc(c.campaign_name||'—');
+    var pie=suelto
+      ? '<button class="btn danger sm" onclick="borrarSuelto('+c.id+',\''+encodeURIComponent(c.name)+'\')">Borrar</button>'
+      : '<button class="btn danger sm" onclick="leave('+c.campaign_id+',\''+encodeURIComponent(c.campaign_name||'')+'\')">Salir</button>';
     return '<div class="pj-card">'
-      +'<div class="pj-clic" onclick="enterPJ('+c.campaign_id+')">'+img
+      +'<div class="pj-clic" onclick="location.href=\''+url+'\'">'+img
         +'<div class="pj-body"><div class="pj-name">'+esc(c.name)+lvl+'</div>'
         +'<div class="pj-class">'+cls+'</div>'
-        +'<div class="pj-camp">⚔ '+esc(c.campaign_name||'—')+'</div></div>'
+        +'<div class="pj-camp">'+camp+'</div></div>'
       +'</div>'
       +'<div class="pj-foot">'
-        +'<a class="btn accent sm" href="/play/'+c.campaign_id+'?tab=pj">Abrir</a>'
-        +'<div class="sep"></div>'
-        +'<button class="btn danger sm" onclick="leave('+c.campaign_id+',\''+encodeURIComponent(c.campaign_name||'')+'\')">Salir</button>'
+        +'<a class="btn accent sm" href="'+url+'">Abrir</a>'
+        +'<div class="sep"></div>'+pie
       +'</div></div>';
   }).join('');
 }
 function enterPJ(cid){ location.href='/play/'+cid+'?tab=pj'; }
+async function borrarSuelto(id,nameEnc){
+  if(!confirm('¿Borrar a "'+decodeURIComponent(nameEnc)+'"? No se puede deshacer.'))return;
+  await api('/api/characters/'+id,'DELETE');
+  loadCharacters();
+}
+// ─── Personaje suelto: sin campaña, para usar la herramienta por tu cuenta ───
+function openSolo(){
+  var dnd=document.getElementById('soloSystem').value==='dnd';
+  var blankPdf=dnd
+    ? '<a class="btn" href="/static/5e_sheet.pdf" download="Ficha_DnD_5e.pdf">⭱ Descargar ficha vacía</a>'
+    : '<a class="btn" href="/static/cosmere_sheet.pdf" download="Ficha_Cosmere.pdf">⭱ Descargar ficha vacía</a>';
+  var statInputs='<input class="fi" id="j-vida" type="number" value="20" title="Vida máx" style="width:70px"/>'
+    +(dnd?'':'<input class="fi" id="j-focus" type="number" value="10" title="Focus máx" style="width:70px"/>'
+      +'<input class="fi" id="j-inv" type="number" value="0" title="Investidura máx" style="width:70px"/>');
+  document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
+    +'<div class="cname" style="font-size:18px">Personaje suelto · '+(dnd?'D&amp;D 5e':'Cosmere RPG')+'</div>'
+    +'<div class="section-sub">Sin campaña. Después lo podés enganchar a una cuando te inviten.</div>'
+    +'<div class="card-actions" style="margin:2px 0 14px">'+blankPdf
+      +'<button class="btn accent" onclick="document.getElementById(\'soloPdf\').click()">⭳ Subir ficha PDF</button>'
+      +'<input type="file" id="soloPdf" accept="application/pdf" style="display:none" onchange="soloUpload(\''+(dnd?'dnd':'cosmere')+'\',this)"/></div>'
+    +'<div style="border-top:1px solid var(--border);padding-top:12px;font-size:13px;color:var(--text3);font-style:italic;margin-bottom:10px">…o cargalo a mano:</div>'
+    +'<div style="display:flex;flex-direction:column;gap:9px">'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nombre</span><input class="fi" id="j-name" style="flex:1;max-width:280px"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>'+(dnd?'Clase':'Clase / senda')+'</span><input class="fi" id="j-class" style="flex:1;max-width:280px"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>Nivel</span><input class="fi" id="j-level" style="width:90px" placeholder="1"/></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>'+(dnd?'Vida máx':'Vida / Focus / Investidura máx')+'</span><span style="display:flex;gap:6px">'+statInputs+'</span></label>'
+    +'</div>'
+    +'<div class="card-actions" style="justify-content:flex-end;margin-top:16px"><button class="btn" onclick="closeModal()">Cancelar</button><button class="btn accent" onclick="soloCreate('+(dnd?'true':'false')+')">Crear personaje</button></div>';
+  document.getElementById('overlay').classList.add('on');
+}
+async function soloCreate(dnd){
+  var name=document.getElementById('j-name').value.trim();
+  if(!name){alert('Poné un nombre al personaje.');return;}
+  await api('/api/characters','POST',{
+    name:name, system:dnd?'dnd':'cosmere',
+    vida_max:parseInt(document.getElementById('j-vida').value)||20,
+    focus_max:dnd?0:(parseInt(document.getElementById('j-focus').value)||0),
+    inv_max:dnd?0:(parseInt(document.getElementById('j-inv').value)||0),
+    sheet:{paths:document.getElementById('j-class').value.trim(),level:document.getElementById('j-level').value.trim()}
+  });
+  closeModal(); loadCharacters();
+}
+async function soloUpload(system,input){
+  if(!input.files||!input.files[0])return;
+  var fd=new FormData(); fd.append('file',input.files[0]); input.value='';
+  var r=await fetch('/api/characters/import-pdf?system='+system,{method:'POST',body:fd});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo leer el PDF');return;}
+  var j=await r.json();
+  closeModal(); loadCharacters();
+  alert('Personaje creado desde el PDF: '+j.name);
+}
+// enganchar un suelto a la campaña que invita
+async function linkChar(cid){
+  var sel=document.getElementById('j-link'); if(!sel||!sel.value)return;
+  var r=await fetch('/api/characters/'+sel.value+'/link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaign_id:cid})});
+  if(!r.ok){var e=await r.json().catch(function(){return{detail:'Error'};});alert(e.detail||'No se pudo enganchar');return;}
+  closeModal();
+  await loadCharacters(); loadInvitations();
+}
 async function leave(cid,nameEnc){
   var nm=nameEnc?decodeURIComponent(nameEnc):'esta campaña';
   if(!confirm('¿Salir de "'+nm+'"?\n\nTu personaje de esta campaña se elimina (no se puede deshacer).'))return;
@@ -268,7 +338,18 @@ function openJoin(cid){
   var pdfHint=dnd
     ? 'Descargá la ficha rellenable de D&D 5e, completala (con Adobe/lector de PDF) y subila: se leen tus stats, vida y spell slots.'
     : 'Descargá la ficha rellenable de Cosmere RPG, completala (con Adobe/lector de PDF) y subila: se leen tus stats, vida, focus e investidura.';
-  var pdfBlock='<div class="card-actions" style="margin:2px 0 14px">'
+  // sueltos del mismo sistema: se pueden usar en vez de crear otro
+  var sueltos=(CHARS||[]).filter(function(c){return !c.campaign_id&&(c.system||'cosmere')===(dnd?'dnd':'cosmere');});
+  var linkBlock=sueltos.length
+    ? '<div style="margin-bottom:12px;padding:10px 12px;border:1px solid var(--gold);border-radius:var(--r)">'
+      +'<div style="font-size:13px;margin-bottom:8px">Usar un personaje suelto que ya tenés:</div>'
+      +'<div class="row"><select class="fi" id="j-link" style="flex:1;min-width:180px">'
+        +sueltos.map(function(c){return '<option value="'+c.id+'">'+esc(c.name)+(c.sheet&&c.sheet.level?' · nivel '+esc(c.sheet.level):'')+'</option>';}).join('')
+      +'</select><button class="btn accent" onclick="linkChar('+cid+')">Usar este</button></div>'
+      +'<div style="font-size:12px;color:var(--text3);font-style:italic;margin-top:6px">Se lleva su ficha, sus condiciones y su inventario tal cual.</div></div>'
+      +'<div style="font-size:13px;color:var(--text3);font-style:italic;margin-bottom:10px">…o creá uno nuevo:</div>'
+    : '';
+  var pdfBlock=linkBlock+'<div class="card-actions" style="margin:2px 0 14px">'
       +blankPdf
       +'<button class="btn accent" onclick="document.getElementById(\'joinPdf\').click()">⭳ Subir ficha PDF</button>'
       +'<input type="file" id="joinPdf" accept="application/pdf" style="display:none" onchange="joinUpload('+cid+',this)"/>'

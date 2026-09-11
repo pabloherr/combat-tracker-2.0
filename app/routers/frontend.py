@@ -74,6 +74,17 @@ def login_page():
     return _page("login.html")
 
 
+@router.get("/personaje/{chid}")
+def solo_page(chid: int, request: Request):
+    """Un personaje suelto, sin campaña: la misma página del jugador."""
+    u = optional_user(request)
+    if not u:
+        return RedirectResponse("/login")
+    if u.get("role") != "player":
+        return RedirectResponse("/dm")
+    return _page("player.html")
+
+
 @router.get("/campaign/{cid}/jugador/{uid}")
 def dm_player_page(cid: int, uid: int, request: Request):
     """La misma página del jugador, para que el DM vea (y toque) la ficha de

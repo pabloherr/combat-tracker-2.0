@@ -796,15 +796,22 @@ async function quitarCond(target,i){
 var COMBAT=null;
 var CONFIG={};     // ajustes de la campaña que le tocan al jugador (qué módulos hay)
 // El catálogo y el inventario se prenden y se apagan por separado.
-function MODULO(n){ return SYSTEM!=='dnd' && CONFIG['modulo_'+n]!==false; }
+function MODULO(n){
+  if(SOLO&&n==='catalogo') return false;      // suelto no hay DM que arme catálogo
+  return SYSTEM!=='dnd' && CONFIG['modulo_'+n]!==false;
+}
 var MY_UID=null;   // id de mi usuario (para reconocer mi personaje en el combate)
 // /play/<cid> para el jugador; /campaign/<cid>/jugador/<uid> para el DM, que
 // ve la ficha de ese jugador tal cual la ve él.
+// /personaje/<id> es un personaje suelto, sin campaña: la misma página, con
+// su propio "roster" de un solo miembro y sin combate, tormentas ni catálogo.
 var _segs=location.pathname.split('/').filter(Boolean);
 var VER_UID=(_segs[0]==='campaign'&&_segs[2]==='jugador')?parseInt(_segs[3]):null;
 var DM_VIEW=VER_UID!=null;
-var CID=DM_VIEW?parseInt(_segs[1]):parseInt(_segs[_segs.length-1]);
-var API='/api/campaigns/'+CID;
+var SOLO=_segs[0]==='personaje';
+var SOLO_ID=SOLO?parseInt(_segs[1]):null;
+var CID=SOLO?null:(DM_VIEW?parseInt(_segs[1]):parseInt(_segs[_segs.length-1]));
+var API=SOLO?'/api/characters/'+SOLO_ID:'/api/campaigns/'+CID;
 var _qtab=(new URLSearchParams(location.search).get('tab')||'').toLowerCase();
 // 'grupo' y 'combate' quedaron como una sola pestaña: los links viejos siguen andando.
 var TAB=({pj:'pj',grupo:'mesa',combate:'mesa',mesa:'mesa',tiendas:'tiendas',inv:'inv'}[_qtab])||'pj';
@@ -1405,6 +1412,7 @@ async function loadRoster(){
     var m=el.dataset.mod;
     el.style.display=(m?MODULO(m):SYSTEM!=='dnd')?'':'none';
   });
+  if(SOLO&&TAB==='mesa') setTab('pj');
   // si el DM apagó un módulo, su pestaña no existe: no te quedes mirando la nada
   if(!MODULO('catalogo')&&TAB==='tiendas') setTab('pj');
   if(!MODULO('inventario')&&TAB==='inv') setTab('pj');
@@ -2428,6 +2436,11 @@ function renderRoster(){
     }
     html+=foldHead('sec:armas','⚔ Armas y ataques');
     if(abierto('sec:armas')) html+='<div class="me-card" id="armasPanel"></div>';
+    if(SOLO&&!esDnd){
+      // sin pestaña de combate, el equipo de combate va acá
+      html+=foldHead('sec:kit','🛡 Equipo de combate');
+      if(abierto('sec:kit')) html+='<div class="me-card">'+kitCombateHTML(c)+'</div>';
+    }
     if(!esDnd){
       // lo que no entra en las tres columnas
       html+=foldHead('sec:resto','📜 Talentos y equipo');
@@ -3059,7 +3072,7 @@ function invItemRow(it,dentro,zona){
   // lo que está dentro de un contenedor viaja con él: la zona la decide la mochila
   var zonaBtn=dentro?''
     : '<button class="btn-sheet" onclick="openStash('+it.id+',\''+(zona||'')+'\')" title="Mover a otra zona">⇄</button>';
-  var pasar=dentro?''
+  var pasar=(dentro||SOLO)?''
     : '<button class="btn-sheet" onclick="openTransfer('+it.id+')" title="Pasárselo a otro">🤝</button>';
   // en mano / puesta: solo lo que se lleva encima y no está en un contenedor
   var rolBtns='';
@@ -3135,7 +3148,7 @@ function renderInventory(){
   html+=stashCard('🏠 Mi guardado',
     'Lo que tenés pero no cargás encima: en la posada, en tu cuarto. No pesa ni tiene tope.',
     INV.character.guardado||[],'personal','Tu guardado está vacío.');
-  html+=stashCard('👥 Guardado del grupo',
+  if(!SOLO) html+=stashCard('👥 Guardado del grupo',
     'Compartido con toda la mesa: cualquiera puede dejar o llevarse cosas de acá.',
     INV.grupo||[],'grupo','El grupo no guardó nada todavía.');
   panel.innerHTML=html;
@@ -3257,11 +3270,12 @@ async function setSize(size){
 var ZONAS=[{k:'',n:'🖐 Encima',d:'Lo cargás vos: cuenta para tu capacidad.'},
            {k:'personal',n:'🏠 Mi guardado',d:'Lo tenés pero no lo llevás. Sin tope.'},
            {k:'grupo',n:'👥 Guardado del grupo',d:'Compartido con toda la mesa.'}];
+function zonasDisponibles(){ return SOLO?ZONAS.filter(function(z){return z.k!=='grupo';}):ZONAS; }
 function openStash(eid,actual){
   document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
     +'<div class="sh-name">Mover a…</div>'
     +'<div class="sh-meta" style="margin-bottom:10px">Lo que está dentro de un contenedor se mueve con él.</div>'
-    +ZONAS.filter(function(z){return z.k!==actual;}).map(function(z){
+    +zonasDisponibles().filter(function(z){return z.k!==actual;}).map(function(z){
       return '<div class="inv-row"><span style="flex:1"><b style="color:var(--gold2)">'+z.n+'</b>'
         +'<div style="font-size:12px;color:var(--text3)">'+z.d+'</div></span>'
         +'<button class="btn-sheet" onclick="invStash('+eid+',\''+z.k+'\')">Mover</button></div>';
@@ -3603,6 +3617,11 @@ function connect(){
 async function init(){
   try{ var me=await api('/api/auth/me'); MY_UID=me.id; }
   catch(e){ return; }   // 401 ya redirige a /login
+  if(SOLO){
+    // sin campaña: ficha e inventario nada más
+    TAB=(TAB==='inv')?'inv':'pj';
+    document.getElementById('tab-mesa').style.display='none';
+  }
   if(DM_VIEW){
     // el DM mira la ficha de un jugador: la página cree que es él, y solo
     // muestra "Mi personaje"
@@ -3614,22 +3633,22 @@ async function init(){
       '<div class="dm-view" id="dmView">Vista de DM · ficha del jugador</div>');
   }
   setTab(TAB);
-  connect();
+  if(!SOLO) connect();
   await loadConditions();           // el catálogo de la campaña, antes de dibujar la ficha
   await loadRoster();               // fija SYSTEM antes de decidir si hay tormentas
-  if(SYSTEM!=='dnd'){ loadStorm(); loadCalendar(); }   // en D&D no hay tormentas ni calendario
+  if(SYSTEM!=='dnd'&&!SOLO){ loadStorm(); loadCalendar(); }   // en D&D no hay tormentas ni calendario
   // Al volver a la pestaña: en segundo plano los timers se frenan y el socket
   // puede haberse caído, así que reconectamos y resincronizamos en el acto.
   document.addEventListener('visibilitychange',function(){
     if(document.visibilityState!=='visible')return;
-    if(!WS||WS.readyState>1) connect();
+    if(!SOLO&&(!WS||WS.readyState>1)) connect();
     loadConditions();               // el DM puede haber cambiado su lista
     loadRoster();
-    if(SYSTEM!=='dnd'){ loadStorm(); loadCalendar(); }
+    if(SYSTEM!=='dnd'&&!SOLO){ loadStorm(); loadCalendar(); }
   });
   // refresco periódico: la ficha del personaje / grupo, el tracker de tormentas
   // y el calendario (esos cambios no viajan por WS)
-  setInterval(function(){ if(SYSTEM!=='dnd'){ loadStorm(); loadCalendar(); } loadRoster(); }, 5000);
+  setInterval(function(){ if(SYSTEM!=='dnd'&&!SOLO){ loadStorm(); loadCalendar(); } loadRoster(); }, 5000);
 }
 init();
 </script>

@@ -199,14 +199,183 @@ _EFECTOS = {e["k"]: e for e in EFECTOS_MENU}
 _TONOS = ("pos", "neg", "neutro")
 
 
-def _extra_cond(raw: dict) -> dict | None:
+# ═══════════ D&D 5e ═══════════
+# Las 15 condiciones del manual más Agotamiento por niveles. Mismo esquema que
+# las de Cosmere, con dos efectos más que 5e necesita:
+#
+#   {"atq": "desv"}      desventaja en las tiradas de ataque
+#   {"atq": "vent"}      ventaja en las tiradas de ataque
+#   {"recibe": "vent"}   los ataques contra vos tienen ventaja
+#   {"recibe": "desv"}   los ataques contra vos tienen desventaja
+#   {"agot": True}       Agotamiento: el nivel va entre corchetes y sus efectos
+#                        se acumulan (ver AGOTAMIENTO)
+
+CONDICIONES_DND = [
+    {
+        "name": "Blinded", "es": "Cegado", "tono": "neg", "param": None, "ph": None,
+        "apila": False, "efecto": {"atq": "desv", "recibe": "vent"},
+        "desc": "No ves nada y fallás automáticamente cualquier prueba que dependa de la "
+                "vista. Tus tiradas de ataque tienen desventaja y los ataques contra vos "
+                "tienen ventaja.",
+    },
+    {
+        "name": "Charmed", "es": "Encantado", "tono": "neg", "param": "texto",
+        "ph": "por el bardo", "apila": True, "efecto": {},
+        "desc": "No podés atacar a quien te encantó ni elegirlo como objetivo de efectos "
+                "dañinos. Esa criatura tiene ventaja en las pruebas de característica para "
+                "interactuar socialmente con vos.",
+    },
+    {
+        "name": "Deafened", "es": "Ensordecido", "tono": "neg", "param": None, "ph": None,
+        "apila": False, "efecto": {},
+        "desc": "No oís nada y fallás automáticamente cualquier prueba que dependa del oído.",
+    },
+    {
+        "name": "Frightened", "es": "Asustado", "tono": "neg", "param": "texto",
+        "ph": "del dragón", "apila": True, "efecto": {"atq": "desv", "desv": "todos"},
+        "desc": "Tenés desventaja en las pruebas de característica y en las tiradas de ataque "
+                "mientras la fuente de tu miedo esté a la vista. No podés acercarte a ella "
+                "voluntariamente.",
+    },
+    {
+        "name": "Grappled", "es": "Agarrado", "tono": "neg", "param": None, "ph": None,
+        "apila": False, "efecto": {"mov": 0},
+        "desc": "Tu velocidad pasa a 0 y no te podés beneficiar de ningún bono a la velocidad. "
+                "Termina si quien te agarra queda Incapacitated, o si algo te saca del alcance "
+                "de la presa.",
+    },
+    {
+        "name": "Incapacitated", "es": "Incapacitado", "tono": "neg", "param": None, "ph": None,
+        "apila": False, "efecto": {},
+        "desc": "No podés realizar acciones ni reacciones.",
+    },
+    {
+        "name": "Invisible", "es": "Invisible", "tono": "pos", "param": None, "ph": None,
+        "apila": False, "efecto": {"atq": "vent", "recibe": "desv"},
+        "desc": "No se te puede ver sin magia o un sentido especial. A efectos de esconderte "
+                "contás como muy oscurecido. Tus tiradas de ataque tienen ventaja y los ataques "
+                "contra vos tienen desventaja.",
+    },
+    {
+        "name": "Paralyzed", "es": "Paralizado", "tono": "neg", "param": None, "ph": None,
+        "apila": False, "efecto": {"mov": 0, "recibe": "vent"},
+        "desc": "Estás Incapacitated, no te podés mover ni hablar. Fallás automáticamente las "
+                "salvaciones de Fuerza y Destreza. Los ataques contra vos tienen ventaja, y "
+                "cualquier ataque que te acierte a 5 pies o menos es un crítico.",
+    },
+    {
+        "name": "Petrified", "es": "Petrificado", "tono": "neg", "param": None, "ph": None,
+        "apila": False, "efecto": {"mov": 0, "recibe": "vent"},
+        "desc": "Te convertís en piedra junto con lo que llevás encima: tu peso se multiplica "
+                "por 10 y dejás de envejecer. Estás Incapacitated, no te podés mover ni hablar "
+                "y no te enterás de nada. Los ataques contra vos tienen ventaja y fallás "
+                "automáticamente las salvaciones de Fuerza y Destreza. Tenés resistencia a todo "
+                "el daño e inmunidad a venenos y enfermedades.",
+    },
+    {
+        "name": "Poisoned", "es": "Envenenado", "tono": "neg", "param": None, "ph": None,
+        "apila": False, "efecto": {"atq": "desv", "desv": "todos"},
+        "desc": "Tenés desventaja en las tiradas de ataque y en las pruebas de característica.",
+    },
+    {
+        "name": "Prone", "es": "Derribado", "tono": "neg", "param": None, "ph": None,
+        "apila": False, "efecto": {"mov": "mitad", "atq": "desv"},
+        "desc": "Solo te podés mover arrastrándote (a media velocidad) hasta que te levantes, "
+                "lo que cuesta la mitad de tu movimiento. Tenés desventaja en las tiradas de "
+                "ataque. Los ataques contra vos tienen ventaja si el atacante está a 5 pies o "
+                "menos; si no, tienen desventaja.",
+    },
+    {
+        "name": "Restrained", "es": "Apresado", "tono": "neg", "param": None, "ph": None,
+        "apila": False, "efecto": {"mov": 0, "atq": "desv", "recibe": "vent"},
+        "desc": "Tu velocidad pasa a 0 y no te podés beneficiar de ningún bono a la velocidad. "
+                "Tus tiradas de ataque tienen desventaja y los ataques contra vos tienen "
+                "ventaja. Tenés desventaja en las salvaciones de Destreza.",
+    },
+    {
+        "name": "Stunned", "es": "Aturdido", "tono": "neg", "param": None, "ph": None,
+        "apila": False, "efecto": {"mov": 0, "recibe": "vent"},
+        "desc": "Estás Incapacitated, no te podés mover y hablás entrecortado. Fallás "
+                "automáticamente las salvaciones de Fuerza y Destreza, y los ataques contra "
+                "vos tienen ventaja.",
+    },
+    {
+        "name": "Unconscious", "es": "Inconsciente", "tono": "neg", "param": None, "ph": None,
+        "apila": False, "efecto": {"mov": 0, "recibe": "vent"},
+        "desc": "Estás Incapacitated, no te enterás de nada, soltás lo que tengas en las manos "
+                "y caés Prone. No te podés mover ni hablar. Fallás automáticamente las "
+                "salvaciones de Fuerza y Destreza, los ataques contra vos tienen ventaja y "
+                "cualquier ataque que te acierte a 5 pies o menos es un crítico.",
+    },
+    {
+        "name": "Exhaustion", "es": "Agotamiento", "tono": "neg", "param": "nivel",
+        "ph": "1", "apila": True, "efecto": {"agot": True},
+        "desc": "Va por niveles, del 1 al 6, y sus efectos se acumulan: "
+                "1 desventaja en las pruebas de característica · "
+                "2 velocidad a la mitad · "
+                "3 desventaja en las tiradas de ataque y en las salvaciones · "
+                "4 máximo de puntos de golpe a la mitad · "
+                "5 velocidad a 0 · "
+                "6 muerte. "
+                "Un descanso largo baja un nivel, siempre que comas y bebas.",
+    },
+]
+
+# Qué agrega cada nivel de agotamiento (acumulativo hasta el nivel que tengas).
+AGOTAMIENTO = [
+    (1, "desventaja en las pruebas de característica"),
+    (2, "velocidad a la mitad"),
+    (3, "desventaja en las tiradas de ataque y en las salvaciones"),
+    (4, "máximo de puntos de golpe a la mitad"),
+    (5, "velocidad a 0"),
+    (6, "muerte"),
+]
+
+# Heridas persistentes de la guía del DM (opcionales, pero encajan igual que las
+# de Cosmere: la herida impone una condición mientras dure).
+HERIDAS_DND = [
+    {"name": "Ojo perdido", "cond": "Blinded"},
+    {"name": "Pierna destrozada", "cond": "Prone"},
+    {"name": "Herida interna", "cond": "Poisoned"},
+    {"name": "Cicatriz horrible", "cond": ""},
+    {"name": "Cojera", "cond": "Exhaustion [2]"},
+    {"name": "Conmoción", "cond": "Exhaustion [1]"},
+    {"name": "Mano inutilizada", "cond": ""},
+    {"name": "Sordera", "cond": "Deafened"},
+]
+
+EFECTOS_MENU_DND = [
+    {"k": "", "n": "Ninguno (solo descripción)", "efecto": {}},
+    {"k": "mov_mitad", "n": "Velocidad a la mitad", "efecto": {"mov": "mitad"}},
+    {"k": "mov_cero", "n": "Velocidad a 0", "efecto": {"mov": 0}},
+    {"k": "desv_todos", "n": "Desventaja en las pruebas de característica",
+     "efecto": {"desv": "todos"}},
+    {"k": "atq_desv", "n": "Desventaja en las tiradas de ataque", "efecto": {"atq": "desv"}},
+    {"k": "atq_vent", "n": "Ventaja en las tiradas de ataque", "efecto": {"atq": "vent"}},
+    {"k": "recibe_vent", "n": "Los ataques contra vos tienen ventaja",
+     "efecto": {"recibe": "vent"}},
+    {"k": "recibe_desv", "n": "Los ataques contra vos tienen desventaja",
+     "efecto": {"recibe": "desv"}},
+    {"k": "tests", "n": "Penalización a las tiradas (va entre corchetes)",
+     "efecto": {"tests": True}, "param": "penal"},
+]
+
+# Cada sistema con su catálogo, sus heridas y su menú de efectos.
+SISTEMAS = {
+    "cosmere": (CONDICIONES, HERIDAS, EFECTOS_MENU),
+    "dnd": (CONDICIONES_DND, HERIDAS_DND, EFECTOS_MENU_DND),
+}
+
+
+def _extra_cond(raw: dict, menu=None) -> dict | None:
     """Normaliza una condición que cargó el DM. Devuelve None si no sirve."""
     if not isinstance(raw, dict):
         return None
     name = str(raw.get("name") or "").strip()[:60]
     if not name:
         return None
-    ef = _EFECTOS.get(str(raw.get("ef") or ""), _EFECTOS[""])
+    efs = {e["k"]: e for e in (menu or EFECTOS_MENU)}
+    ef = efs.get(str(raw.get("ef") or ""), efs.get("", _EFECTOS[""]))
     tono = str(raw.get("tono") or "neg").strip().lower()
     return {
         "name": name,
@@ -230,34 +399,37 @@ def _extra_herida(raw: dict) -> dict | None:
     return {"name": name, "cond": str(raw.get("cond") or "").strip()[:80], "propia": True}
 
 
-def resolve(cfg: dict) -> dict:
-    """Las condiciones y heridas que valen en esta campaña.
+def resolve(cfg: dict, system: str = "cosmere") -> dict:
+    """Las condiciones y heridas que valen en esta campaña, según su sistema.
 
     Sale el catálogo sin las que el DM apagó, más las que agregó. Lo consumen
     la ficha del jugador (para aplicar los efectos) y el panel del DM.
     """
+    system = "dnd" if system == "dnd" else "cosmere"
+    catalogo, heridas, menu = SISTEMAS[system]
+
     off = set(cfg.get("cond_off") or [])
-    conds = [dict(c) for c in CONDICIONES if c["name"] not in off]
+    conds = [dict(c) for c in catalogo if c["name"] not in off]
     for raw in (cfg.get("cond_extra") or []):
-        c = _extra_cond(raw)
+        c = _extra_cond(raw, menu)
         if c and c["name"] not in off:
             conds.append(c)
 
     hoff = set(cfg.get("her_off") or [])
-    hers = [dict(h) for h in HERIDAS if h["name"] not in hoff]
+    hers = [dict(h) for h in heridas if h["name"] not in hoff]
     for raw in (cfg.get("her_extra") or []):
         h = _extra_herida(raw)
         if h and h["name"] not in hoff:
             hers.append(h)
 
     return {
+        "system": system,
         "condiciones": conds,
         "heridas": hers,
         "atributos": ATTR_KEYS,
         "attr_labels": [{"k": k, "n": n} for k, n in ATTR_LABELS],
-        # Para el panel del DM: el catálogo entero (también las que apagó, que
-        # si no no las podría volver a prender) y los efectos que puede elegir.
-        "catalogo": CONDICIONES,
-        "catalogo_heridas": HERIDAS,
-        "efectos": [{"k": e["k"], "n": e["n"]} for e in EFECTOS_MENU],
+        "catalogo": [dict(c) for c in catalogo],
+        "catalogo_heridas": [dict(h) for h in heridas],
+        "efectos": [{"k": e["k"], "n": e["n"], "param": e.get("param")} for e in menu],
+        "agotamiento": [{"n": n, "d": d} for n, d in AGOTAMIENTO],
     }
