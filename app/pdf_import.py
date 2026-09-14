@@ -7,6 +7,8 @@ para el tracker, más una ficha completa (`sheet`) para poder visualizarla.
 """
 
 import io
+import re
+import unicodedata
 
 import pypdf
 
@@ -36,6 +38,81 @@ _SKILLS = {
 }
 
 
+# ── Potencias radiantes (Surges) ──
+# Cada una se usa como una habilidad más, con su atributo fijo, y por eso vive
+# en la columna de ese atributo. La ficha oficial no tiene casillas para ellas:
+# el jugador las escribe en la fila libre de la columna (o, si no le entran, en
+# los talentos), así que se buscan en los dos lugares.
+SURGES = {
+    "Abrasion": "SPD", "Adhesion": "PRE", "Cohesion": "WIL", "Division": "INT",
+    "Gravitation": "AWA", "Illumination": "PRE", "Progression": "AWA",
+    "Tension": "STR", "Transformation": "WIL", "Transportation": "INT",
+}
+
+# Como se escriben en la mesa: en inglés (el manual) o en castellano.
+_SURGE_ALIAS = {
+    "abrasion": "Abrasion", "adhesion": "Adhesion", "cohesion": "Cohesion",
+    "division": "Division", "gravitation": "Gravitation", "gravitacion": "Gravitation",
+    "illumination": "Illumination", "iluminacion": "Illumination",
+    "progression": "Progression", "progresion": "Progression", "tension": "Tension",
+    "transformation": "Transformation", "transformacion": "Transformation",
+    "transportation": "Transportation", "transportacion": "Transportation",
+}
+
+CAT_DE_ATTR = {"STR": "physical", "SPD": "physical",
+               "INT": "cognitive", "WIL": "cognitive",
+               "AWA": "spiritual", "PRE": "spiritual"}
+
+_ATTR_ALIAS = {
+    "str": "STR", "strength": "STR", "fuerza": "STR",
+    "spd": "SPD", "speed": "SPD", "velocidad": "SPD",
+    "int": "INT", "intellect": "INT", "intelecto": "INT",
+    "wil": "WIL", "will": "WIL", "willpower": "WIL", "voluntad": "WIL",
+    "awa": "AWA", "awareness": "AWA", "conciencia": "AWA",
+    "pre": "PRE", "presence": "PRE", "presencia": "PRE",
+}
+
+
+def _norm(txt: str) -> str:
+    """Minúsculas, sin tildes y sin puntuación: para comparar nombres escritos a mano."""
+    t = unicodedata.normalize("NFKD", str(txt or "")).encode("ascii", "ignore").decode()
+    return re.sub(r"\s+", " ", re.sub(r"[^a-zA-Z0-9\s]", " ", t)).strip().lower()
+
+
+def surge_en(txt: str, exacto: bool = False) -> str | None:
+    """La potencia que nombra este texto, o None.
+
+    `exacto` pide que el texto sea solo el nombre (para no confundir un talento
+    como "Division of Spoils" con la potencia Division). Si no, alcanza con que
+    la nombre: "Surge of Gravitation", "Potencia de Gravitación"."""
+    t = _norm(txt)
+    if not t:
+        return None
+    if t in _SURGE_ALIAS:
+        return _SURGE_ALIAS[t]
+    if exacto:
+        return None
+    for palabra in t.split(" "):
+        if palabra in _SURGE_ALIAS:
+            return _SURGE_ALIAS[palabra]
+    return None
+
+
+def _attr_code(txt: str) -> str:
+    return _ATTR_ALIAS.get(_norm(txt).replace(" ", ""), "")
+
+
+# Atributo de cada habilidad (el modificador es atributo + rangos).
+_SK_ATTR = {
+    "Athletics": "STR", "Heavy Weaponry": "STR",
+    "Agility": "SPD", "Light Weaponry": "SPD", "Stealth": "SPD", "Thievery": "SPD",
+    "Crafting": "INT", "Deduction": "INT", "Lore": "INT", "Medicine": "INT",
+    "Discipline": "WIL", "Intimidation": "WIL",
+    "Deception": "PRE", "Leadership": "PRE", "Persuasion": "PRE",
+    "Insight": "AWA", "Perception": "AWA", "Survival": "AWA",
+}
+
+
 def parse_character_pdf(data: bytes) -> dict:
     try:
         reader = pypdf.PdfReader(io.BytesIO(data))
@@ -61,21 +138,63 @@ def parse_character_pdf(data: bytes) -> dict:
             i += 1
         return out
 
-    # Habilidades: por categoría, solo las que tienen valor.
-    skills = {}
+    attrs = {
+        "STR": _i(g("char_strength")), "SPD": _i(g("char_speed")),
+        "INT": _i(g("char_intellect")), "WIL": _i(g("char_willpower")),
+        "AWA": _i(g("char_awareness")), "PRE": _i(g("char_presence")),
+    }
+
+    def rango(field):
+        """Los rangos son los cinco cuadraditos de la fila: cuenta los marcados."""
+        return sum(1 for i in range(1, 6)
+                   if _s(g(f"char_{field}_rank_{i}")) not in ("", "/Off", "Off"))
+
+    def fila(label, field, attr):
+        """Una habilidad de la ficha, o None si el jugador no anotó nada.
+
+        Con el modificador escrito se respeta tal cual (puede llevar sumas que
+        la app no conoce). Si solo marcó los rangos, el modificador se calcula:
+        atributo + rangos."""
+        val = g(f"char_{field}")
+        if val not in (None, ""):
+            return {"name": label, "value": _i(val)}
+        r = rango(field)
+        if not r:
+            return None
+        return {"name": label, "rank": r, "value": attrs.get(attr, 0) + r}
+
+    # Habilidades: por categoría, solo las que el jugador anotó.
+    skills = {cat: [] for cat in _SKILLS}
     for cat, items in _SKILLS.items():
-        rows = []
         for field, label in items:
-            val = g(f"char_{field}")
-            if val not in (None, ""):
-                rows.append({"name": label, "value": _i(val)})
-        # habilidad custom de la categoría
+            f = fila(label, field, _SK_ATTR.get(label, ""))
+            if f:
+                skills[cat].append(f)
+
+    # La fila libre de cada columna: ahí van las potencias radiantes y cualquier
+    # habilidad que la mesa se haya inventado. Una potencia se guarda en la
+    # columna de su atributo, aunque esté escrita en otra.
+    for cat in _SKILLS:
         cat_key = {"physical": "phys", "cognitive": "cog", "spiritual": "spirit"}[cat]
         cname = _s(g(f"char_{cat_key}_custom_name"))
-        cval = g(f"char_{cat_key}_custom")
-        if cname and cval not in (None, ""):
-            rows.append({"name": cname, "value": _i(cval)})
-        skills[cat] = rows
+        if not cname:
+            continue
+        f = fila(cname, f"{cat_key}_custom", _attr_code(g(f"char_{cat_key}_custom_attr")))
+        if not f:
+            # nombre escrito y nada más: igual vale, con rango 0
+            f = {"name": cname, "rank": 0, "value": 0}
+        surge = surge_en(cname)
+        if surge:
+            at = SURGES[surge]
+            f.update({"name": surge, "surge": True, "attr": at})
+            if "rank" in f:
+                f["value"] = attrs.get(at, 0) + f["rank"]
+            skills[CAT_DE_ATTR[at]].append(f)
+        else:
+            at = _attr_code(g(f"char_{cat_key}_custom_attr"))
+            if at:
+                f["attr"] = at
+            skills[cat].append(f)
 
     # Talentos: char_talent_name_N / char_talent_desc_N
     talents = []
@@ -85,6 +204,19 @@ def parse_character_pdf(data: bytes) -> dict:
         if tn or td:
             talents.append({"name": tn, "desc": td})
 
+    # Un radiante suele tener dos potencias de la misma columna y en la ficha
+    # hay una sola fila libre por columna: la segunda termina anotada entre los
+    # talentos. Se busca ahí también, pidiendo que el talento se llame igual que
+    # la potencia (para no confundirla con un talento que solo la menciona).
+    puestas = {x["name"] for rows in skills.values() for x in rows}
+    for t in talents:
+        surge = surge_en(t["name"], exacto=True)
+        if surge and surge not in puestas:
+            at = SURGES[surge]
+            skills[CAT_DE_ATTR[at]].append({"name": surge, "surge": True, "attr": at,
+                                            "rank": 0, "value": attrs.get(at, 0)})
+            puestas.add(surge)
+
     vida_max = _i(g("char_health_max"), 20)
     focus_max = _i(g("char_focus_max"), 0)
     inv_max = _i(g("char_invest_max"), 0)
@@ -93,11 +225,7 @@ def parse_character_pdf(data: bytes) -> dict:
         "level": _s(g("char_level")),
         "ancestry": _s(g("char_ancestry")),
         "paths": _s(g("char_paths")),
-        "attributes": {
-            "STR": _i(g("char_strength")), "SPD": _i(g("char_speed")),
-            "INT": _i(g("char_intellect")), "WIL": _i(g("char_willpower")),
-            "AWA": _i(g("char_awareness")), "PRE": _i(g("char_presence")),
-        },
+        "attributes": attrs,
         "defenses": {
             "physical": _i(g("char_phys_def")),
             "cognitive": _i(g("char_cog_def")),

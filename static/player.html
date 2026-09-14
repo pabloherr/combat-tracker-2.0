@@ -447,6 +447,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .sh-pips{display:flex;gap:3px;flex:none;}
 .sh-pip{width:9px;height:9px;border-radius:50%;border:1px solid var(--border2);}
 .sh-pip.on{background:var(--text2);border-color:var(--text2);}
+.sk-surge{color:var(--gold);font-size:10px;flex:none;}
+.sh-sk.surge .sh-sk-n,.ed-surge .sh-sk-n{color:var(--gold2);}
+.sh-sk.surge .sh-pip.on{background:var(--gold);border-color:var(--gold);}
+.ed-surge{opacity:.55;}
+.ed-surge.on{opacity:1;}
+.ed-surge input[type=checkbox]{margin:0;cursor:pointer;}
 .sh-foot{display:flex;flex-wrap:wrap;gap:8px 30px;justify-content:center;background:var(--bg2);
   border:1px solid var(--border);border-radius:var(--rl);padding:9px 12px;margin-bottom:10px;}
 .sh-foot>div{text-align:center;}
@@ -2018,10 +2024,21 @@ async function togglePetShared(pid){
 // modificador es atributo + rangos, así que los rangos salen de restar.
 var SK_ATTR={Athletics:'STR','Heavy Weaponry':'STR',
   Agility:'SPD','Light Weaponry':'SPD',Stealth:'SPD',Thievery:'SPD',
-  Crafting:'INT',Deduction:'INT',Lore:'INT',Medicine:'INT',Transportation:'INT',
-  Discipline:'WIL',Intimidation:'WIL',Transformation:'WIL',
+  Crafting:'INT',Deduction:'INT',Lore:'INT',Medicine:'INT',
+  Discipline:'WIL',Intimidation:'WIL',
   Deception:'PRE',Leadership:'PRE',Persuasion:'PRE',
   Insight:'AWA',Perception:'AWA',Survival:'AWA'};
+// Potencias radiantes (Surges): se ganan al entrar en un camino radiante y se
+// usan como una habilidad más, con su atributo fijo. Por eso cada una vive en
+// la columna de ese atributo.
+var SURGES={Abrasion:'SPD',Adhesion:'PRE',Cohesion:'WIL',Division:'INT',
+  Gravitation:'AWA',Illumination:'PRE',Progression:'AWA',Tension:'STR',
+  Transformation:'WIL',Transportation:'INT'};
+var SURGE_ORDEN=Object.keys(SURGES).sort();
+var CAT_ATTR={STR:'physical',SPD:'physical',INT:'cognitive',WIL:'cognitive',
+  AWA:'spiritual',PRE:'spiritual'};
+function catDeSurge(n){ return CAT_ATTR[SURGES[n]]; }
+Object.keys(SURGES).forEach(function(n){ SK_ATTR[n]=SURGES[n]; });
 // Orden de la hoja. Las que el jugador no anotó se muestran igual, con el
 // atributo solo y ningún rango: la ficha se lee completa.
 var SK_ORDEN={physical:['Agility','Athletics','Heavy Weaponry','Light Weaponry','Stealth','Thievery'],
@@ -2070,7 +2087,8 @@ function shSkRows(cat,s,eff){
   var nombres=SK_ORDEN[cat].slice();
   puestas.forEach(function(x){ if(nombres.indexOf(x.name)<0) nombres.push(x.name); });
   return nombres.map(function(n){
-    var at=SK_ATTR[n]||'', base=(at&&a[at]!=null)?a[at]:null, x=por[n];
+    var x=por[n], at=(x&&x.attr)||SK_ATTR[n]||'';
+    var base=(at&&a[at]!=null)?a[at]:null;
     // con rango guardado el modificador se recalcula: si cambia el atributo, cambia
     var mod=(x&&x.rank!=null&&base!=null)?base+rangoDe(x,base):((x&&x.value!=null)?x.value:base);
     if(mod==null) return '';
@@ -2086,7 +2104,9 @@ function shSkRows(cat,s,eff){
       var r=rangoDe(x,base);
       for(var i=0;i<5;i++) pips+='<span class="sh-pip'+(i<r?' on':'')+'"></span>';
     }
-    return '<div class="sh-sk"><span class="sh-sk-b'+cls+'"'+tip+'>'+(total>=0?'+':'')+total+'</span>'
+    var esSurge=!!(x&&x.surge)||SURGES[n]!=null;
+    return '<div class="sh-sk'+(esSurge?' surge':'')+'"><span class="sh-sk-b'+cls+'"'+tip+'>'+(total>=0?'+':'')+total+'</span>'
+      +(esSurge?'<span class="sk-surge" title="Potencia radiante (Surge)">✦</span>':'')
       +'<span class="sh-sk-n">'+esc(n)+'</span>'+desv
       +'<span class="sh-sk-a">'+at+'</span>'
       +'<span class="sh-pips">'+pips+'</span></div>';
@@ -3036,6 +3056,36 @@ function edSkillsHTML(){
       }).join('')+'</div>';
   }).join('')+'</div>';
 }
+// Las potencias del personaje, agrupadas por la columna de su atributo. Se
+// prenden con el tilde (o tocando un puntito) y el rango son los puntitos.
+function edSurgesHTML(){
+  return '<div class="ed-sk3">'+CAT3.map(function(cat){
+    var ns=SURGE_ORDEN.filter(function(n){ return catDeSurge(n)===cat.k; });
+    return '<div class="sh-col"><div class="sh-col-h">'+cat.n+'</div>'
+      +ns.map(function(n){
+        var pips='';
+        for(var j=0;j<5;j++) pips+='<span class="sh-pip" onclick="edSurgeRank(\''+n+'\','+j+')"></span>';
+        return '<div class="ed-sk ed-surge" id="edsu-'+n+'">'
+          +'<input type="checkbox" id="edsuc-'+n+'" onchange="edSurgeToggle(\''+n+'\')" '
+            +'title="Tiene esta potencia"/>'
+          +'<span class="sh-sk-b" id="edsumod-'+n+'">—</span>'
+          +'<span class="sh-sk-n">'+n+'</span><span class="sh-sk-a">'+SURGES[n]+'</span>'
+          +'<span class="sh-pips ed" id="edsupips-'+n+'" title="Tocá un puntito para poner el rango">'+pips+'</span></div>';
+      }).join('')+'</div>';
+  }).join('')+'</div>';
+}
+function edSurgeToggle(n){
+  if(!CH_ED)return;
+  if(CH_ED.surges[n]!=null) delete CH_ED.surges[n]; else CH_ED.surges[n]=0;
+  edPreview();
+}
+// Tocar un puntito prende la potencia; el último prendido la baja un rango.
+function edSurgeRank(n,j){
+  if(!CH_ED)return;
+  var tenia=CH_ED.surges[n]!=null, r=CH_ED.surges[n]||0;
+  CH_ED.surges[n]=(tenia&&r===j+1)?j:j+1;
+  edPreview();
+}
 // Tocar el último puntito prendido lo apaga; cualquier otro deja el rango ahí.
 function edRank(cat,i,j){
   if(!CH_ED)return;
@@ -3055,6 +3105,16 @@ function edPreview(){
       document.getElementById('edmod-'+cat.k+'-'+i).textContent=(mod>=0?'+':'')+mod;
     });
   });
+  SURGE_ORDEN.forEach(function(n){
+    var fila=document.getElementById('edsu-'+n); if(!fila)return;
+    var on=CH_ED.surges[n]!=null, r=CH_ED.surges[n]||0, base=edAttrVal(SURGES[n]);
+    fila.classList.toggle('on',on);
+    document.getElementById('edsuc-'+n).checked=on;
+    var pips=document.getElementById('edsupips-'+n).children;
+    for(var j=0;j<5;j++) pips[j].classList.toggle('on',on&&j<r);
+    var mod=(base==null?r:base+r);
+    document.getElementById('edsumod-'+n).textContent=on?((mod>=0?'+':'')+mod):'—';
+  });
   var spd=edAttrVal('SPD'), wil=edAttrVal('WIL'), awa=edAttrVal('AWA'), str=edAttrVal('STR'), pre=edAttrVal('PRE');
   document.getElementById('edDeriv').innerHTML=
      'Movimiento <b>'+(spd==null?'—':movDeSPD(spd)+' ft.')+'</b> · '
@@ -3073,13 +3133,17 @@ function openEditChar(){
   var c=meChar(); if(!c)return; var s=c.sheet||{};
   if(SYSTEM==='dnd'){ openEditCharDnd(); return; }
   var a=s.attributes||{};
-  CH_ED={ranks:{}};
+  CH_ED={ranks:{},surges:{}};
   CAT3.forEach(function(cat){
     var por={}; ((s.skills||{})[cat.k]||[]).forEach(function(x){ por[x.name]=x; });
     CH_ED.ranks[cat.k]={};
     SK_ORDEN[cat.k].forEach(function(n){
       var at=SK_ATTR[n], base=(a[at]==null?null:a[at]);
       CH_ED.ranks[cat.k][n]=rangoDe(por[n],base);
+    });
+    // las potencias que ya tiene, en la columna donde hayan quedado guardadas
+    ((s.skills||{})[cat.k]||[]).forEach(function(x){
+      if(SURGES[x.name]!=null) CH_ED.surges[x.name]=rangoDe(x,a[SURGES[x.name]]);
     });
   });
   var modal=document.getElementById('modal');
@@ -3101,6 +3165,9 @@ function openEditChar(){
       +'<div><div class="fl">Sale de las tablas del manual</div><div class="ed-deriv" id="edDeriv"></div></div></div>'
     +'<div class="ed-sec">Habilidades <span style="text-transform:none;letter-spacing:0;color:var(--text3);font-family:inherit;font-size:11px">(el modificador es atributo + rango)</span></div>'
     +edSkillsHTML()
+    +'<div class="ed-sec">Potencias radiantes <span style="text-transform:none;letter-spacing:0;color:var(--text3);font-family:inherit;font-size:11px">'
+      +'(se ganan al entrar en un camino radiante; van en la columna de su atributo)</span></div>'
+    +edSurgesHTML()
     +'<div class="ed-sec">Talentos</div><div id="edTalents"></div>'
     +'<button class="btn-sheet ed-add" onclick="addEntryRow(\'edTalents\')">+ Agregar talento</button>'
     +'<div class="ed-sec">Especialidades</div>'
@@ -3132,13 +3199,22 @@ async function saveEditChar(){
   if(Object.keys(d).length) s.defenses=d; else delete s.defenses;
   // Habilidades: las 18 con su rango (y el total, que es lo que lee el resto);
   // las que el PDF trajo con otro nombre se conservan tal cual.
-  var sk={};
+  var sk={}, surges={};
+  Object.keys(CH_ED.surges).forEach(function(n){
+    var at=SURGES[n], base=a[at], r=CH_ED.surges[n]||0, k=catDeSurge(n);
+    (surges[k]=surges[k]||[]).push(
+      {name:n,rank:r,value:(base==null?r:base+r),attr:at,surge:true});
+  });
   CAT3.forEach(function(cat){
-    var viejas=((s.skills||{})[cat.k]||[]).filter(function(x){return SK_ORDEN[cat.k].indexOf(x.name)<0;});
+    // lo que el PDF trajo con otro nombre se conserva; las potencias se
+    // reescriben desde el editor (destildarlas las saca de la ficha)
+    var viejas=((s.skills||{})[cat.k]||[]).filter(function(x){
+      return SK_ORDEN[cat.k].indexOf(x.name)<0 && SURGES[x.name]==null;
+    });
     sk[cat.k]=SK_ORDEN[cat.k].map(function(n){
       var r=CH_ED.ranks[cat.k][n]||0, base=a[SK_ATTR[n]];
       return {name:n,rank:r,value:(base==null?r:base+r)};
-    }).concat(viejas);
+    }).concat(surges[cat.k]||[]).concat(viejas);
   });
   s.skills=sk;
   var der=derivados(a);

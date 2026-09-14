@@ -1543,7 +1543,10 @@ function sheetHTML(c){
   ['physical','cognitive','spiritual'].forEach(function(cat){
     var arr=sk[cat]||[];
     if(arr.length){h+='<div class="sb-h">Habilidades '+({physical:'físicas',cognitive:'cognitivas',spiritual:'espirituales'}[cat])+'</div>'
-      +'<div class="chips">'+arr.map(function(x){return '<span class="chip">'+esc(x.name)+' +'+x.value+'</span>';}).join('')+'</div>';}
+      +'<div class="chips">'+arr.map(function(x){
+        // las potencias radiantes van marcadas, como en la ficha del jugador
+        return '<span class="chip">'+(x.surge?'✦ ':'')+esc(x.name)+' +'+x.value+'</span>';
+      }).join('')+'</div>';}
   });
   if((s.talents||[]).length){h+='<div class="sb-h">Talentos</div>'+s.talents.map(function(t){return '<div class="sb-item"><span class="n">'+esc(t.name)+'</span>'+(t.desc?'<div>'+esc(t.desc)+'</div>':'')+'</div>';}).join('');}
   if((s.weapons||[]).length){h+='<div class="sb-h">Armas</div>'+s.weapons.map(function(w){return '<div class="sb-item">'+esc(w)+'</div>';}).join('');}
