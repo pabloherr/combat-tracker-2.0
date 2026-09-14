@@ -7,7 +7,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:wght@500;600;700&family=Work+Sans:wght@400;500;600&family=Cormorant+Garamond:wght@500;600;700&family=Lato:wght@400;700&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="/static/theme.css"/>
+<link rel="stylesheet" href="/static/map.css"/>
 <script src="/static/theme.js"></script>
+<script src="/static/map.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:15px;line-height:1.55;
@@ -412,6 +414,9 @@ select.fi{appearance:auto;}
     <button class="tab" data-tab="encuentros" onclick="showTab('encuentros')">Encuentros</button>
     <button class="tab cosmere-only" data-mod="catalogo" data-tab="objetos" onclick="showTab('objetos')">Objetos</button>
     <button class="tab cosmere-only" data-mod="inventario" data-tab="comercio" onclick="showTab('comercio')">Inventarios</button>
+    <!-- El mapa vale para los dos sistemas, así que no lleva cosmere-only: se
+         muestra o se esconde según su propio interruptor. -->
+    <button class="tab" id="tabBtnMapa" data-tab="mapa" style="display:none" onclick="showTab('mapa')">Mapa</button>
   </div>
 
   <!-- ═══════════ COMBATE ═══════════ -->
@@ -598,6 +603,11 @@ select.fi{appearance:auto;}
     <div id="invList"></div>
     <div class="empty" id="invEmpty">Todavía no hay personajes en la campaña.</div>
   </div>
+
+  <!-- ═══════════ MAPA ═══════════ -->
+  <!-- El módulo entero (lienzo, chinches, medición) vive en static/map.js y lo
+       comparte con el panel del jugador: acá solo se le da dónde montarse. -->
+  <div id="tab-mapa" style="display:none"><div id="mapaMod"></div></div>
 </div>
 
 <div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
@@ -749,7 +759,7 @@ document.addEventListener('visibilitychange',function(){
 
 // ═══════════ tabs ═══════════
 function showTab(t){
-  ['combate','jugadores','bestiario','encuentros','objetos','comercio'].forEach(function(x){
+  ['combate','jugadores','bestiario','encuentros','objetos','comercio','mapa'].forEach(function(x){
     document.getElementById('tab-'+x).style.display=x===t?'':'none';
   });
   document.querySelectorAll('.tab').forEach(function(el){
@@ -761,6 +771,26 @@ function showTab(t){
   if(t==='combate')renderCombatSetup();
   if(t==='objetos')loadItems();
   if(t==='comercio')loadInventories();
+  if(t==='mapa')montarMapa();
+}
+
+// ═══════════ MAPA ═══════════
+// El módulo se monta la primera vez que se entra a la pestaña (subir la lámina
+// es caro y no tiene sentido hacerlo si el DM no la mira). Después se refresca.
+var MAPA_MONTADO=false;
+function montarMapa(){
+  if(MAPA_MONTADO){ MapaModulo.recargar(); return; }
+  MAPA_MONTADO=true;
+  MapaModulo.mount({el:'mapaMod', cid:CID, onState:function(st){
+    document.getElementById('tabBtnMapa').style.display=st.enabled?'':'none';
+  }});
+}
+// Sin montar el lienzo: solo saber si la pestaña va o no.
+async function loadMapaTab(){
+  try{
+    var d=await api(API+'/maps');
+    document.getElementById('tabBtnMapa').style.display=d.enabled?'':'none';
+  }catch(e){}
 }
 function toggleForm(id){
   var f=document.getElementById(id);
@@ -1273,6 +1303,8 @@ var CFG_CAMPOS=[
   ['cfg-mcat','modulo_catalogo','bool'], ['cfg-minv','modulo_inventario','bool'],
   ['cfg-mstorm','modulo_tormentas','bool'], ['cfg-mcal','modulo_calendario','bool'],
   ['cfg-calvis','calendario_visible','bool'], ['cfg-caledit','calendario_editable','bool'],
+  ['cfg-mmapa','modulo_mapa','bool'], ['cfg-mapavis','mapa_visible','bool'],
+  ['cfg-mapaedit','mapa_editable','bool'], ['cfg-mapauni','mapa_unidad','txt'],
   ['cfg-salto','salto_dias','int'],
   ['cfg-calyear','cal_year','int'], ['cfg-calmonth','cal_month','int'],
   ['cfg-calweek','cal_week','int'], ['cfg-calday','cal_day','int'],
@@ -1318,7 +1350,9 @@ function paintConfig(){
       +cfgSwitch('Tracker de altas tormentas','cfg-mstorm',cfg.modulo_tormentas,
                  'La barra del ciclo y la descarga de marcos por día')
       +cfgSwitch('Calendario rosharano','cfg-mcal',cfg.modulo_calendario,
-                 'En qué día están, con notas y pines (se ajusta en la solapa Calendario)');
+                 'En qué día están, con notas y pines (se ajusta en la solapa Calendario)')
+      +cfgSwitch('Mapa','cfg-mmapa',cfg.modulo_mapa,
+                 'Mapas con puntos de interés, distancias y tiempos de viaje (solapa Mapa)');
   }else if(CFG_TAB==='condiciones'){
     cuerpo=cfgCondCuerpo(cfg);
   }else if(CFG_TAB==='calendario'){
@@ -1343,6 +1377,24 @@ function paintConfig(){
       +'<div class="import-hint" style="margin-top:10px">Ahora mismo es <b>'+esc(d.day_name||'')+'</b> · '
         +esc(d.formal||'')+' — semana '+esc(d.week_name||'')+' del mes de '+esc(d.month_name||'')+'.<br>'
         +'También podés tocar un día en el calendario y marcarlo como hoy.</div>';
+  }else if(CFG_TAB==='mapa'){
+    var unidades=[['km','Kilómetros (km)'],['mi','Millas (mi)']].map(function(u){
+      return '<option value="'+u[0]+'"'+(u[0]===cfg.mapa_unidad?' selected':'')+'>'+u[1]+'</option>';
+    }).join('');
+    cuerpo='<div class="cfg-sec">Mapa</div>'
+      +'<div class="import-hint" style="margin-bottom:8px">Subís una lámina, le decís cuánto '
+        +'mide de lado a lado (o la calibrás con una regla) y el mapa traduce solo pixeles a '
+        +'distancias. Se prende y se apaga en la solapa <b>Módulos</b>.</div>'
+      +cfgSwitch('Los jugadores lo ven','cfg-mapavis',cfg.mapa_visible,
+                 'Apagado, los mapas son solo tuyos')
+      +cfgSwitch('Los jugadores pueden marcar puntos','cfg-mapaedit',cfg.mapa_editable,
+                 'Cada uno maneja los suyos; los tuyos los tocás siempre vos')
+      +'<label class="cfg-lrow"><span>Unidad de distancia</span>'
+        +'<select class="fi" id="cfg-mapauni" style="min-width:170px">'+unidades+'</select></label>'
+      +'<div class="import-hint" style="margin-top:10px">La unidad vale para toda la campaña: '
+        +'el ancho de cada mapa y la velocidad de cada transporte se escriben en ella. '
+        +'Los mapas secretos y los puntos secretos siguen siendo solo tuyos aunque los '
+        +'jugadores vean el módulo.</div>';
   }else if(CFG_TAB==='carga'){
     // Capacidad = base del tamaño + Fuerza. Acá se toca la base de cada tamaño.
     cuerpo='<div class="cfg-sec">Capacidad de carga por tamaño</div>'
@@ -1393,7 +1445,7 @@ function paintConfig(){
   var tabs=[['modulos','Módulos'],['condiciones','Condiciones y heridas'],
             ['carga','Capacidad de carga'],
             ['ver','Qué ven los jugadores'],['tormentas','Tormentas y marcos'],
-            ['calendario','Calendario']];
+            ['calendario','Calendario'],['mapa','Mapa']];
   document.getElementById('modal').innerHTML='<button class="modal-close" onclick="closeModal()">✕</button>'
     +'<div class="cname" style="font-size:18px">⚙ Ajustes de la campaña</div>'
     +'<div class="cfg-tabs">'+tabs.map(function(t){
@@ -1438,6 +1490,7 @@ async function saveConfig(){
   loadConditions().then(renderCombat);   // el catálogo puede haber cambiado
   loadStorm();
   loadCalendar();
+  if(MAPA_MONTADO) MapaModulo.recargar(); else loadMapaTab();
   // las bases de carga cambian todas las barras: si estás mirándolas, refrescá
   if(document.getElementById('tab-comercio').style.display!=='none') loadInventories();
 }
@@ -1455,6 +1508,9 @@ function aplicarModulos(cfg){
   });
   if(STORM) STORM.enabled=cfg.modulo_tormentas!==false;
   if(CAL) CAL.enabled=!!cfg.modulo_calendario;
+  document.getElementById('tabBtnMapa').style.display=cfg.modulo_mapa?'':'none';
+  if(!cfg.modulo_mapa&&document.getElementById('tab-mapa').style.display!=='none')
+    showTab('combate');
   applyDayBar();
   // si estabas parado en una pestaña que se apagó, volvés al combate
   if((!on.catalogo&&document.getElementById('tab-objetos').style.display!=='none')
@@ -3209,6 +3265,7 @@ async function toggleCreateItems(uid){
 
 // init
 loadCampaign().then(function(){ if(SYSTEM!=='dnd'){ loadStorm(); loadCalendar(); } });
+loadMapaTab();
 loadConditions().then(renderCombat);   // el catálogo, antes de dibujar los estados
 connectWS();
 renderCombatSetup();

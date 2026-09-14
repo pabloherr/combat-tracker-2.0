@@ -527,6 +527,50 @@ En *⚙ Ajustes → Calendario* el DM decide **si los jugadores lo ven**, **si p
 y en **qué día están** (mes, semana, día y año). Si lo deja para él solo, a los jugadores
 no les aparece el botón y **la fecha ni siquiera les viaja**.
 
+### Mapa, puntos de interés y tiempos de viaje
+
+El DM sube una **imagen de mapa** y la mesa la usa para marcar lugares y medir cuánto
+tardan en ir de uno a otro. Sirve igual en Cosmere y en D&D.
+
+Viene **apagado**: se prende en *⚙ Ajustes → Módulos → Mapa*. Cuando está encendido
+aparece la pestaña **Mapa**, tanto en el panel del DM como en el del jugador.
+
+**Subir el mapa y darle escala.** En *＋ Subir mapa* elegís la imagen (PNG, JPG, GIF o
+WEBP) y decís **cuánto mide de lado a lado** (por ejemplo, 4000 km). El servidor lee solo
+el tamaño de la lámina en pixeles; el alto real lo deduce, porque los pixeles son
+cuadrados. Si no sabés cuánto mide, dejalo vacío y después usá
+**⚖ Escala → 📐 Calibrar con una regla**: marcás los dos extremos de algo que sí conozcas
+(la escala gráfica del mapa, o dos ciudades a distancia conocida), escribís cuánto mide
+ese tramo y el mapa queda calibrado. Abajo a la izquierda del lienzo siempre se ve la
+**regla de escala**.
+
+Se pueden tener **varios mapas** (el mundo, una región, una mazmorra) y se cambia entre
+ellos con el desplegable. Un mapa marcado como **secreto** solo lo ve el DM.
+
+**Puntos de interés.** Con **📍 Marcar punto** tocás el mapa y le ponés nombre,
+descripción, ícono y color. Cada uno **edita y borra lo suyo**; el DM puede tocar
+cualquiera y marcar los suyos como **secretos** (a los jugadores **ni les viajan**).
+Al tocar una chinche se abre su ficha con la descripción.
+
+**Medir.** Con **📏 Medir** vas tocando paradas —chinches ya marcadas o cualquier punto
+del mapa— y se arma el recorrido. Abajo aparece la **distancia total**, el desglose por
+tramo y **cuánto se tarda con cada transporte**: días de viaje, horas de marcha y la
+velocidad con la que se calculó.
+
+**Transportes.** En **🐴 Transportes** el DM arma la lista: nombre, ícono, **velocidad**
+(en km o millas por hora) y **horas de marcha por jornada**. Al subir el primer mapa se
+cargan cuatro sugeridos (a pie, a caballo, carreta de chull y barco) que podés cambiar o
+borrar; **Sugeridos** los vuelve a traer sin duplicar los que ya tengas. Las jornadas se
+redondean para arriba: media jornada de marcha igual te obliga a acampar.
+
+**Manejar el lienzo.** Se arrastra con el mouse (o el dedo) y se acerca con los botones
+**+ / −**, con **Ctrl + rueda**, o pellizcando en el trackpad. La rueda sola mueve la
+página, para que el mapa no te deje encerrado. **⤢** vuelve a encajar el mapa entero.
+
+En *⚙ Ajustes → Mapa* el DM decide **si los jugadores lo ven**, **si pueden marcar
+puntos** y la **unidad de distancia** (kilómetros o millas), que vale para toda la
+campaña: el ancho de cada mapa y la velocidad de cada transporte se escriben en ella.
+
 ### Pasar varios días de una
 
 Al lado de **+1 día** hay un botón de **avance rápido** que pasa varios días de un saque:
@@ -541,7 +585,7 @@ altas tormentas, se avisa cuántas) y se aplica la descarga de marcos de cada d�
 ### Panel de ajustes del DM (⚙ Ajustes)
 
 En la vista del DM, el botón **⚙ Ajustes** (arriba a la derecha, al lado de *← Inicio*)
-abre el panel de configuración de la campaña, con cinco solapas. Podés moverte entre
+abre el panel de configuración de la campaña, con varias solapas. Podés moverte entre
 ellas sin perder lo que tocaste; se guarda todo junto con **Guardar**.
 
 **Módulos** — qué se usa en esta campaña. Lo que apagues desaparece para todos, y el

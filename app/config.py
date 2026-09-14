@@ -11,6 +11,8 @@ objetos para saber si el módulo está encendido, y el tracker de tormentas.
 
 import json
 
+from . import maps
+
 # Qué tanto ve un jugador de un stat ajeno.
 #   no        → ni se muestra
 #   color     → una barra llena que solo cambia de color, con su etiqueta
@@ -31,11 +33,17 @@ CONFIG_DEFAULTS = {
     "modulo_inventario": True,  # inventario, guardados y capacidad de carga
     "modulo_tormentas": True,   # tracker de altas tormentas
     "modulo_calendario": False,  # calendario rosharano (lo prende el DM si lo quiere)
+    "modulo_mapa": False,        # mapas, puntos de interés y tiempos de viaje
 
     # ── Calendario: quién lo ve y quién lo anota ──
     "calendario_visible": True,   # False = solo lo ve el DM
     "calendario_editable": True,  # False = solo el DM agrega notas y pines
     "salto_dias": 5,              # días del botón de avance rápido (1 semana = 5)
+
+    # ── Mapa: quién lo ve, quién marca puntos y en qué se mide ──
+    "mapa_visible": True,     # False = los mapas son solo del DM
+    "mapa_editable": True,    # False = solo el DM agrega puntos
+    "mapa_unidad": "km",      # km | mi — vale para los mapas y las velocidades
 
     # ── Capacidad de carga: base por tamaño (la fuerza se suma aparte) ──
     "carga_pequeno": 4,
@@ -74,7 +82,10 @@ INT_KEYS = {"storm_min", "storm_max", "discharge_start", "discharge_full",
 FLOAT_KEYS = {"discharge_curve"}
 BOOL_KEYS = {"modulo_catalogo", "modulo_inventario", "modulo_tormentas",
              "modulo_calendario", "calendario_visible", "calendario_editable",
+             "modulo_mapa", "mapa_visible", "mapa_editable",
              "ver_estados_enemigos", "ver_estados_aliados"}
+# Claves con un juego cerrado de valores propio (no son modos de visibilidad).
+UNIT_KEYS = {"mapa_unidad"}
 MODO_KEYS = {k for k in CONFIG_DEFAULTS if k.startswith("ver_") and k not in BOOL_KEYS}
 # Listas: las dos de nombres apagados y las dos de entradas propias.
 STR_LIST_KEYS = {"cond_off", "her_off"}
@@ -83,7 +94,8 @@ LIST_KEYS = STR_LIST_KEYS | DICT_LIST_KEYS
 
 # Claves que los jugadores necesitan saber (el resto es cosa del DM).
 PLAYER_KEYS = ("modulo_catalogo", "modulo_inventario", "modulo_tormentas",
-               "modulo_calendario", "calendario_visible", "calendario_editable")
+               "modulo_calendario", "calendario_visible", "calendario_editable",
+               "modulo_mapa", "mapa_visible", "mapa_editable", "mapa_unidad")
 
 
 def coerce(key: str, value):
@@ -97,6 +109,8 @@ def coerce(key: str, value):
             if not isinstance(value, list):
                 return []
             return [x for x in value if isinstance(x, dict)][:200]
+        if key in UNIT_KEYS:
+            return maps.unit(value)
         if key in BOOL_KEYS:
             if isinstance(value, str):
                 return value.strip().lower() not in ("", "0", "false", "no")

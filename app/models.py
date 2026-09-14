@@ -88,10 +88,15 @@ class ConfigIn(BaseModel):
     modulo_inventario: bool | None = None   # inventario, guardados y carga
     modulo_tormentas: bool | None = None    # tracker de altas tormentas
     modulo_calendario: bool | None = None   # calendario rosharano
+    modulo_mapa: bool | None = None         # mapas y tiempos de viaje
     # Calendario: quién lo ve, quién lo anota y cuántos días salta el botón
     calendario_visible: bool | None = None
     calendario_editable: bool | None = None
     salto_dias: int | None = None
+    # Mapa: quién lo ve, quién marca puntos y en qué unidad se mide
+    mapa_visible: bool | None = None
+    mapa_editable: bool | None = None
+    mapa_unidad: str | None = None          # km | mi
     # Estado actual del calendario (opcional, como el de la tormenta)
     cal_year: int | None = None
     cal_month: int | None = None
@@ -396,3 +401,58 @@ class ColorChange(BaseModel):
 class InitiativeIn(BaseModel):
     uid: str
     value: int                 # iniciativa del participante (D&D)
+
+
+# ── Mapas, puntos y transportes ────────────────────────────
+
+class MapIn(BaseModel):
+    """Datos de un mapa (la imagen se sube aparte, por multipart)."""
+    name: str = ""
+    descripcion: str = ""
+    ancho_real: float | None = None   # cuánto mide el mapa de lado a lado
+    secreto: bool | None = None       # mapa que solo ve el DM
+
+
+class MapCalibrate(BaseModel):
+    """Calibrar con una regla: dos puntos del mapa y cuánto mide entre ellos.
+
+    Las coordenadas son relativas (0..1), como las de los puntos. De ahí sale
+    el `ancho_real` del mapa (ver app/maps.py)."""
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+    distancia: float                  # lo que mide ese tramo en el mundo
+
+
+class MapPointIn(BaseModel):
+    name: str = ""
+    descripcion: str = ""
+    x: float | None = None            # fracción del ancho (0..1)
+    y: float | None = None            # fracción del alto  (0..1)
+    icono: str = ""
+    color: str = ""
+    secreto: bool = False             # solo del DM: los jugadores no lo ven
+
+
+class TravelModeIn(BaseModel):
+    """Un medio de transporte de la campaña. La velocidad va en la unidad de
+    la campaña por hora (km/h o mi/h, según `mapa_unidad`)."""
+    name: str = ""
+    icono: str = ""
+    velocidad: float | None = None
+    horas_dia: float | None = None    # horas de marcha por jornada
+    notas: str = ""
+
+
+class Coord(BaseModel):
+    x: float = 0
+    y: float = 0
+
+
+class MeasureIn(BaseModel):
+    """Medir una ruta: las paradas en orden. Con dos alcanza; más de dos arma
+    un recorrido por tramos. Se puede mandar coordenadas sueltas, ids de puntos
+    del mapa, o una mezcla de las dos."""
+    puntos: list[Coord] = []
+    point_ids: list[int] = []

@@ -13,6 +13,7 @@ routers. La lógica vive en el paquete `app/`:
     app/pdf_import.py       → extracción de fichas PDF
     app/state.py            → estado del combate por campaña
     app/ws.py               → WebSockets por campaña
+    app/maps.py             → escala, distancias y tiempo de viaje
     app/routers/            → endpoints por dominio
 
 Ejecutar:
@@ -25,7 +26,7 @@ from fastapi.staticfiles import StaticFiles
 from app import ws
 from app.database import STATIC, init_db
 from app.routers import (auth, campaigns, characters, combat, encounters,
-                         enemies, frontend, items)
+                         enemies, frontend, items, maps)
 
 init_db()
 
@@ -38,6 +39,7 @@ app.include_router(characters.router)
 app.include_router(enemies.router)
 app.include_router(encounters.router)
 app.include_router(items.router)
+app.include_router(maps.router)
 app.include_router(combat.router)
 app.include_router(frontend.router)
 

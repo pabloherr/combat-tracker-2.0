@@ -408,6 +408,63 @@ def init_db():
             ON calendar_notes(campaign_id, day_index);
         """)
 
+        # ── Mapas de campaña ───────────────────────────────────────────────
+        # La imagen va aparte (blob) para no arrastrarla en cada consulta de
+        # la lista. Los puntos se guardan en coordenadas relativas (0..1), así
+        # que sobreviven a que el DM vuelva a subir la lámina en otro tamaño.
+        # `ancho_real` es la única cifra de escala: el alto se deduce.
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS maps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            descripcion TEXT DEFAULT '',
+            img_w INTEGER NOT NULL DEFAULT 0,
+            img_h INTEGER NOT NULL DEFAULT 0,
+            ancho_real REAL NOT NULL DEFAULT 0,   -- ancho del mapa en la unidad de la campaña
+            mime TEXT DEFAULT 'image/png',
+            secreto INTEGER DEFAULT 0,            -- mapa que solo ve el DM
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE IF NOT EXISTS map_images (
+            map_id INTEGER PRIMARY KEY REFERENCES maps(id) ON DELETE CASCADE,
+            image BLOB NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS map_points (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            map_id INTEGER NOT NULL REFERENCES maps(id) ON DELETE CASCADE,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            name TEXT NOT NULL,
+            descripcion TEXT DEFAULT '',
+            x REAL NOT NULL DEFAULT 0,            -- fracción del ancho (0..1)
+            y REAL NOT NULL DEFAULT 0,            -- fracción del alto  (0..1)
+            icono TEXT DEFAULT '',
+            color TEXT DEFAULT '',
+            secreto INTEGER DEFAULT 0,            -- punto que solo ve el DM
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_mappoints_map ON map_points(map_id);
+        CREATE INDEX IF NOT EXISTS idx_maps_camp ON maps(campaign_id);
+
+        -- Medios de transporte de la campaña: los arma el DM y valen para
+        -- todos sus mapas. `velocidad` está en unidades por hora.
+        CREATE TABLE IF NOT EXISTS travel_modes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            icono TEXT DEFAULT '',
+            velocidad REAL NOT NULL DEFAULT 4,
+            horas_dia REAL NOT NULL DEFAULT 8,
+            notas TEXT DEFAULT '',
+            orden INTEGER DEFAULT 0
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_travelmodes_camp ON travel_modes(campaign_id);
+        """)
+
         # Backfill: las entradas viejas son de un personaje; les completamos la
         # campaña para que las consultas por campaña las vean.
         conn.execute(

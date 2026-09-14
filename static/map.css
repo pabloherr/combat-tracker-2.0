@@ -1,0 +1,120 @@
+/* ═══════════ Módulo de mapa ═══════════
+   Lo comparten el panel del DM y el del jugador (ver static/map.js). Usa las
+   variables de theme.css, así que sigue los tres temas sin tocar nada. */
+
+.mapmod{display:flex;flex-direction:column;gap:10px;}
+
+/* ── Barra de herramientas ── */
+.mapmod-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.mapmod-bar .sep{flex:1;}
+.mapmod-sel{background:var(--bg3);color:var(--text);border:.5px solid var(--border2);
+  border-radius:var(--r);padding:5px 10px;font-family:var(--font-h);font-size:12px;max-width:260px;}
+.mapmod-scale{font-size:11px;color:var(--text3);font-family:var(--font-h);letter-spacing:.04em;}
+.mapmod-scale b{color:var(--gold2);font-weight:500;}
+.mapmod-btn{font-family:var(--font-h);font-size:11px;letter-spacing:.06em;padding:5px 11px;
+  border-radius:var(--r);cursor:pointer;border:.5px solid var(--border2);background:transparent;
+  color:var(--gold2);white-space:nowrap;}
+.mapmod-btn:hover{background:var(--accsoft);border-color:var(--gold);}
+.mapmod-btn.on{background:var(--gold);color:var(--onacc);border-color:var(--gold);}
+.mapmod-btn.danger{color:var(--red);border-color:var(--red);}
+
+.mapmod-hint{font-size:12px;color:var(--text2);font-style:italic;min-height:1.2em;}
+.mapmod-hint b{color:var(--gold2);font-style:normal;}
+
+/* ── El lienzo ── */
+.mapmod-stage{position:relative;overflow:hidden;background:var(--bg);border:.5px solid var(--border);
+  border-radius:var(--rl);height:min(68vh,660px);touch-action:none;cursor:grab;}
+.mapmod-stage.grabbing{cursor:grabbing;}
+.mapmod-stage.picking{cursor:crosshair;}
+.mapmod-in{position:absolute;top:0;left:0;transform-origin:0 0;}
+.mapmod-in img{display:block;width:100%;height:100%;user-select:none;-webkit-user-drag:none;}
+.mapmod-svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
+
+/* Chinche: el ancla es la punta de abajo, por eso el -100% en Y. */
+.mapmod-pin{position:absolute;transform-origin:50% 100%;cursor:pointer;pointer-events:auto;
+  display:flex;flex-direction:column;align-items:center;}
+.mapmod-pin-dot{width:17px;height:17px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+  border:1.5px solid rgba(0,0,0,.45);box-shadow:0 1px 3px rgba(0,0,0,.5);
+  display:flex;align-items:center;justify-content:center;}
+/* El ícono se des-rota para leerse derecho dentro de la gota. */
+.mapmod-pin-ico{transform:rotate(45deg);font-size:10px;line-height:1;}
+.mapmod-pin-lbl{margin-top:2px;font-family:var(--font-h);font-size:10px;letter-spacing:.03em;
+  white-space:nowrap;color:var(--text);text-shadow:0 1px 3px var(--bg),0 0 4px var(--bg);}
+.mapmod-pin.secreto .mapmod-pin-dot{border-style:dashed;}
+.mapmod-pin.sel .mapmod-pin-dot{outline:2px solid var(--gold);outline-offset:2px;}
+.mapmod-pin.paso .mapmod-pin-lbl{color:var(--gold2);}
+
+.mapmod-zoom{position:absolute;right:8px;bottom:8px;display:flex;flex-direction:column;gap:4px;z-index:3;}
+.mapmod-zoom button{width:28px;height:28px;border-radius:var(--r);border:.5px solid var(--border2);
+  background:var(--bg2);color:var(--text2);cursor:pointer;font-size:14px;line-height:1;}
+.mapmod-zoom button:hover{color:var(--gold);border-color:var(--gold);}
+
+/* Regla de escala, abajo a la izquierda del lienzo. */
+.mapmod-ruler{position:absolute;left:10px;bottom:10px;z-index:3;font-family:var(--font-h);
+  font-size:10px;color:var(--text2);text-shadow:0 1px 3px var(--bg);pointer-events:none;}
+.mapmod-ruler-bar{height:5px;border:1px solid var(--text2);border-top:none;margin-bottom:2px;}
+
+.mapmod-empty{padding:2.5rem 1rem;text-align:center;color:var(--text3);font-style:italic;}
+
+/* ── Panel de abajo: resultado de la medición y lista de puntos ── */
+.mapmod-panel{display:flex;flex-wrap:wrap;gap:12px;}
+.mapmod-card{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--rl);
+  padding:12px 14px;flex:1 1 280px;min-width:0;}
+.mapmod-card h4{font-family:var(--font-h);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--text3);font-weight:500;margin-bottom:8px;}
+.mapmod-dist{font-family:var(--font-h);font-size:26px;color:var(--gold);line-height:1.1;}
+.mapmod-dist small{font-size:13px;color:var(--text3);}
+.mapmod-legs{font-size:12px;color:var(--text2);margin-top:6px;}
+.mapmod-trip{display:flex;align-items:baseline;gap:8px;padding:5px 0;border-top:.5px solid var(--border);}
+.mapmod-trip:first-of-type{border-top:none;}
+.mapmod-trip-n{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mapmod-trip-d{font-family:var(--font-h);font-size:14px;color:var(--gold2);white-space:nowrap;}
+.mapmod-trip-h{font-size:11px;color:var(--text3);white-space:nowrap;}
+
+.mapmod-plist{display:flex;flex-direction:column;gap:2px;max-height:230px;overflow:auto;}
+.mapmod-prow{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:var(--r);cursor:pointer;}
+.mapmod-prow:hover{background:var(--bg3);}
+.mapmod-prow.sel{background:var(--accsoft);}
+.mapmod-prow-c{width:9px;height:9px;border-radius:50%;flex:none;}
+.mapmod-prow-n{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mapmod-prow-s{font-size:10px;color:var(--text3);font-family:var(--font-h);}
+
+/* ── Formularios de los modales del módulo ── */
+.mapmod-f{display:flex;flex-direction:column;gap:10px;margin-top:10px;}
+.mapmod-f label{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);
+  font-family:var(--font-h);display:block;margin-bottom:3px;}
+.mapmod-f input[type=text],.mapmod-f input[type=number],.mapmod-f textarea,.mapmod-f select{
+  width:100%;background:var(--bg3);color:var(--text);border:.5px solid var(--border2);
+  border-radius:var(--r);padding:7px 10px;font-family:var(--font-b);font-size:14px;}
+.mapmod-f textarea{min-height:80px;resize:vertical;}
+.mapmod-f .r2{display:flex;gap:10px;}
+.mapmod-f .r2>*{flex:1;min-width:0;}
+.mapmod-f .chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text2);}
+.mapmod-f .chk input{width:auto;}
+.mapmod-f .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
+.mapmod-note{font-size:12px;color:var(--text3);font-style:italic;}
+
+.mapmod-colors{display:flex;gap:6px;flex-wrap:wrap;}
+.mapmod-colors span{width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;}
+.mapmod-colors span.on{border-color:var(--text);}
+
+.mapmod-modes{width:100%;border-collapse:collapse;font-size:13px;}
+.mapmod-modes th{font-family:var(--font-h);font-size:9px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--text3);font-weight:500;text-align:left;padding:4px 5px;}
+.mapmod-modes td{padding:3px 5px;border-top:.5px solid var(--border);}
+.mapmod-modes input{width:100%;background:var(--bg3);color:var(--text);border:.5px solid var(--border);
+  border-radius:6px;padding:4px 6px;font-family:var(--font-b);font-size:13px;}
+.mapmod-modes .w-ico{width:44px;}
+.mapmod-modes .w-num{width:78px;}
+.mapmod-modes .w-act{width:34px;text-align:right;}
+
+/* En el teléfono el lienzo se hace más bajo: el dedo que lo arrastra no puede
+   desplazar la página (touch-action: none), así que tiene que quedar sitio
+   arriba y abajo para poder seguir bajando. */
+@media (max-width:640px){
+  .mapmod-stage{height:min(46vh,380px);}
+  .mapmod-bar{gap:4px;}
+  .mapmod-btn{padding:5px 8px;font-size:10px;}
+  .mapmod-sel{max-width:150px;}
+  .mapmod-card{flex-basis:100%;}
+}

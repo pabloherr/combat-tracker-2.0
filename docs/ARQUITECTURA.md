@@ -92,6 +92,7 @@ routers/*.py        ← endpoints por dominio (validan, orquestan)
 | `characters` | `/api/characters` | personajes, PDF, imagen, mascotas, stats en vivo, heridas, marcos, recursos D&D |
 | `enemies` | `/api/campaigns/{cid}/enemies` | bestiario (por DM + sistema): import, bulk, export |
 | `items` | `/api/campaigns/{cid}/items` | catálogo de objetos (por DM), `/catalog` para jugadores y `/inventories` (vista del DM) |
+| `maps` | `/api/campaigns/{cid}/maps` | mapas, puntos de interés, `/travel-modes` y `/measure` (distancia + tiempo de viaje) |
 | `encounters` | `/api/campaigns/{cid}/encounters` | encuentros y overrides por-encuentro |
 | `combat` | `/api/campaigns/{cid}/combat` | combate en vivo (stats, turnos, vida máx, ocultar) |
 | `frontend` | `/` | sirve las páginas HTML y hace el gating por rol |
@@ -129,11 +130,13 @@ combat-tracker-2.0/
     dnd_import.py          ← statblocks D&D (import/export)
     state.py               ← estado del combate (cache + persistencia)
     roshar.py              ← calendario rosharano (índice de día ↔ fecha y nombres)
+    maps.py                ← mapas: escala, distancias, tiempo de viaje, tamaño de imagen
     ws.py                  ← WebSockets por campaña
     routers/               ← auth, campaigns, characters, enemies,
-                             encounters, combat, frontend
+                             encounters, combat, maps, frontend
   static/
     login.html  home.html  dm.html  player.html
+    map.js  map.css        ← módulo de mapa, compartido por dm.html y player.html
     cosmere_sheet.pdf  5e_sheet.pdf   ← fichas rellenables para descargar
   tests/                   ← suite pytest (corre contra DB temporal)
   cosmere.db               ← la base (se crea sola; no va al repo)
@@ -390,10 +393,65 @@ acarreo de semanas, meses y años. Arranca en `1173.1.1.1`.
 | `color` | TEXT | color del pin |
 | `secreto` | INTEGER | 1 = solo la ve el DM |
 
+#### `maps` — mapas de una campaña
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `campaign_id` | INTEGER FK→campaigns | cascade |
+| `name`, `descripcion` | TEXT | |
+| `img_w`, `img_h` | INTEGER | tamaño de la lámina en pixeles, leído del encabezado |
+| `ancho_real` | REAL | cuánto mide el mapa de lado a lado; 0 = todavía sin escala |
+| `mime` | TEXT | tipo de la imagen |
+| `secreto` | INTEGER | 1 = solo lo ve el DM |
+
+Una sola cifra de escala: `escala = ancho_real / img_w` (unidades por pixel). Como los
+pixeles son cuadrados, el **alto real se deduce** y no se guarda. Calibrar con la regla
+tampoco guarda nada nuevo: despeja el `ancho_real` que hace que el tramo medido valga lo
+que dijo el DM ([`app/maps.py`](../app/maps.py)). La unidad (km o millas) es de la
+campaña, en `config.mapa_unidad`.
+
+#### `map_images` — la lámina
+| Columna | Tipo | Notas |
+|---|---|---|
+| `map_id` | INTEGER PK FK→maps | cascade |
+| `image` | BLOB | igual que `character_images`: aparte, para no arrastrarla en cada consulta |
+
+#### `map_points` — puntos de interés
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `map_id` | INTEGER FK→maps | cascade |
+| `user_id` | INTEGER FK→users | quién lo clavó (SET NULL); cada uno edita los suyos |
+| `name`, `descripcion` | TEXT | |
+| `x`, `y` | REAL | **coordenadas relativas** (0..1), no pixeles: sobreviven a que se vuelva a subir la lámina en otra resolución |
+| `icono`, `color` | TEXT | |
+| `secreto` | INTEGER | 1 = solo lo ve el DM (no se le manda a los jugadores) |
+
+#### `travel_modes` — medios de transporte de la campaña
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `campaign_id` | INTEGER FK→campaigns | cascade |
+| `name`, `icono`, `notas` | TEXT | |
+| `velocidad` | REAL | unidades por hora |
+| `horas_dia` | REAL | horas de marcha por jornada |
+| `orden` | INTEGER | orden en la lista |
+
+Los arma el DM y valen para todos sus mapas: `tiempo = distancia / velocidad`, y las
+jornadas salen de `horas / horas_dia` (redondeadas para arriba, porque media jornada de
+marcha igual obliga a acampar).
+
 ---
 
 ## 5. Decisiones de diseño a tener en cuenta
 
+- **Los puntos del mapa se guardan en coordenadas relativas** (0..1), no en pixeles: el
+  DM puede volver a subir la misma lámina escaneada en mejor resolución y los puntos
+  siguen donde estaban. Y el alto real del mapa no se guarda: se deduce del ancho, así no
+  hay dos cifras de escala que se puedan contradecir.
+- **Las distancias las calcula el servidor**, no el navegador. El frontend podría hacer la
+  cuenta (tiene la escala), pero entonces habría dos fórmulas que mantener en sincronía;
+  `/measure` es la única que contesta, y es la que prueban los tests.
 - **Bestiario por DM + sistema, no por campaña**: un DM carga sus enemigos una vez y los
   reusa en todas sus campañas del mismo sistema. Por eso `enemies.campaign_id` quedó como
   columna muerta.

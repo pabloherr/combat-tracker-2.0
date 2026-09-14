@@ -7,7 +7,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:wght@500;600;700&family=Work+Sans:wght@400;500;600&family=Cormorant+Garamond:wght@500;600;700&family=Lato:wght@400;700&family=Spectral:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="/static/theme.css"/>
+<link rel="stylesheet" href="/static/map.css"/>
 <script src="/static/theme.js"></script>
+<script src="/static/map.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:16px;line-height:1.55;
@@ -505,6 +507,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
     <button class="tab" id="tab-pj" onclick="setTab('pj')">Mi personaje</button>
     <button class="tab" id="tab-mesa" onclick="setTab('mesa')">Grupo y combate<span class="tab-badge" id="combBadge" style="display:none">●</span></button>
     <button class="tab cosmere-only" data-mod="catalogo" id="tab-tiendas" onclick="setTab('tiendas')">Catálogo</button>
+    <!-- El mapa no es de Cosmere ni de D&D: se muestra según su interruptor. -->
+    <button class="tab" id="tab-mapa" style="display:none" onclick="setTab('mapa')">Mapa</button>
   </div>
 
   <!-- El inventario tiene su propia pestaña: en la del personaje va la ficha. -->
@@ -544,6 +548,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
     </div>
     <div class="kind-bar" id="catCats"></div>
     <div id="catalogPanel"></div>
+  </div>
+
+  <!-- El módulo entero (lienzo, chinches, medición) vive en static/map.js y es
+       el mismo que usa el DM: acá solo se le da dónde montarse. -->
+  <div id="tabMapa" class="tabpanel" style="display:none">
+    <div id="mapaMod"></div>
   </div>
 </div>
 
@@ -1286,7 +1296,7 @@ function card(p,enemyView){
 }
 
 var PREV_ACTIVE=null;   // para autocambiar a la mesa cuando arranca el combate
-var PANELS={inv:'tabInv',pj:'tabPJ',mesa:'tabMesa',tiendas:'tabTiendas'};
+var PANELS={inv:'tabInv',pj:'tabPJ',mesa:'tabMesa',tiendas:'tabTiendas',mapa:'tabMapa'};
 function setTab(t){
   TAB=t;
   Object.keys(PANELS).forEach(function(x){
@@ -1297,6 +1307,19 @@ function setTab(t){
   if(t==='pj'||t==='mesa') loadRoster();
   if(t==='inv') loadInventory();
   if(t==='tiendas') loadCatalog();
+  if(t==='mapa') montarMapa();
+}
+
+// ─── Mapa ───────────────────────────────────────────────────
+// Se monta recién al entrar a la pestaña: la lámina pesa y no tiene sentido
+// bajarla si el jugador no la mira.
+var MAPA_MONTADO=false;
+function montarMapa(){
+  if(MAPA_MONTADO){ MapaModulo.recargar(); return; }
+  MAPA_MONTADO=true;
+  MapaModulo.mount({el:'mapaMod', cid:CID, onState:function(st){
+    document.getElementById('tab-mapa').style.display=(st.enabled&&st.visible)?'':'none';
+  }});
 }
 
 // ─── Grupo y combate en la misma página ───
@@ -1460,6 +1483,12 @@ async function loadRoster(){
     el.style.display=(m?MODULO(m):SYSTEM!=='dnd')?'':'none';
     if(m) el.style.display=MODULO(m)?'':'none';
   });
+  // El mapa tiene su propio interruptor (y el DM puede guardárselo para él).
+  var verMapa=!SOLO&&MODULO('mapa')&&CONFIG.mapa_visible!==false;
+  document.getElementById('tab-mapa').style.display=verMapa?'':'none';
+  // Ojo: el roster se refresca cada 5 s. El mapa NO se recarga acá, porque eso
+  // borraría la medición a medio hacer; se recarga al entrar a la pestaña.
+  if(!verMapa&&TAB==='mapa') setTab('pj');
   if(SOLO&&TAB==='mesa') setTab('pj');
   // si el DM apagó un módulo, su pestaña no existe: no te quedes mirando la nada
   if(!MODULO('catalogo')&&TAB==='tiendas') setTab('pj');
