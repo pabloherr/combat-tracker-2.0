@@ -277,9 +277,16 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
    botones bajan enteros. Antes el nombre se estrujaba en una columna de una
    letra de ancho. */
 .inv-info{flex:1 1 180px;min-width:0;}
-.inv-btns{display:flex;align-items:center;flex-wrap:wrap;gap:8px;flex:none;}
+/* Los botones se pueden encoger (`flex:0 1 auto` + `min-width:0`) para que,
+   cuando no entran en una línea, se envuelvan entre ellos en vez de asomarse
+   por fuera del recuadro: con `flex:none` el bloque conservaba su ancho de
+   contenido y el último botón (la ✕) quedaba pisando el borde de la fila.
+   Cada botón sí es rígido, así no se estruja ninguno. */
+.inv-btns{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;
+  gap:8px;flex:0 1 auto;min-width:0;}
+.inv-btns>*{flex:none;}
 @media (max-width:640px){
-  .inv-btns{width:100%;justify-content:flex-end;border-top:1px solid var(--border);padding-top:8px;}
+  .inv-btns{width:100%;border-top:1px solid var(--border);padding-top:8px;}
 }
 /* descripción: dos líneas y el resto se abre tocándola */
 .inv-desc{font-size:12px;color:var(--text3);font-style:italic;cursor:pointer;
@@ -428,6 +435,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .sh-res3-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:4px 0;}
 .sh-res3-l{font-family:var(--font-h);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);}
 .sh-res3-v{font-family:var(--font-h);font-size:16px;}
+/* De dónde sale el número (la armadura puesta, la ficha): chico y al lado. */
+.sh-res3-n{font-family:var(--font-b);font-size:11px;font-style:italic;color:var(--text3);
+  margin-left:5px;}
 /* daño y curación: se escribe cuánto y se toca de qué lado */
 .dmg-box{display:inline-flex;align-items:stretch;border:1px solid var(--border);border-radius:var(--r);
   overflow:hidden;margin-left:auto;flex:none;}
@@ -2208,9 +2218,11 @@ function shPuntoRow(c,stat,label,color){
       +'<button class="res-btn plus" onclick="pasoRes(\'c\',\''+stat+'\',null,1)" title="Uno más">+</button>'
     +'</span></div>';
 }
-function shTextoRow(label,v){
-  return '<div class="sh-res3-row"><span class="sh-res3-l">'+label+'</span>'
-    +'<span class="sh-res3-v">'+((v&&v!=='-')?esc(v):'—')+'</span></div>';
+function shTextoRow(label,v,nota){
+  return '<div class="sh-res3-row"'+(nota?' title="'+escA(nota)+'"':'')+'>'
+    +'<span class="sh-res3-l">'+label+'</span>'
+    +'<span class="sh-res3-v">'+((v&&v!=='-')?esc(v):'—')
+    +(nota?'<span class="sh-res3-n">'+esc(nota)+'</span>':'')+'</span></div>';
 }
 // `delta` viene de una condición: el número se muestra modificado, en verde si
 // sube y en rojo si baja. Las defensas nunca se tocan (lo dicen las reglas).
@@ -2271,9 +2283,9 @@ function shPieResto(s,eff){
 }
 function cosmere3HTML(c){
   var s=c.sheet||{}, a=s.attributes||{}, d=s.defenses||{};
-  var insts=condActivas(c), eff=calcEfectos(insts);
+  var insts=condActivas(c), eff=calcEfectos(insts), df=deflectActivo(c);
   var cols=CAT3.map(function(cat){
-    var res=cat.k==='physical' ? shVidaRow(c)+shTextoRow('Deflect',s.deflect)
+    var res=cat.k==='physical' ? shVidaRow(c)+shTextoRow('Deflect',df.texto,df.nota)
       : cat.k==='cognitive' ? shPuntoRow(c,'focus','Focus','var(--blue)')
       : shPuntoRow(c,'inv','Investidura','var(--purple)');
     return '<div class="sh-col3"><div class="sh-col3-h">'+cat.n+'</div>'
@@ -2946,6 +2958,41 @@ function renderArmas(){
   if(el) el.innerHTML=armasHTML();
   renderKit();
 }
+/* De dónde sale el Deflect.
+
+   Hay dos números posibles: el que el jugador escribió a mano en la ficha y el
+   que le da la armadura que tenga puesta en el inventario. `sheet.deflect_src`
+   decide cuál manda, y se elige en el editor de la ficha:
+
+     auto    → el del equipo; si no hay ninguna armadura cargada, el de la ficha
+               (es lo que hacía siempre, y sigue siendo el valor por defecto)
+     equipo  → siempre el de la armadura puesta, 0 si no tiene ninguna
+     ficha   → siempre el escrito a mano, aunque lleve armadura
+
+   Lo usan la ficha y el equipo de combate, así que nunca muestran cosas
+   distintas. `texto` es lo que se pinta (la ficha puede tener algo como
+   "1 (leather)", que no es un número); `valor` es el número para las cuentas. */
+function deflectActivo(c){
+  var s=(c&&c.sheet)||{};
+  var src=s.deflect_src||'auto';
+  var crudo=(s.deflect==null?'':String(s.deflect)).trim();
+  var deFicha={valor:parseInt(crudo)||0, texto:crudo||'—',
+               nota:crudo?'de la ficha':'sin armadura'};
+  if(src==='ficha') return deFicha;
+  var armaduras=armadurasDeInv();
+  var puesta=armaduras.filter(function(x){return x.rol==='puesta';})[0];
+  if(puesta){
+    var n=(puesta.stats||{}).deflect||0;
+    return {valor:n, texto:String(n), nota:puesta.name};
+  }
+  // Sin armadura puesta: en 'equipo' no hay Deflect; en 'auto' la ficha cubre
+  // solo si el jugador no cargó ninguna armadura (si cargó y no se la puso,
+  // es que anda sin armadura).
+  if(src==='equipo'||armaduras.length)
+    return {valor:0, texto:'0', nota:'sin armadura puesta'};
+  return deFicha;
+}
+
 // ── Equipo de combate: lo que hay que tener a mano cuando toca pegar ──
 // Defensas, deflect de la armadura puesta, arma principal y secundaria (con
 // su ataque y daño), el golpe desarmado y los objetos con cargas que el
@@ -2954,17 +3001,13 @@ function kitCombateHTML(c){
   if(!c) return '';
   if(SYSTEM==='dnd'||(c.sheet||{}).dnd) return kit5HTML(c);
   var s=c.sheet||{}, d=s.defenses||{}, eff=calcEfectos(condActivas(c));
-  var armaduras=armadurasDeInv(), puesta=armaduras.filter(function(x){return x.rol==='puesta';})[0];
-  var deflect=puesta
-    ? (puesta.stats||{}).deflect||0
-    : (armaduras.length?0:(parseInt(s.deflect)||0));
-  var deflectNota=puesta?esc(puesta.name):(armaduras.length?'sin armadura puesta':(s.deflect?'de la ficha':'sin armadura'));
+  var df=deflectActivo(c);
   var h='<div class="kit-def">'
     +[['Def. física',d.physical],['Def. cognitiva',d.cognitive],['Def. espiritual',d.spiritual]].map(function(x){
         return '<div class="kit-box"><span class="l">'+x[0]+'</span><span class="v">'+(x[1]==null?'—':x[1])+'</span></div>';
       }).join('')
-    +'<div class="kit-box" title="Lo que resta al daño que recibís: lo da la armadura puesta"><span class="l">Deflect</span>'
-      +'<span class="v">'+deflect+'<span class="t">'+deflectNota+'</span></span></div></div>';
+    +'<div class="kit-box" title="Lo que resta al daño que recibís"><span class="l">Deflect</span>'
+      +'<span class="v">'+df.valor+'<span class="t">'+esc(df.nota)+'</span></span></div></div>';
   var arm=armasDeInv();
   var principal=arm.filter(function(x){return x.rol==='principal';})[0];
   var secundaria=arm.filter(function(x){return x.rol==='secundaria';})[0];
@@ -3081,6 +3124,20 @@ function _num(id,v){return '<input class="oc-fi" type="number" style="width:80px
 // de las tablas del manual según Velocidad, Voluntad y Conciencia.
 var CH_ED=null;   // {ranks:{cat:{nombre:rango}}} mientras el editor está abierto
 var ED_ATTRS=[['STR','Strength'],['SPD','Speed'],['INT','Intellect'],['WIL','Willpower'],['AWA','Awareness'],['PRE','Presence']];
+/* Qué Deflect usa la ficha: el escrito a mano o el de la armadura puesta.
+   Ver deflectActivo(). El valor vive en `sheet.deflect_src`. */
+var ED_DEFLECT_SRC=[
+  ['auto',  'El del equipo, y si no tengo armadura el de la ficha'],
+  ['equipo','Siempre el del equipo'],
+  ['ficha', 'Siempre el de la ficha']
+];
+function edDeflectSrcSel(v){
+  v=v||'auto';
+  return '<select class="fi" id="edDeflectSrc">'+ED_DEFLECT_SRC.map(function(o){
+    return '<option value="'+o[0]+'"'+(o[0]===v?' selected':'')+'>'+esc(o[1])+'</option>';
+  }).join('')+'</select>';
+}
+
 function edAtRow(id,lbl,v,def){
   return '<div class="ed-at'+(def?' def':'')+'"><span class="fl">'+lbl+'</span>'
     +'<input class="fi" type="number" id="'+id+'" value="'+(v==null?'':v)+'" oninput="edPreview()"/></div>';
@@ -3211,8 +3268,9 @@ function openEditChar(){
     +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr">'+edRes(c,false)+'</div>'
     +'<div class="ed-sec">Atributos y defensas</div>'
     +edAttrsHTML(s)
-    +'<div class="ed-row" style="grid-template-columns:1fr 2fr;margin-top:8px">'
-      +edFld('Deflect',edInp('edDeflect',s.deflect,'2'))
+    +'<div class="ed-row" style="grid-template-columns:1fr 1.4fr 2fr;margin-top:8px">'
+      +edFld('Deflect a mano',edInp('edDeflect',s.deflect,'2'))
+      +edFld('Qué Deflect vale',edDeflectSrcSel(s.deflect_src))
       +'<div><div class="fl">Sale de las tablas del manual</div><div class="ed-deriv" id="edDeriv"></div></div></div>'
     +'<div class="ed-sec">Habilidades <span style="text-transform:none;letter-spacing:0;color:var(--text3);font-family:inherit;font-size:11px">(el modificador es atributo + rango)</span></div>'
     +edSkillsHTML()
@@ -3243,6 +3301,7 @@ async function saveEditChar(){
   if(vidaM<1){ alert('La vida máxima tiene que ser al menos 1.'); return; }
   s.ancestry=edVal('edAncestry'); s.paths=edVal('edPaths'); s.level=edVal('edLevel');
   s.deflect=edVal('edDeflect');
+  s.deflect_src=edVal('edDeflectSrc')||'auto';
   var a={};
   ED_ATTRS.forEach(function(x){ var v=edAttrVal(x[0]); if(v!=null) a[x[0]]=v; });
   if(Object.keys(a).length) s.attributes=a; else delete s.attributes;
