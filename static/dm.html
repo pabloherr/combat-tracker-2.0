@@ -1586,9 +1586,9 @@ function sheetHTML(c){
   if(s.paths||s.ancestry||s.level) h+='<div class="cmeta">'+[s.ancestry,s.paths,(s.level?'Nivel '+s.level:'')].filter(Boolean).map(esc).join(' · ')+'</div>';
   if(a.STR!=null){
     h+='<div class="sb-attrs" style="margin-top:10px">'
-      +'<div class="sb-col"><div class="sb-col-h">Físico</div>'+_at('STR',a.STR)+_at('DEF',d.physical)+_at('SPD',a.SPD)+'</div>'
-      +'<div class="sb-col"><div class="sb-col-h">Cognitivo</div>'+_at('INT',a.INT)+_at('DEF',d.cognitive)+_at('WIL',a.WIL)+'</div>'
-      +'<div class="sb-col"><div class="sb-col-h">Espiritual</div>'+_at('AWA',a.AWA)+_at('DEF',d.spiritual)+_at('PRE',a.PRE)+'</div>'
+      +'<div class="sb-col"><div class="sb-col-h">Physical</div>'+_at('STR',a.STR)+_at('DEF',d.physical)+_at('SPD',a.SPD)+'</div>'
+      +'<div class="sb-col"><div class="sb-col-h">Cognitive</div>'+_at('INT',a.INT)+_at('DEF',d.cognitive)+_at('WIL',a.WIL)+'</div>'
+      +'<div class="sb-col"><div class="sb-col-h">Spiritual</div>'+_at('AWA',a.AWA)+_at('DEF',d.spiritual)+_at('PRE',a.PRE)+'</div>'
       +'</div>';
   }
   h+='<div class="sb-res"><span>Vida <b style="color:var(--red)">'+c.vida_max+'</b></span>'

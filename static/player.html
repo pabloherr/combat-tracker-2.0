@@ -1310,6 +1310,24 @@ function setTab(t){
   if(t==='mapa') montarMapa();
 }
 
+/* Vista de DM: qué pestañas quedan.
+
+   Se llama al arrancar y después de cada `loadRoster()`, porque ese barrido
+   vuelve a mostrar las pestañas de los módulos que estén prendidos. Al DM le
+   dejamos la ficha y el inventario del jugador: lo demás (el grupo, el catálogo
+   para comprar, el mapa) ya lo tiene en su propio panel, y desde acá sería la
+   vista del jugador, no la suya. */
+function dmViewTabs(){
+  if(!DM_VIEW) return;
+  ['mesa','tiendas','mapa'].forEach(function(t){
+    var b=document.getElementById('tab-'+t); if(b) b.style.display='none';
+  });
+  // El inventario sigue el interruptor del módulo, como para el jugador.
+  var inv=document.getElementById('tab-inv');
+  if(inv) inv.style.display=MODULO('inventario')?'':'none';
+  if(TAB!=='pj'&&TAB!=='inv') setTab('pj');
+}
+
 // ─── Mapa ───────────────────────────────────────────────────
 // Se monta recién al entrar a la pestaña: la lámina pesa y no tiene sentido
 // bajarla si el jugador no la mira.
@@ -1483,8 +1501,9 @@ async function loadRoster(){
     el.style.display=(m?MODULO(m):SYSTEM!=='dnd')?'':'none';
     if(m) el.style.display=MODULO(m)?'':'none';
   });
+  dmViewTabs();
   // El mapa tiene su propio interruptor (y el DM puede guardárselo para él).
-  var verMapa=!SOLO&&MODULO('mapa')&&CONFIG.mapa_visible!==false;
+  var verMapa=!SOLO&&!DM_VIEW&&MODULO('mapa')&&CONFIG.mapa_visible!==false;
   document.getElementById('tab-mapa').style.display=verMapa?'':'none';
   // Ojo: el roster se refresca cada 5 s. El mapa NO se recarga acá, porque eso
   // borraría la medición a medio hacer; se recarga al entrar a la pestaña.
@@ -2073,9 +2092,12 @@ Object.keys(SURGES).forEach(function(n){ SK_ATTR[n]=SURGES[n]; });
 var SK_ORDEN={physical:['Agility','Athletics','Heavy Weaponry','Light Weaponry','Stealth','Thievery'],
   cognitive:['Crafting','Deduction','Discipline','Intimidation','Lore','Medicine'],
   spiritual:['Deception','Insight','Leadership','Perception','Persuasion','Survival']};
-var CAT3=[{k:'physical',n:'Físico',a:[['STR','Fuerza'],['SPD','Velocidad']]},
-          {k:'cognitive',n:'Cognitivo',a:[['INT','Intelecto'],['WIL','Voluntad']]},
-          {k:'spiritual',n:'Espiritual',a:[['AWA','Conciencia'],['PRE','Presencia']]}];
+// Los atributos y las defensas llevan el nombre del manual, en inglés, igual
+// que las habilidades (Agility, Stealth…) y las potencias: así lo que se lee en
+// pantalla es lo mismo que se busca en el libro. `n` es el título de la columna.
+var CAT3=[{k:'physical',n:'Physical',a:[['STR','Strength'],['SPD','Speed']]},
+          {k:'cognitive',n:'Cognitive',a:[['INT','Intellect'],['WIL','Willpower']]},
+          {k:'spiritual',n:'Spiritual',a:[['AWA','Awareness'],['PRE','Presence']]}];
 
 // ── Tablas del manual: lo que sale de cada atributo ──
 // Las seis tienen los mismos escalones (0, 1-2, 3-4, 5-6, 7-8, 9+).
@@ -2257,7 +2279,7 @@ function cosmere3HTML(c){
     return '<div class="sh-col3"><div class="sh-col3-h">'+cat.n+'</div>'
       +'<div class="sh-at3">'
         +shAtBox(cat.a[0][1],a[cat.a[0][0]],'',eff.attr[cat.a[0][0]]||0)
-        +shAtBox('Defensa',d[cat.k],'def')
+        +shAtBox('Defense',d[cat.k],'def')
         +shAtBox(cat.a[1][1],a[cat.a[1][0]],'',eff.attr[cat.a[1][0]]||0)
       +'</div>'
       +'<div class="sh-res3">'+res+'</div>'
@@ -2983,7 +3005,7 @@ function renderRoster(){
   var meM=ROSTER.members.find(function(m){return m.user_id===MY_UID;});
   var dv=document.getElementById('dmView');
   if(dv) dv.textContent='Vista de DM · '+(meM?(meM.character?meM.character.name+' ('+meM.username+')':meM.username):'ese jugador no está en la campaña')
-    +' · lo que toques acá le cambia la ficha a él';
+    +' · lo que toques acá le cambia la ficha y el inventario a él';
   MYCHAR=(meM&&meM.character)?meM.character.id:null;
   indexarMascotas();
   var mp=document.getElementById('ocMe');
@@ -3058,7 +3080,7 @@ function _num(id,v){return '<input class="oc-fi" type="number" style="width:80px
 // equipo y contactos. Movimiento, recuperación y sentidos no se escriben: salen
 // de las tablas del manual según Velocidad, Voluntad y Conciencia.
 var CH_ED=null;   // {ranks:{cat:{nombre:rango}}} mientras el editor está abierto
-var ED_ATTRS=[['STR','Fuerza'],['SPD','Velocidad'],['INT','Intelecto'],['WIL','Voluntad'],['AWA','Conciencia'],['PRE','Presencia']];
+var ED_ATTRS=[['STR','Strength'],['SPD','Speed'],['INT','Intellect'],['WIL','Willpower'],['AWA','Awareness'],['PRE','Presence']];
 function edAtRow(id,lbl,v,def){
   return '<div class="ed-at'+(def?' def':'')+'"><span class="fl">'+lbl+'</span>'
     +'<input class="fi" type="number" id="'+id+'" value="'+(v==null?'':v)+'" oninput="edPreview()"/></div>';
@@ -3069,7 +3091,7 @@ function edAttrsHTML(s){
     return '<div class="sh-col"><div class="sh-col-h">'+cat.n+'</div>'
       +edAtRow('edA'+cat.a[0][0],cat.a[0][1],a[cat.a[0][0]])
       +edAtRow('edA'+cat.a[1][0],cat.a[1][1],a[cat.a[1][0]])
-      +edAtRow('edD'+cat.k,'Defensa',d[cat.k],true)+'</div>';
+      +edAtRow('edD'+cat.k,'Defense',d[cat.k],true)+'</div>';
   }).join('')+'</div>';
 }
 function edAttrVal(k){ return edNum('edA'+k); }
@@ -3578,6 +3600,9 @@ function cerrarPetEditor(){
 // ═══════════ INVENTARIO (capacidad de carga) ═══════════
 var INV=null, CAN_CREATE=false, INV_CONTENEDORES=[];
 function canCreateItems(){
+  // El DM crea y entrega objetos siempre; el permiso `can_create_items` es el
+  // que le da (o no) a cada jugador para armarse los suyos.
+  if(DM_VIEW) return true;
   var m=ROSTER&&ROSTER.members.find(function(x){return x.user_id===MY_UID;});
   return !!(m&&m.can_create_items);
 }
@@ -4229,14 +4254,16 @@ async function init(){
     document.getElementById('tab-mesa').style.display='none';
   }
   if(DM_VIEW){
-    // el DM mira la ficha de un jugador: la página cree que es él, y solo
-    // muestra "Mi personaje"
+    // El DM mira la ficha de un jugador: la página cree que es él. Le quedan
+    // "Mi personaje" y "Inventario" (para darle o sacarle cosas sin salir de la
+    // ficha); el grupo, el catálogo y el mapa los tiene en su propio panel, así
+    // que ahí no hacen falta. Ver dmViewTabs().
     MY_UID=VER_UID; TAB='pj';
-    document.querySelector('.tabbar').style.display='none';
     var back=document.querySelector('.header a');
     if(back){ back.href='/campaign/'+CID; back.textContent='← Volver a la campaña'; }
     document.querySelector('.tabbar').insertAdjacentHTML('beforebegin',
-      '<div class="dm-view" id="dmView">Vista de DM · ficha del jugador</div>');
+      '<div class="dm-view" id="dmView">Vista de DM · ficha e inventario del jugador</div>');
+    dmViewTabs();
   }
   setTab(TAB);
   if(!SOLO) connect();
