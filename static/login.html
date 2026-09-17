@@ -55,9 +55,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 
   <div id="resetHint" class="hint" style="display:none">Recuperá tu contraseña con el email de tu cuenta.</div>
 
-  <div id="f-username"><label class="fl">Usuario</label><input class="fi" id="username" autocomplete="username"/></div>
+  <div><label class="fl">Usuario</label><input class="fi" id="username" autocomplete="username"/></div>
   <div id="f-email" style="display:none"><label class="fl">Email</label><input class="fi" id="email" type="email" autocomplete="email"/></div>
-  <div id="f-password"><label class="fl" id="lbl-password">Contraseña</label><input class="fi" id="password" type="password" onkeydown="if(event.key==='Enter')submit()"/></div>
+  <div><label class="fl" id="lbl-password">Contraseña</label><input class="fi" id="password" type="password" onkeydown="if(event.key==='Enter')submit()"/></div>
   <div id="f-password2" style="display:none"><label class="fl">Confirmar contraseña</label><input class="fi" id="password2" type="password" onkeydown="if(event.key==='Enter')submit()"/></div>
 
   <button class="btn" id="submitBtn" onclick="submit()">Entrar</button>

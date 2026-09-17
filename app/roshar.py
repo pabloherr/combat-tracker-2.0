@@ -92,8 +92,3 @@ def describe(idx: int) -> dict:
         "formal": f'{d["year"]}.{d["month"]}.{d["week"]}.{d["day"]}',
     })
     return d
-
-
-def month_start(year: int, month: int) -> int:
-    """Índice del primer día de un mes (útil para dibujar la grilla)."""
-    return to_index(year, month, 1, 1)

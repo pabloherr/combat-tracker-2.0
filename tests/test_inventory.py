@@ -3,8 +3,8 @@
 import io
 
 import pypdf
-from helpers import (SAMPLE_STATBLOCK, create_campaign, create_character,
-                     get_enemies, import_enemy, invite, make_user, party)
+from helpers import (SAMPLE_STATBLOCK, create_campaign, get_enemies, import_enemy, invite, make_user, party)
+
 
 
 def _members(dm, cid):

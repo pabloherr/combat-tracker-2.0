@@ -30,15 +30,13 @@ html[data-theme="oscuro"]{
   --accsoft:rgba(224,189,124,.12);/* fondo de hover / estado activo */
   --text:#efece4;--text2:#c1baa9;--text3:#948d7b;
   --shadow:0 2px 10px rgba(0,0,0,.28);
-  --shadow2:0 8px 40px rgba(0,0,0,.5);
   --glow:radial-gradient(120% 55% at 50% -8%, rgba(224,189,124,.05), transparent 60%);
   /* colores semánticos (antes hardcodeados en el CSS y en el JS) */
   --red:#e05050;--green:#5aaa70;--blue:#6aaae8;--blue2:#4a8ac8;
   --purple:#aa8aec;--orange:#c87830;--orange2:#e8a860;--yellow:#e8c840;
-  --err:#e88;--ok:#8ac88c;
+  --err:#e88;
   /* colores de enemigo (COMMON_COLORS en dm.html) */
-  --e-rojo:#e05050;--e-naranja:#e0842e;--e-amarillo:#e8c840;--e-verde:#5aaa70;
-  --e-turquesa:#3aa89a;--e-azul:#4a8ac8;--e-morado:#a06ad0;--e-rosa:#d060a0;
+  --e-turquesa:#3aa89a;--e-morado:#a06ad0;--e-rosa:#d060a0;
   --e-gris:#8a8a8a;--e-blanco:#e8dcc8;
 }
 
@@ -51,13 +49,11 @@ html[data-theme="claro"]{
   --accsoft:rgba(138,99,20,.10);
   --text:#26211a;--text2:#4d453a;--text3:#7a7061;
   --shadow:0 1px 3px rgba(60,45,20,.13);
-  --shadow2:0 8px 32px rgba(60,45,20,.22);
   --glow:radial-gradient(120% 55% at 50% -8%, rgba(180,140,70,.10), transparent 60%);
   --red:#b3271f;--green:#2f7a45;--blue:#1e5f9e;--blue2:#1e5f9e;
   --purple:#6b3fbd;--orange:#96520d;--orange2:#7d430a;--yellow:#8a6a00;
-  --err:#a02018;--ok:#2f7a45;
-  --e-rojo:#c02a22;--e-naranja:#a85c0c;--e-amarillo:#8a6a00;--e-verde:#2b6b3d;
-  --e-turquesa:#0f6f68;--e-azul:#1b4f8f;--e-morado:#6b34a8;--e-rosa:#a3266e;
+  --err:#a02018;
+  --e-turquesa:#0f6f68;--e-morado:#6b34a8;--e-rosa:#a3266e;
   --e-gris:#5a5a5a;--e-blanco:#8a7d66;
 }
 
@@ -70,13 +66,11 @@ html[data-theme="ac-oscuro"]{
   --accsoft:rgba(255,212,41,.18);
   --text:#fff;--text2:#ededed;--text3:#c4c4c4;
   --shadow:none;
-  --shadow2:0 0 0 1px #d6d6d6;
   --glow:none;
   --red:#ff6161;--green:#4ce07a;--blue:#6ec2ff;--blue2:#6ec2ff;
   --purple:#cba3ff;--orange:#ffa245;--orange2:#ffc07a;--yellow:#ffe14a;
-  --err:#ff8080;--ok:#4ce07a;
-  --e-rojo:#ff6161;--e-naranja:#ffa245;--e-amarillo:#ffe14a;--e-verde:#4ce07a;
-  --e-turquesa:#3fe0d0;--e-azul:#6ec2ff;--e-morado:#cba3ff;--e-rosa:#ff8ac8;
+  --err:#ff8080;
+  --e-turquesa:#3fe0d0;--e-morado:#cba3ff;--e-rosa:#ff8ac8;
   --e-gris:#c4c4c4;--e-blanco:#fff;
 }
 
@@ -89,13 +83,11 @@ html[data-theme="ac-claro"]{
   --accsoft:rgba(122,61,0,.12);
   --text:#000;--text2:#1c1c1c;--text3:#424242;
   --shadow:none;
-  --shadow2:0 0 0 1px #141414;
   --glow:none;
   --red:#ab0000;--green:#06642a;--blue:#00429c;--blue2:#00429c;
   --purple:#560ea3;--orange:#8a3d00;--orange2:#6b2f00;--yellow:#6b5200;
-  --err:#ab0000;--ok:#06642a;
-  --e-rojo:#ab0000;--e-naranja:#8a3d00;--e-amarillo:#6b5200;--e-verde:#06642a;
-  --e-turquesa:#005a52;--e-azul:#00429c;--e-morado:#560ea3;--e-rosa:#94005e;
+  --err:#ab0000;
+  --e-turquesa:#005a52;--e-morado:#560ea3;--e-rosa:#94005e;
   --e-gris:#424242;--e-blanco:#6b6b6b;
 }
 
@@ -108,13 +100,11 @@ html[data-theme="nocturno"]{
   --accsoft:rgba(201,132,60,.12);
   --text:#cbb9a4;--text2:#9c8c7b;--text3:#6e6357;
   --shadow:0 2px 8px rgba(0,0,0,.55);
-  --shadow2:0 8px 34px rgba(0,0,0,.7);
   --glow:radial-gradient(120% 55% at 50% -8%, rgba(201,132,60,.05), transparent 60%);
   --red:#c25a4e;--green:#6f9a63;--blue:#6f8cb0;--blue2:#5b779b;
   --purple:#9a7fad;--orange:#bb7c3c;--orange2:#cf9553;--yellow:#b9973c;
-  --err:#c25a4e;--ok:#6f9a63;
-  --e-rojo:#c25a4e;--e-naranja:#bb7c3c;--e-amarillo:#b9973c;--e-verde:#6f9a63;
-  --e-turquesa:#4f9088;--e-azul:#6f8cb0;--e-morado:#9a7fad;--e-rosa:#b06e93;
+  --err:#c25a4e;
+  --e-turquesa:#4f9088;--e-morado:#9a7fad;--e-rosa:#b06e93;
   --e-gris:#8a8177;--e-blanco:#cbb9a4;
 }
 
@@ -127,13 +117,11 @@ html[data-theme="stormlight"]{
   --accsoft:rgba(98,200,216,.13);
   --text:#e7f0f3;--text2:#b0c3cc;--text3:#7d919b;
   --shadow:0 2px 10px rgba(0,10,20,.45);
-  --shadow2:0 8px 40px rgba(0,8,16,.6);
   --glow:radial-gradient(120% 55% at 50% -8%, rgba(98,200,216,.07), transparent 60%);
   --red:#e3625c;--green:#4fb98a;--blue:#5f9ee8;--blue2:#4f86cc;
   --purple:#a77ce8;--orange:#e0a04a;--orange2:#eebd74;--yellow:#e3cf5a;
-  --err:#e3625c;--ok:#4fb98a;
-  --e-rojo:#e3625c;--e-naranja:#e0a04a;--e-amarillo:#e3cf5a;--e-verde:#4fb98a;
-  --e-turquesa:#3ab8b0;--e-azul:#5f9ee8;--e-morado:#a77ce8;--e-rosa:#dd6fb0;
+  --err:#e3625c;
+  --e-turquesa:#3ab8b0;--e-morado:#a77ce8;--e-rosa:#dd6fb0;
   --e-gris:#8fa2ac;--e-blanco:#e7f0f3;
 }
 
@@ -149,12 +137,11 @@ html[data-theme="brutalista"]{
   --gold:#cf2f18;--gold2:#8f1e0d;
   --onacc:#f4f2ed;--accsoft:rgba(207,47,24,.12);
   --text:#111;--text2:#333;--text3:#5c5c5c;
-  --shadow:none;--shadow2:5px 5px 0 #1a1a1a;--glow:none;
+  --shadow:none;--glow:none;
   --red:#cf2f18;--green:#1c6b33;--blue:#17418f;--blue2:#17418f;
   --purple:#5a1f9e;--orange:#8f4a00;--orange2:#6d3800;--yellow:#6b5200;
-  --err:#cf2f18;--ok:#1c6b33;
-  --e-rojo:#c02a22;--e-naranja:#a85c0c;--e-amarillo:#8a6a00;--e-verde:#2b6b3d;
-  --e-turquesa:#0f6f68;--e-azul:#1b4f8f;--e-morado:#6b34a8;--e-rosa:#a3266e;
+  --err:#cf2f18;
+  --e-turquesa:#0f6f68;--e-morado:#6b34a8;--e-rosa:#a3266e;
   --e-gris:#5a5a5a;--e-blanco:#8a7d66;
 }
 
@@ -169,13 +156,12 @@ html[data-theme="editorial"]{
   --gold:#0f5c53;--gold2:#0a423b;
   --onacc:#fffefb;--accsoft:rgba(15,92,83,.10);
   --text:#1c1c1a;--text2:#4a4a45;--text3:#78766f;
-  --shadow:0 2px 12px rgba(30,40,38,.09);--shadow2:0 12px 40px rgba(30,40,38,.16);
+  --shadow:0 2px 12px rgba(30,40,38,.09);
   --glow:radial-gradient(120% 55% at 50% -8%, rgba(15,92,83,.06), transparent 60%);
   --red:#a92a20;--green:#1c6b40;--blue:#1d4f96;--blue2:#1d4f96;
   --purple:#5b3391;--orange:#8c5210;--orange2:#6f3f0a;--yellow:#7a5f00;
-  --err:#a92a20;--ok:#1c6b40;
-  --e-rojo:#c02a22;--e-naranja:#a85c0c;--e-amarillo:#8a6a00;--e-verde:#2b6b3d;
-  --e-turquesa:#0f6f68;--e-azul:#1b4f8f;--e-morado:#6b34a8;--e-rosa:#a3266e;
+  --err:#a92a20;
+  --e-turquesa:#0f6f68;--e-morado:#6b34a8;--e-rosa:#a3266e;
   --e-gris:#5a5a5a;--e-blanco:#8a7d66;
 }
 
@@ -190,12 +176,11 @@ html[data-theme="terminal"]{
   --gold:#7ee787;--gold2:#b6f5bb;
   --onacc:#07090a;--accsoft:rgba(126,231,135,.12);
   --text:#d7e6da;--text2:#9db3a2;--text3:#6c8073;
-  --shadow:none;--shadow2:0 0 0 1px rgba(126,231,135,.3);--glow:none;
+  --shadow:none;--glow:none;
   --red:#ff7b72;--green:#7ee787;--blue:#79c0ff;--blue2:#58a6ff;
   --purple:#d2a8ff;--orange:#ffa657;--orange2:#ffc680;--yellow:#e3d24a;
-  --err:#ff7b72;--ok:#7ee787;
-  --e-rojo:#ff7b72;--e-naranja:#ffa657;--e-amarillo:#e3d24a;--e-verde:#7ee787;
-  --e-turquesa:#3fe0d0;--e-azul:#79c0ff;--e-morado:#d2a8ff;--e-rosa:#ff8ac8;
+  --err:#ff7b72;
+  --e-turquesa:#3fe0d0;--e-morado:#d2a8ff;--e-rosa:#ff8ac8;
   --e-gris:#9db3a2;--e-blanco:#d7e6da;
 }
 
@@ -210,13 +195,12 @@ html[data-theme="arcano"]{
   --gold:#c4a8ff;--gold2:#e2d4ff;
   --onacc:#14101f;--accsoft:rgba(196,168,255,.13);
   --text:#ece7f7;--text2:#b8aed0;--text3:#857ba0;
-  --shadow:0 3px 14px rgba(5,0,20,.5);--shadow2:0 14px 48px rgba(5,0,20,.65);
+  --shadow:0 3px 14px rgba(5,0,20,.5);
   --glow:radial-gradient(120% 55% at 50% -8%, rgba(196,168,255,.09), transparent 60%);
   --red:#ef6a76;--green:#5fc79a;--blue:#79a8f0;--blue2:#6690dd;
   --purple:#c48aff;--orange:#e8a45c;--orange2:#f2bd82;--yellow:#e8d266;
-  --err:#ef6a76;--ok:#5fc79a;
-  --e-rojo:#ef6a76;--e-naranja:#e8a45c;--e-amarillo:#e8d266;--e-verde:#5fc79a;
-  --e-turquesa:#4fc7bd;--e-azul:#79a8f0;--e-morado:#c48aff;--e-rosa:#e57ab8;
+  --err:#ef6a76;
+  --e-turquesa:#4fc7bd;--e-morado:#c48aff;--e-rosa:#e57ab8;
   --e-gris:#a49cbd;--e-blanco:#ece7f7;
 }
 
@@ -231,13 +215,12 @@ html[data-theme="arena"]{
   --gold:#a34a20;--gold2:#74300f;
   --onacc:#f8f2e7;--accsoft:rgba(163,74,32,.10);
   --text:#2b241c;--text2:#55493c;--text3:#837563;
-  --shadow:0 2px 8px rgba(90,70,40,.12);--shadow2:0 10px 34px rgba(90,70,40,.2);
+  --shadow:0 2px 8px rgba(90,70,40,.12);
   --glow:radial-gradient(120% 55% at 50% -8%, rgba(163,74,32,.07), transparent 60%);
   --red:#a8291f;--green:#38702f;--blue:#1f5580;--blue2:#1f5580;
   --purple:#6a3688;--orange:#9a5410;--orange2:#7d4009;--yellow:#7d6000;
-  --err:#a8291f;--ok:#38702f;
-  --e-rojo:#c02a22;--e-naranja:#a85c0c;--e-amarillo:#8a6a00;--e-verde:#2b6b3d;
-  --e-turquesa:#0f6f68;--e-azul:#1b4f8f;--e-morado:#6b34a8;--e-rosa:#a3266e;
+  --err:#a8291f;
+  --e-turquesa:#0f6f68;--e-morado:#6b34a8;--e-rosa:#a3266e;
   --e-gris:#5a5a5a;--e-blanco:#8a7d66;
 }
 

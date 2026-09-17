@@ -67,7 +67,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .empty{text-align:center;padding:2.5rem 1rem;border:.5px dashed var(--border);border-radius:var(--rl);color:var(--text3);font-style:italic;font-size:14px;margin-bottom:1.5rem;}
 
 /* accion rows */
-.accion-row{display:grid;grid-template-columns:1.5fr 1fr 3fr auto;gap:6px;margin-bottom:6px;align-items:center;}
 .accion-item{background:var(--bg3);border-left:2px solid var(--gold);border-radius:0 var(--r) var(--r) 0;padding:6px 10px;margin-bottom:5px;font-size:12px;}
 .accion-nombre{font-family:var(--font-h);color:var(--gold2);font-size:12px;}
 .accion-coste{color:var(--blue);font-size:11px;margin-left:6px;}
@@ -116,7 +115,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .acted-btn.done{border-color:var(--green);color:var(--green);background:rgba(90,170,112,.08);}
 
 select.fi{appearance:auto;}
-.enc-enemy-pick{display:grid;grid-template-columns:2fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center;}
 
 /* import */
 .import-hint{font-size:12px;color:var(--text3);margin-bottom:8px;font-style:italic;}
@@ -236,8 +234,6 @@ select.fi{appearance:auto;}
 .acted-dual .acted-btn{margin-top:0;}
 .hidden-mark{font-size:10px;letter-spacing:.05em;color:var(--red);font-style:italic;margin-top:4px;font-family:var(--font-h);text-transform:uppercase;}
 .pcard.hidden-enemy{border-style:dashed;}
-.pstatuses{display:flex;flex-wrap:wrap;gap:3px;margin-top:6px;}
-.pstatuses .stag{font-size:10px;padding:2px 7px;border-radius:var(--pill);border:.5px solid;font-family:var(--font-h);}
 .section-label.collapsible{cursor:pointer;user-select:none;}
 .section-label.collapsible:hover{color:var(--gold);}
 .enemy-group-h{font-family:var(--font-h);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin:14px 0 8px;padding:5px 13px;border-radius:var(--pill);display:inline-block;border:1px solid;}
@@ -373,8 +369,6 @@ select.fi{appearance:auto;}
 .mem-chip{font-size:10px;padding:2px 8px;border-radius:var(--pill);border:1px solid;font-family:var(--font-h);letter-spacing:.03em;}
 /* comercio */
 .inv-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:8px 10px;margin-bottom:6px;}
-.stock-price{font-family:var(--font-h);font-size:12px;color:var(--gold2);cursor:pointer;border-bottom:1px dashed var(--border2);padding:0 4px;}
-.stock-price:hover{color:var(--gold);border-bottom-color:var(--gold2);}
 .inv-row.hidden-enemy{opacity:.55;}
 </style>
 </head>
@@ -480,9 +474,9 @@ select.fi{appearance:auto;}
     <div class="row">
       <div class="section-label" style="margin-bottom:0">Fichas de enemigos</div>
       <div class="sep"></div>
-      <button class="btn accent" id="importBtn" onclick="toggleForm('importForm')">⭳ Importar desde código</button>
-      <button class="btn accent" id="bulkBtn" onclick="toggleForm('bulkForm')">⭳⭳ Importar en bulk</button>
-      <button class="btn ghost" id="exportBtn" onclick="exportBestiary()" title="Descarga todo el bestiario en un .yaml. Se vuelve a cargar con Importar en bulk.">⭱ Exportar bestiario</button>
+      <button class="btn accent" onclick="toggleForm('importForm')">⭳ Importar desde código</button>
+      <button class="btn accent" onclick="toggleForm('bulkForm')">⭳⭳ Importar en bulk</button>
+      <button class="btn ghost" onclick="exportBestiary()" title="Descarga todo el bestiario en un .yaml. Se vuelve a cargar con Importar en bulk.">⭱ Exportar bestiario</button>
       <button class="btn" onclick="openEnemyEditor()">+ Agregar enemigo</button>
     </div>
     <div class="form-wrap" id="bulkForm" style="display:none">

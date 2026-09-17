@@ -49,7 +49,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .turn-slow{color:var(--blue);border-color:var(--blue2);}
 .turn-both{color:var(--orange2);border-color:var(--orange);}
 .color-dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;}
-.health-text{font-family:var(--font-h);font-size:13px;display:block;margin-bottom:4px;}
 .hbar{height:6px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-bottom:6px;}
 .hbar-fill{height:100%;width:100%;border-radius:3px;transition:background .5s,width .3s;}
 /* stats de una tarjeta de combate: vida, focus e investidura */
@@ -64,9 +63,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 /* elegir personaje */
 .me-select{background:var(--bg3);border:.5px solid var(--border2);border-radius:var(--rl);padding:1.1rem;text-align:center;}
 .me-q{font-family:var(--font-h);font-size:13px;color:var(--gold);letter-spacing:.06em;margin-bottom:12px;}
-.me-opts{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
-.btn-pj{font-family:var(--font-h);font-size:12px;letter-spacing:.05em;padding:8px 16px;border-radius:var(--r);cursor:pointer;border:.5px solid var(--border2);background:transparent;color:var(--gold2);}
-.btn-pj:hover{background:var(--accsoft);border-color:var(--gold);}
 
 /* mi personaje */
 .me-card{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:1.1rem;box-shadow:0 3px 16px rgba(0,0,0,.32);}
@@ -164,8 +160,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .ed-sk .sh-sk-b{min-width:34px;}
 .sh-pips.ed .sh-pip{width:13px;height:13px;cursor:pointer;}
 /* hoja 5e: seis características, competencia de salvaciones y habilidades */
-.sh-at6{grid-template-columns:repeat(3,1fr);}
-.sh-ab-score{display:block;font-size:11px;color:var(--text3);font-family:var(--font-b);}
 .ed-ab6{grid-template-columns:repeat(6,1fr);}
 .ed5-mod{text-align:center;font-family:var(--font-h);font-size:13px;color:var(--gold2);margin-top:2px;}
 .ed5-sv{display:block;text-align:center;font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;}
@@ -287,7 +281,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .pj-hero-ph{display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--text3);background:linear-gradient(135deg,var(--bg3),var(--bg4));}
 .pj-hero-name{font-family:var(--font-h);font-size:19px;color:var(--gold2);letter-spacing:.03em;}
 .pj-hero-sub{font-size:13px;color:var(--text2);margin-top:3px;}
-.pj-hero-lvl{display:inline-block;font-size:10px;letter-spacing:.05em;padding:1px 8px;border-radius:var(--pill);border:1px solid var(--border2);color:var(--gold);font-family:var(--font-h);margin-top:6px;}
 .pj-actions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;}
 .import-ta{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;color:var(--text);font-family:'Courier New',monospace;font-size:12px;line-height:1.5;outline:none;resize:vertical;min-height:150px;white-space:pre;}
 .import-ta:focus{border-color:var(--gold);}
@@ -348,7 +341,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .marcos-w-cell:hover{background:var(--accsoft);}
 .marcos-w-inp{width:100%;background:var(--bg2);border:none;color:inherit;font-family:var(--font-h);font-size:15px;text-align:center;outline:none;padding:0;-moz-appearance:textfield;}
 .marcos-w-inp::-webkit-outer-spin-button,.marcos-w-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
-.marcos-w-lbl{font-family:var(--font-h);font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin:14px 0 6px;}
 /* D&D: spell slots y contadores */
 .dnd-slot-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);}
 .dnd-slot-lvl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);width:58px;flex:none;}
@@ -1733,7 +1725,6 @@ function ocUrl(target){
   var pid=target.slice(1);
   return '/api/characters/'+(PET_CHAR[pid]||MYCHAR)+'/pets/'+pid;
 }
-async function ocStat(target,stat,delta){ return aplicarDelta(target,stat,delta); }
 
 // ─── Recursos: el número actual al lado del máximo, sin barra ───
 // Se toca el número y se escribe el valor exacto; los botones lo mueven de uno
@@ -2403,12 +2394,6 @@ function d20Marca(eff,tipo){
   var vent=v==='vent';
   return '<span class="sh-desv" style="color:'+(vent?'var(--green)':'var(--red)')+'" title="'
     +escA((vent?'Ventaja':'Desventaja')+' por una condición')+'">'+(vent?'▲':'▼')+'</span>';
-}
-function shAb5(k,lbl,score,eff){
-  var m=mod5(score);
-  return '<div class="sh-atbox"><span class="l">'+lbl+'</span>'
-    +'<span class="v">'+fmt5(m)+'</span>'
-    +'<span class="sh-ab-score">'+(score==null||score===''?'—':score)+'</span></div>';
 }
 // Las habilidades que cuelgan de cada característica, como en la hoja de 2024.
 var SK5_POR_AB={STR:['Athletics'],DEX:['Acrobatics','Sleight of Hand','Stealth'],CON:[],
@@ -3143,7 +3128,6 @@ function renderRoster(){
 
 // ─── Gestión del personaje (editar / mascotas / PDF / imagen) ───
 function meChar(){ var m=ROSTER&&ROSTER.members.find(function(x){return x.user_id===MY_UID;}); return m?m.character:null; }
-function _num(id,v){return '<input class="oc-fi" type="number" style="width:80px" id="'+id+'" value="'+(v==null?'':v)+'"/>';}
 // ── Editor de la ficha (Cosmere): identidad, recursos, atributos y defensas,
 // rangos de habilidad (los puntitos se tocan), talentos, especialidades, armas,
 // equipo y contactos. Movimiento, recuperación y sentidos no se escriben: salen

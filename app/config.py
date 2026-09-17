@@ -79,7 +79,6 @@ CARGA_BASE = {"Pequeño": "carga_pequeno", "Mediano": "carga_mediano",
 
 INT_KEYS = {"storm_min", "storm_max", "discharge_start", "discharge_full",
             "salto_dias"} | set(CARGA_BASE.values())
-FLOAT_KEYS = {"discharge_curve"}
 BOOL_KEYS = {"modulo_catalogo", "modulo_inventario", "modulo_tormentas",
              "modulo_calendario", "calendario_visible", "calendario_editable",
              "modulo_mapa", "mapa_visible", "mapa_editable",
@@ -90,7 +89,6 @@ MODO_KEYS = {k for k in CONFIG_DEFAULTS if k.startswith("ver_") and k not in BOO
 # Listas: las dos de nombres apagados y las dos de entradas propias.
 STR_LIST_KEYS = {"cond_off", "her_off"}
 DICT_LIST_KEYS = {"cond_extra", "her_extra"}
-LIST_KEYS = STR_LIST_KEYS | DICT_LIST_KEYS
 
 # Claves que los jugadores necesitan saber (el resto es cosa del DM).
 PLAYER_KEYS = ("modulo_catalogo", "modulo_inventario", "modulo_tormentas",

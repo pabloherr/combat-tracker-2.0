@@ -1,7 +1,7 @@
 """Campañas: membresías, roster, config de tormenta/marcos, ciclo de tormenta."""
 
-from helpers import (create_campaign, create_character, invite, make_user,
-                     party, register)
+from helpers import create_campaign, invite, make_user, party
+
 
 
 def test_create_list_delete(make_client):

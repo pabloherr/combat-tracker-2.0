@@ -995,13 +995,10 @@ def _norm_size(value) -> str:
     return _SIZE_ALIASES.get(str(value or "").strip().lower(), "Mediano")
 
 
-# Zonas donde puede estar un objeto. Solo lo que está encima ('') pesa: los
-# guardados representan lo que el personaje tiene pero no carga (en la posada,
-# en el carro, en la casa del grupo) y no tienen tope.
-STASHES = ("", "personal", "grupo")
-
-
 def _norm_stash(value) -> str:
+    """Zona donde está un objeto. Solo lo que está encima ('') pesa: los
+    guardados son lo que el personaje tiene pero no carga (en la posada, en el
+    carro, en la casa del grupo) y no tienen tope."""
     v = str(value or "").strip().lower()
     return v if v in ("personal", "grupo") else ""
 
