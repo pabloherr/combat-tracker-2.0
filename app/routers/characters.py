@@ -1047,9 +1047,14 @@ def _norm_txt(s) -> str:
 
 
 def tiene_expertise(nombre: str, expertise: str) -> bool:
-    """Si el nombre del objeto figura entre las especialidades de la ficha
-    (una lista separada por comas). Vale la coincidencia exacta o que una
-    aparezca entera dentro de la otra ("Espada" en "Espada larga")."""
+    """Si el nombre del objeto figura entre las especialidades de texto de la
+    ficha (una lista separada por comas). Vale la coincidencia exacta o que una
+    aparezca entera dentro de la otra ("Espada" en "Espada larga").
+
+    Es el camino viejo, y solo lo usan las fichas que todavía no tienen su
+    lista de expertise de equipo: ese campo es texto libre del PDF, donde la
+    gente escribe categorías. La lista nueva compara nombre completo
+    (ver `en_lista`)."""
     n = _norm_txt(nombre)
     if not n:
         return False
@@ -1075,11 +1080,20 @@ def lista_expertise(sheet: dict | None) -> list | None:
     return [str(x) for x in v] if isinstance(v, list) else None
 
 
+def en_lista(nombre: str, lista) -> bool:
+    """Si el objeto está en la lista de la ficha.
+
+    Compara el nombre **completo**, no por pedazos: la expertise es de un arma,
+    no de una familia. "Hacha" y "Hacha de asta" son dos armas distintas, y
+    marcar una no tiene por qué darte la otra."""
+    n = _norm_txt(nombre)
+    return bool(n) and any(_norm_txt(x) == n for x in (lista or []))
+
+
 def es_experto(r, sheet: dict | None) -> bool:
     """Si el objeto se usa con expertise.
 
-    Manda la lista de la ficha (`expertise_equipo`), con la misma comparación
-    tolerante de siempre: marcar "Espada" alcanza para una "Espada larga".
+    Manda la lista de la ficha (`expertise_equipo`), por nombre completo.
 
     Una ficha que todavía no pasó por el editor nuevo no tiene esa lista; para
     esas se sigue deduciendo como antes (la marca por objeto y, si no, el texto
@@ -1088,7 +1102,7 @@ def es_experto(r, sheet: dict | None) -> bool:
     prender y apagar la expertise sin pelearse con la deducción."""
     lista = lista_expertise(sheet)
     if lista is not None:
-        return tiene_expertise(r["name"], ", ".join(lista))
+        return en_lista(r["name"], lista)
     marca = (r["experto"] if "experto" in r.keys() else "") or ""
     if marca == "si":
         return True
@@ -1656,10 +1670,12 @@ def set_expertise(cid: int, body: ExpertiseList, user=Depends(current_user)):
 
 @router.post("/{cid}/expertise")
 def toggle_expertise(cid: int, body: ExpertiseIn, user=Depends(current_user)):
-    """Prende o apaga la expertise en un nombre suelto: es lo que hace el
-    cartel del inventario. Apagar saca de la lista todo lo que estaba dando
-    por experto a ese objeto (marcar "Espada" alcanzaba para la "Espada
-    larga", así que apagarla desde la espada larga tiene que sacar "Espada")."""
+    """Prende o apaga la expertise en un nombre suelto, sin tener que mandar
+    la lista entera.
+
+    La pantalla no lo usa (la expertise se marca en el editor de la ficha, y en
+    el inventario es solo una marca para mirar); queda para tocar una sola
+    entrada desde afuera sin pisar el resto."""
     nombre = (body.name or "").strip()
     if not nombre:
         raise HTTPException(400, "Falta el nombre del objeto")
@@ -1668,10 +1684,10 @@ def toggle_expertise(cid: int, body: ExpertiseIn, user=Depends(current_user)):
         sheet = json.loads(ch["sheet"] or "{}")
         lista = list(_expertise_actual(conn, ch, sheet))
         if body.on:
-            if not tiene_expertise(nombre, ", ".join(lista)):
+            if not en_lista(nombre, lista):
                 lista.append(nombre)
         else:
-            lista = [n for n in lista if not tiene_expertise(nombre, n)]
+            lista = [n for n in lista if _norm_txt(n) != _norm_txt(nombre)]
         return {"ok": True, "lista": _guardar_expertise(conn, ch, sheet, lista)}
 
 

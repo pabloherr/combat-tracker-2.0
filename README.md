@@ -322,11 +322,14 @@ Como vive en la ficha, **te queda marcada aunque todavía no tengas el arma**: l
 cuando la aprendés y, el día que te llega, ya viene con sus rasgos de experto puestos. Y
 no se pierde si dejás el objeto, lo guardás o se lo pasás a otro.
 
-El nombre se compara con tolerancia: marcar **Espada** alcanza para una *Espada larga*.
+La expertise es **de un arma, no de una familia**: el nombre se compara entero (sin
+distinguir tildes ni mayúsculas), así que tener *Hacha* no te da también el *Hacha de
+asta*. Cada una se marca por su cuenta.
 
-En el inventario, cada arma y armadura sigue mostrando su **cartel** (*★ experto* /
-*☆ sin expertise*), y tocarlo prende o apaga la expertise en la ficha. Los rasgos que no
-aplican se ven tachados en la línea del objeto.
+En el inventario, cada arma y armadura muestra su **marca** (*★ experto* / *☆ sin
+expertise*). Es solo para mirar: te dice en qué tenés expertise sin tener que abrir la
+ficha, pero **no se toca** — se pone y se saca en un único lugar, el editor. Los rasgos
+que no aplican se ven tachados en la línea del objeto.
 
 > Las fichas viejas, que nunca pasaron por este editor, siguen deduciendo la expertise
 > del texto de **Otras especialidades** como antes. La primera vez que guardás la ficha

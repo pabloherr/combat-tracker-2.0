@@ -418,6 +418,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .kit-carga{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--bg3);border-radius:var(--r);padding:5px 10px;margin-bottom:5px;font-size:13px;}
 .kit-carga .n{font-family:var(--font-h);color:var(--gold2);font-size:12px;flex:1;min-width:0;}
 .btn-sheet.rol-on{border-color:var(--gold);color:var(--gold2);background:var(--accsoft);}
+/* Marca de expertise en el inventario: informa y no se toca (se cambia en la
+   ficha). El borde punteado la despega de los botones, que van con borde
+   entero. */
+.inv-exp{font-family:var(--font-h);font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+  padding:6px 10px;border:1px dashed var(--border);border-radius:var(--r);
+  color:var(--text3);white-space:nowrap;cursor:default;user-select:none;}
+.inv-exp.on{border-color:var(--gold2);color:var(--gold2);}
 @media(max-width:430px){ .kit-def{grid-template-columns:repeat(2,1fr);} }
 /* la ficha de la mascota, embutida en su recuadro */
 .pet-hoja{border-top:1px solid var(--border);padding-top:8px;}
@@ -3331,29 +3338,12 @@ function expNorm(t){
   return String(t==null?'':t).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .replace(/\s+/g,' ').trim().toLowerCase();
 }
-/* Misma regla que el servidor (`tiene_expertise` en app/routers/characters.py):
-   vale la igualdad o que una esté entera dentro de la otra. Así marcar "Espada"
-   prende también la "Espada larga", y el chip dice lo mismo que va a decir la
-   ficha después de guardar. Se compara palabra completa: "Espada" no cubre a
-   "Espadón". */
-function expDentro(chico,grande){
-  var i=grande.indexOf(chico);
-  while(i>=0){
-    var antes=(i===0)||!/[a-z0-9]/.test(grande.charAt(i-1));
-    var j=i+chico.length;
-    var desp=(j===grande.length)||!/[a-z0-9]/.test(grande.charAt(j));
-    if(antes&&desp) return true;
-    i=grande.indexOf(chico,i+1);
-  }
-  return false;
-}
-function expCubre(marca,nombre){
-  var a=expNorm(marca), b=expNorm(nombre);
-  if(a.length<3||!b) return false;
-  return a===b||expDentro(a,b)||expDentro(b,a);
-}
+/* Misma regla que el servidor (`en_lista` en app/routers/characters.py): el
+   nombre completo, sin tildes ni mayúsculas. La expertise es de un arma y no
+   de una familia, así que marcar "Hacha" no prende "Hacha de asta". */
 function expTiene(n){
-  return ((CH_ED&&CH_ED.exp)||[]).some(function(x){return expCubre(x,n);});
+  n=expNorm(n);
+  return ((CH_ED&&CH_ED.exp)||[]).some(function(x){return expNorm(x)===n;});
 }
 async function cargarExpEquipo(){
   var cont=document.getElementById('edExpEquipo'); if(!cont)return;
@@ -3440,10 +3430,8 @@ function pintarExpChips(){
 }
 function expToggle(i){
   var o=(CH_ED.expOpts||[])[i]; if(!o)return;
-  // Apagar saca todo lo que se la estaba dando: si "Espada" cubría a la
-  // "Espada larga", sacar solo "Espada larga" dejaría el chip prendido.
   if(expTiene(o.name))
-    CH_ED.exp=CH_ED.exp.filter(function(x){return !expCubre(x,o.name);});
+    CH_ED.exp=CH_ED.exp.filter(function(x){return expNorm(x)!==expNorm(o.name);});
   else CH_ED.exp.push(o.name);
   pintarExpChips();
 }
@@ -3926,13 +3914,15 @@ function invItemRow(it,dentro,zona){
   }
   // expertise en el arma o la armadura: la deduce el sistema de las
   // especialidades de la ficha, y el jugador la puede marcar a mano
-  var expBtn=(it.kind==='arma'||it.kind==='armadura')
-    ? '<button class="btn-sheet'+(it.expertise?' rol-on':' off')+'" onclick="invExperto('+it.id+')" title="'
+  /* Marca, no botón: la expertise se pone y se saca en un solo lugar, la ficha
+     (✎ Editar → Expertise en armas y armaduras). Acá solo se informa, para
+     saber de un vistazo en qué tenés y en qué no. */
+  var expMarca=(it.kind==='arma'||it.kind==='armadura')
+    ? '<span class="inv-exp'+(it.expertise?' on':'')+'" title="'
         +escA((it.expertise?'Tenés expertise en este objeto: aplican sus rasgos de experto.'
                            :'Sin expertise: sus rasgos de experto no aplican.')
-          +' Se marca en tu ficha (✎ Editar → Expertise en armas y armaduras), así que te queda '
-          +'aunque dejes el objeto. Tocá para cambiarlo.')+'">'
-        +(it.expertise?'★ experto':'☆ sin expertise')+'</button>':'';
+          +' Se marca en tu ficha, en ✎ Editar → Expertise en armas y armaduras.')+'">'
+        +(it.expertise?'★ experto':'☆ sin expertise')+'</span>':'';
   // lo que está dentro de un contenedor viaja con él: la zona la decide la mochila
   var zonaBtn=dentro?''
     : '<button class="btn-sheet" onclick="openStash('+it.id+',\''+(zona||'')+'\')" title="Mover a otra zona">⇄</button>';
@@ -3961,7 +3951,7 @@ function invItemRow(it,dentro,zona){
       +invDescHTML(it)
     +'</span>'
     +'<span class="inv-btns">'
-    +rolBtns+expBtn+verComb+mover+zonaBtn+pasar
+    +rolBtns+expMarca+verComb+mover+zonaBtn+pasar
     +'<button class="btn-sheet" style="color:var(--red);border-color:var(--red)" onclick="invDel('+it.id+')">✕</button>'
     +'</span></div>';
   if(!it.contenedor) return head;
@@ -4058,18 +4048,6 @@ async function invPost(eid,accion,body){
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
   if(!r.ok){ var e=await r.json().catch(function(){return{detail:'Error'};}); alert(e.detail||'No se pudo cambiar.'); return false; }
   return true;
-}
-// Tocar el que ya tiene lo apaga: con expertise deducida pasa a "no", sin
-// expertise pasa a "si".
-/* El cartel prende y apaga la expertise en la ficha, no en el objeto: por eso
-   manda el nombre y no el id. Apagarla saca de la lista lo que se la estaba
-   dando (ver POST /api/characters/{id}/expertise). */
-async function invExperto(eid){
-  var it=findInv(eid); if(!it) return;
-  try{ await api('/api/characters/'+MYCHAR+'/expertise','POST',
-                 {name:it.name, on:!it.expertise}); }
-  catch(e){ return; }
-  loadInventory();
 }
 function findInv(eid){
   var hallado=null;

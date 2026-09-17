@@ -246,32 +246,34 @@ def test_expertise_survives_not_owning_the_weapon(make_client):
     assert esp["expertise"] is True and esp["rasgos"] == ["Offhand"]
 
 
-def test_the_list_still_matches_a_name_inside_a_longer_one(make_client):
+def test_the_list_is_per_weapon_not_per_family(make_client):
+    """La expertise es de un arma, no de una familia: tener "Hacha" no puede
+    darte también el "Hacha de asta", que es otra arma."""
     dm, pl, cid, chid = party(make_client)
-    _dar(dm, chid, name="Espada larga", kind="arma", stats={"weapon_class": "heavy"})
-    _dar(dm, chid, name="Cota de malla", kind="armadura", stats={"deflect": 2})
-    _exp_set(pl, chid, ["Espada", "Cota de Malla"])
+    _dar(dm, chid, name="Hacha", kind="arma", stats={"weapon_class": "light"})
+    _dar(dm, chid, name="Hacha de asta", kind="arma", stats={"weapon_class": "heavy"})
+    _exp_set(pl, chid, ["Hacha"])
     it = _items(pl, chid)
-    assert it["Espada larga"]["expertise"] is True
-    assert it["Cota de malla"]["expertise"] is True
+    assert it["Hacha"]["expertise"] is True
+    assert it["Hacha de asta"]["expertise"] is False
+
+    # el nombre se compara sin tildes ni mayúsculas, pero entero
+    _dar(dm, chid, name="Cota de malla", kind="armadura", stats={"deflect": 2})
+    _exp_set(pl, chid, ["cota de MALLA"])
+    assert _items(pl, chid)["Cota de malla"]["expertise"] is True
 
 
-def test_turning_it_off_from_the_item_removes_what_was_granting_it(make_client):
-    """El cartel del inventario apaga la expertise de esa arma: si la estaba
-    dando una entrada más corta ("Espada" para la "Espada larga"), esa es la
-    que tiene que salir, o el botón no haría nada."""
+def test_one_name_can_be_toggled_without_sending_the_whole_list(make_client):
     dm, pl, cid, chid = party(make_client)
     _dar(dm, chid, name="Espada larga", kind="arma", stats={"weapon_class": "heavy"})
-    _exp_set(pl, chid, ["Espada", "Daga"])
-    assert _items(pl, chid)["Espada larga"]["expertise"] is True
+    _exp_set(pl, chid, ["Espada larga", "Daga"])
 
-    lista = _exp_toggle(pl, chid, "Espada larga", False)
-    assert lista == ["Daga"]                       # se fue "Espada", quedó el resto
+    assert _exp_toggle(pl, chid, "Espada larga", False) == ["Daga"]
     assert _items(pl, chid)["Espada larga"]["expertise"] is False
 
-    # y prenderla la suma de nuevo, sin duplicar si ya estaba cubierta
-    _exp_toggle(pl, chid, "Espada larga", True)
+    assert _exp_toggle(pl, chid, "Espada larga", True) == ["Daga", "Espada larga"]
     assert _items(pl, chid)["Espada larga"]["expertise"] is True
+    # prenderla otra vez no la duplica
     assert _exp_toggle(pl, chid, "Espada larga", True) == ["Daga", "Espada larga"]
 
 
