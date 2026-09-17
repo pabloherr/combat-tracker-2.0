@@ -309,9 +309,14 @@ Un arma o una armadura puede traer **rasgos de experto**, que solo aplican si te
 expertise en ella (el Estoque tiene *Defensive*; la Placa deja de ser `Cumbersome`…).
 
 La expertise se marca **en tu ficha**, no en cada objeto: *✎ Editar → Expertise en armas
-y armaduras*. Ahí aparece un chip por cada arma y armadura **del catálogo del DM** y del
-**inventario propio**, y se prende tocándolo. Lo que el DM esconde no aparece. Si querés
-una que no está en ninguna lista, la escribís a mano y listo.
+y armaduras*. Ahí hay un chip por cada arma y armadura **del catálogo del DM** y del
+**inventario propio**, y se prende tocándolo. Lo que el DM esconde no aparece.
+
+Los chips van en tres grupos —**las tuyas** primero, después **armas** y **armaduras**—
+con la cuenta de cada uno, así un catálogo de treinta objetos se sigue leyendo. Arriba
+hay un **buscador** que filtra los tres grupos mientras escribís. Ese mismo campo sirve
+para agregar una que no esté en ninguna lista: cuando lo escrito no coincide con ninguna
+aparece el botón **+ Agregar**, o se confirma con Enter.
 
 Como vive en la ficha, **te queda marcada aunque todavía no tengas el arma**: la anotás
 cuando la aprendés y, el día que te llega, ya viene con sus rasgos de experto puestos. Y
