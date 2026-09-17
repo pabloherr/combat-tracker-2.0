@@ -4,32 +4,8 @@
     {
       "name": "cosmere",
       "runtimeExecutable": "python",
-      "runtimeArgs": [
-        "-m",
-        "uvicorn",
-        "main:app",
-        "--host",
-        "127.0.0.1",
-        "--port",
-        "8000"
-      ],
+      "runtimeArgs": ["-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", "8000"],
       "port": 8000
-    },
-    {
-      "name": "cosmere-dev-mapa",
-      "runtimeExecutable": "python",
-      "runtimeArgs": [
-        "-m",
-        "uvicorn",
-        "devserver:app",
-        "--app-dir",
-        "C:/Users/pablo/AppData/Local/Temp/claude/C--La-Mierda-Dnd-Cosmere-RPG-cosmere-app-combat-tracker-2-0/7d77a2d6-1a30-4d83-81f1-3552b3c406c6/scratchpad",
-        "--host",
-        "127.0.0.1",
-        "--port",
-        "8011"
-      ],
-      "port": 8011
     }
   ]
 }
