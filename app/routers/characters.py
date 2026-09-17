@@ -14,7 +14,8 @@ from ..config import CONFIG_DEFAULTS, get_config, player_config, sane, size_base
 from ..database import db
 from ..dnd2024_pdf import parse_dnd2024_pdf
 from ..dnd_pdf import parse_dnd_pdf
-from ..models import (CharacterIn, CounterIn, CounterValue, Damage, DaysChange, InjuryIn,
+from ..models import (CharacterIn, CounterIn, CounterValue, Damage, DaysChange,
+                      ExpertiseIn, ExpertiseList, InjuryIn,
                       InventoryExperto, InventoryIn, InventoryMove, InventoryQty, InventoryRol,
                       InventoryStash, LinkIn,
                       InventoryTransfer, LiveStat, LiveStatus, MarcosChange, MarcosSet,
@@ -1062,8 +1063,32 @@ def tiene_expertise(nombre: str, expertise: str) -> bool:
     return False
 
 
+# Clave de la ficha con la expertise de armas y armaduras: una lista de
+# nombres que el jugador arma en el editor. Vive en la ficha y no en cada
+# objeto, así que le queda aunque no tenga (todavía) el arma encima.
+EQUIPO_KEY = "expertise_equipo"
+
+
+def lista_expertise(sheet: dict | None) -> list | None:
+    """La lista de la ficha, o None si esa ficha todavía no la tiene."""
+    v = (sheet or {}).get(EQUIPO_KEY)
+    return [str(x) for x in v] if isinstance(v, list) else None
+
+
 def es_experto(r, sheet: dict | None) -> bool:
-    """Lo que marcó el jugador manda; si no marcó nada, se deduce de la ficha."""
+    """Si el objeto se usa con expertise.
+
+    Manda la lista de la ficha (`expertise_equipo`), con la misma comparación
+    tolerante de siempre: marcar "Espada" alcanza para una "Espada larga".
+
+    Una ficha que todavía no pasó por el editor nuevo no tiene esa lista; para
+    esas se sigue deduciendo como antes (la marca por objeto y, si no, el texto
+    de especialidades). En cuanto el jugador guarda la ficha una vez, la lista
+    existe y pasa a ser la única fuente: así el botón del inventario puede
+    prender y apagar la expertise sin pelearse con la deducción."""
+    lista = lista_expertise(sheet)
+    if lista is not None:
+        return tiene_expertise(r["name"], ", ".join(lista))
     marca = (r["experto"] if "experto" in r.keys() else "") or ""
     if marca == "si":
         return True
@@ -1532,15 +1557,141 @@ def set_rol(cid: int, eid: int, body: InventoryRol, user=Depends(current_user)):
     return {"ok": True, "rol": rol}
 
 
+# ── Expertise en armas y armaduras (vive en la ficha) ─────
+
+def _expertise_actual(conn, ch, sheet: dict) -> list:
+    """La lista de la ficha. Si esa ficha todavía no la tiene, se arma con lo
+    que hoy está dando por experto (la marca por objeto o el texto de
+    especialidades), para que pasar al sistema nuevo no le saque a nadie una
+    expertise que ya tenía."""
+    lista = lista_expertise(sheet)
+    if lista is not None:
+        return lista
+    vistos, out = set(), []
+    for r in _inv_rows(conn, character_id=ch["id"]):
+        if (r["kind"] or "equipo") not in ("arma", "armadura"):
+            continue
+        clave = _norm_txt(r["name"])
+        if clave in vistos or not es_experto(r, sheet):
+            continue
+        vistos.add(clave)
+        out.append(r["name"])
+    return out
+
+
+def _guardar_expertise(conn, ch, sheet: dict, lista: list) -> list:
+    """Deja la lista en la ficha, sin duplicados y con un tope sano."""
+    vistos, limpia = set(), []
+    for n in lista:
+        n = str(n).strip()[:80]
+        clave = _norm_txt(n)
+        if not n or clave in vistos:
+            continue
+        vistos.add(clave)
+        limpia.append(n)
+    limpia = sorted(limpia, key=_norm_txt)[:200]
+    sheet[EQUIPO_KEY] = limpia
+    conn.execute("UPDATE characters SET sheet=? WHERE id=?",
+                 (json.dumps(sheet), ch["id"]))
+    return limpia
+
+
+@router.get("/{cid}/expertise")
+def get_expertise(cid: int, user=Depends(current_user)):
+    """Qué expertise de equipo tiene el personaje y entre qué puede elegir.
+
+    Las opciones salen del catálogo del DM (armas y armaduras, sin lo que él
+    esconde) más lo que el personaje ya tiene en el inventario: son nombres, no
+    objetos, así que se puede marcar la expertise en un arma que todavía no
+    compró. Lo que ya está marcado siempre aparece, aunque no figure en ningún
+    lado (alguien lo escribió a mano)."""
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        sheet = json.loads(ch["sheet"] or "{}")
+        lista = _expertise_actual(conn, ch, sheet)
+        opciones, vistos = [], {}
+
+        def sumar(nombre, kind, origen):
+            nombre = (nombre or "").strip()
+            clave = _norm_txt(nombre)
+            if not clave:
+                return
+            if clave in vistos:
+                # si ya estaba, nos quedamos con el origen más informativo
+                vistos[clave]["origen"] = vistos[clave]["origen"] or origen
+                return
+            d = {"name": nombre, "kind": kind or "arma", "origen": origen}
+            vistos[clave] = d
+            opciones.append(d)
+
+        if ch["campaign_id"] and ch["dm_id"]:
+            for r in conn.execute(
+                "SELECT name, kind FROM items WHERE owner_id=? AND kind IN "
+                "('arma','armadura') AND COALESCE(secreto,0)=0 ORDER BY name",
+                (ch["dm_id"],),
+            ):
+                sumar(r["name"], r["kind"], "catalogo")
+        for r in _inv_rows(conn, character_id=cid):
+            if (r["kind"] or "equipo") in ("arma", "armadura"):
+                sumar(r["name"], r["kind"], "inventario")
+        for n in lista:
+            sumar(n, "arma", "")
+
+        marcadas = {_norm_txt(n) for n in lista}
+        for o in opciones:
+            o["marcada"] = _norm_txt(o["name"]) in marcadas
+        opciones.sort(key=lambda o: _norm_txt(o["name"]))
+        return {"lista": lista, "explicita": lista_expertise(sheet) is not None,
+                "opciones": opciones}
+
+
+@router.put("/{cid}/expertise")
+def set_expertise(cid: int, body: ExpertiseList, user=Depends(current_user)):
+    """Reemplaza la lista entera (es lo que manda el editor de la ficha)."""
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        sheet = json.loads(ch["sheet"] or "{}")
+        return {"ok": True, "lista": _guardar_expertise(conn, ch, sheet, body.lista)}
+
+
+@router.post("/{cid}/expertise")
+def toggle_expertise(cid: int, body: ExpertiseIn, user=Depends(current_user)):
+    """Prende o apaga la expertise en un nombre suelto: es lo que hace el
+    cartel del inventario. Apagar saca de la lista todo lo que estaba dando
+    por experto a ese objeto (marcar "Espada" alcanzaba para la "Espada
+    larga", así que apagarla desde la espada larga tiene que sacar "Espada")."""
+    nombre = (body.name or "").strip()
+    if not nombre:
+        raise HTTPException(400, "Falta el nombre del objeto")
+    with db() as conn:
+        ch = _owned_or_dm(conn, cid, user)
+        sheet = json.loads(ch["sheet"] or "{}")
+        lista = list(_expertise_actual(conn, ch, sheet))
+        if body.on:
+            if not tiene_expertise(nombre, ", ".join(lista)):
+                lista.append(nombre)
+        else:
+            lista = [n for n in lista if not tiene_expertise(nombre, n)]
+        return {"ok": True, "lista": _guardar_expertise(conn, ch, sheet, lista)}
+
+
 @router.post("/{cid}/inventory/{eid}/experto")
 def set_experto(cid: int, eid: int, body: InventoryExperto, user=Depends(current_user)):
-    """Marcar a mano la expertise en un arma o armadura (por si el sistema no
-    la dedujo bien de las especialidades de la ficha)."""
+    """Marca vieja de expertise, por objeto.
+
+    La expertise pasó a vivir en la ficha (`PUT`/`POST /expertise`): así le
+    queda al personaje aunque no tenga el arma. Esto queda para las fichas que
+    todavía no pasaron por el editor nuevo, que se siguen leyendo con la marca
+    por objeto. Sobre una ficha que ya tiene su lista no haría nada, así que
+    mejor decirlo que fingir que guardó."""
     v = (body.experto or "").strip().lower()
     if v not in ("", "si", "no"):
         raise HTTPException(400, "Valor inválido: si, no o vacío (automático)")
     with db() as conn:
-        _owned_or_dm(conn, cid, user)
+        ch = _owned_or_dm(conn, cid, user)
+        if lista_expertise(json.loads(ch["sheet"] or "{}")) is not None:
+            raise HTTPException(409, "La expertise de este personaje se marca en su "
+                                     "ficha, no en cada objeto")
         r = _inv_entry(conn, cid, eid)
         if (r["kind"] or "equipo") not in ("arma", "armadura"):
             raise HTTPException(400, "La expertise se marca en armas y armaduras")

@@ -195,3 +195,161 @@ def test_charged_items_show_in_combat_until_the_player_hides_them(make_client):
 
     r = pl.post(f"/api/characters/{chid}/inventory/{eid}/combate").json()
     assert r["en_combate"] is True
+
+
+# ── Expertise de equipo: una lista en la ficha ─────────────
+# Vive en la ficha y no en cada objeto, así que se puede marcar un arma que el
+# personaje todavía no tiene. Ver `EQUIPO_KEY` en app/routers/characters.py.
+
+def _exp(pl, chid):
+    r = pl.get(f"/api/characters/{chid}/expertise")
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def _exp_set(pl, chid, lista):
+    r = pl.put(f"/api/characters/{chid}/expertise", json={"lista": lista})
+    assert r.status_code == 200, r.text
+    return r.json()["lista"]
+
+
+def _exp_toggle(pl, chid, name, on):
+    r = pl.post(f"/api/characters/{chid}/expertise", json={"name": name, "on": on})
+    assert r.status_code == 200, r.text
+    return r.json()["lista"]
+
+
+def test_the_sheet_list_decides_the_expertise(make_client):
+    dm, pl, cid, chid = _armado(make_client)
+    assert _items(pl, chid)["Daga"]["expertise"] is False
+
+    _exp_set(pl, chid, ["Daga"])
+    it = _items(pl, chid)
+    assert it["Daga"]["expertise"] is True and it["Daga"]["rasgos"] == ["Offhand"]
+    assert it["Espada"]["expertise"] is False
+
+    # y sacarla de la lista la apaga
+    _exp_set(pl, chid, [])
+    assert _items(pl, chid)["Daga"]["expertise"] is False
+
+
+def test_expertise_survives_not_owning_the_weapon(make_client):
+    """Lo que motiva todo esto: marcar el arma antes de tenerla."""
+    dm, pl, cid, chid = party(make_client)
+    _exp_set(pl, chid, ["Espadón"])
+    assert _exp(pl, chid)["lista"] == ["Espadón"]
+
+    # más tarde le llega el arma, y ya viene con la expertise puesta
+    _dar(dm, chid, name="Espadón", kind="arma",
+         stats={"weapon_class": "heavy", "expert_traits": ["Offhand"]})
+    esp = _items(pl, chid)["Espadón"]
+    assert esp["expertise"] is True and esp["rasgos"] == ["Offhand"]
+
+
+def test_the_list_still_matches_a_name_inside_a_longer_one(make_client):
+    dm, pl, cid, chid = party(make_client)
+    _dar(dm, chid, name="Espada larga", kind="arma", stats={"weapon_class": "heavy"})
+    _dar(dm, chid, name="Cota de malla", kind="armadura", stats={"deflect": 2})
+    _exp_set(pl, chid, ["Espada", "Cota de Malla"])
+    it = _items(pl, chid)
+    assert it["Espada larga"]["expertise"] is True
+    assert it["Cota de malla"]["expertise"] is True
+
+
+def test_turning_it_off_from_the_item_removes_what_was_granting_it(make_client):
+    """El cartel del inventario apaga la expertise de esa arma: si la estaba
+    dando una entrada más corta ("Espada" para la "Espada larga"), esa es la
+    que tiene que salir, o el botón no haría nada."""
+    dm, pl, cid, chid = party(make_client)
+    _dar(dm, chid, name="Espada larga", kind="arma", stats={"weapon_class": "heavy"})
+    _exp_set(pl, chid, ["Espada", "Daga"])
+    assert _items(pl, chid)["Espada larga"]["expertise"] is True
+
+    lista = _exp_toggle(pl, chid, "Espada larga", False)
+    assert lista == ["Daga"]                       # se fue "Espada", quedó el resto
+    assert _items(pl, chid)["Espada larga"]["expertise"] is False
+
+    # y prenderla la suma de nuevo, sin duplicar si ya estaba cubierta
+    _exp_toggle(pl, chid, "Espada larga", True)
+    assert _items(pl, chid)["Espada larga"]["expertise"] is True
+    assert _exp_toggle(pl, chid, "Espada larga", True) == ["Daga", "Espada larga"]
+
+
+def test_an_old_sheet_keeps_deducing_until_it_gets_a_list(make_client):
+    """Una ficha que nunca pasó por el editor nuevo no tiene lista: sigue
+    deduciendo del texto de especialidades y de la marca por objeto, y al
+    materializarse conserva exactamente lo que ya daba por experto."""
+    dm, pl, cid, chid = _armado(make_client)
+    _ficha(pl, cid, chid, expertise="Daga, Idiomas")
+    assert _exp(pl, chid)["explicita"] is False
+    assert _items(pl, chid)["Daga"]["expertise"] is True
+
+    # lo que estaba deducido aparece ya marcado entre las opciones
+    o = _exp(pl, chid)
+    assert o["lista"] == ["Daga"]
+    assert [x["name"] for x in o["opciones"] if x["marcada"]] == ["Daga"]
+
+    # al tocar cualquier cosa, la lista queda escrita y manda ella
+    _exp_toggle(pl, chid, "Espada", True)
+    o = _exp(pl, chid)
+    assert o["explicita"] is True and sorted(o["lista"]) == ["Daga", "Espada"]
+    it = _items(pl, chid)
+    assert it["Daga"]["expertise"] is True and it["Espada"]["expertise"] is True
+
+
+def test_the_options_come_from_the_catalog_and_the_inventory(make_client):
+    dm, pl, cid, chid = party(make_client)
+    for it in (
+        {"name": "Estoque", "kind": "arma", "stats": {"damage": "1d6 keen"}},
+        {"name": "Coraza", "kind": "armadura", "stats": {"deflect": 3}},
+        {"name": "Estoque secreto", "kind": "arma", "secreto": True},
+        {"name": "Cuerda", "kind": "equipo"},          # no es arma ni armadura
+    ):
+        assert dm.post(f"/api/campaigns/{cid}/items", json=it).status_code == 200
+    _dar(dm, chid, name="Maza", kind="arma", stats={"damage": "1d8"})
+
+    o = _exp(pl, chid)
+    porNombre = {x["name"]: x for x in o["opciones"]}
+    assert porNombre["Estoque"]["origen"] == "catalogo"
+    assert porNombre["Coraza"]["kind"] == "armadura"
+    assert porNombre["Maza"]["origen"] == "inventario"
+    assert "Cuerda" not in porNombre                   # solo armas y armaduras
+    assert "Estoque secreto" not in porNombre          # lo que el DM esconde, no
+
+    # una marcada a mano que no está en ningún lado igual aparece en la lista
+    _exp_set(pl, chid, ["Hoja esquirlada"])
+    o = _exp(pl, chid)
+    assert [x["name"] for x in o["opciones"] if x["marcada"]] == ["Hoja esquirlada"]
+
+
+def test_the_list_is_deduplicated_and_kept_tidy(make_client):
+    dm, pl, cid, chid = party(make_client)
+    assert _exp_set(pl, chid, ["  Daga ", "daga", "", "Cota"]) == ["Cota", "Daga"]
+
+
+def test_nobody_else_touches_your_expertise(make_client):
+    from helpers import make_user
+    dm, pl, cid, chid = party(make_client)
+    fuera = make_user(make_client, "colado", "player")
+    assert fuera.get(f"/api/characters/{chid}/expertise").status_code == 404
+    assert fuera.put(f"/api/characters/{chid}/expertise",
+                     json={"lista": ["Daga"]}).status_code == 404
+    # el DM de la campaña sí (edita la ficha de los suyos)
+    assert dm.put(f"/api/characters/{chid}/expertise",
+                  json={"lista": ["Daga"]}).status_code == 200
+
+
+def test_the_old_per_item_mark_refuses_once_the_sheet_has_its_list(make_client):
+    """Marcar por objeto no haría nada sobre una ficha con lista: se rechaza en
+    vez de guardar algo que después nadie mira."""
+    dm, pl, cid, chid = _armado(make_client)
+    eid = _items(pl, chid)["Daga"]["id"]
+    # sin lista todavía, la marca vieja sigue valiendo
+    assert pl.post(f"/api/characters/{chid}/inventory/{eid}/experto",
+                   json={"experto": "si"}).status_code == 200
+    assert _items(pl, chid)["Daga"]["expertise"] is True
+
+    _exp_set(pl, chid, [])                      # la ficha estrena su lista
+    assert _items(pl, chid)["Daga"]["expertise"] is False
+    r = pl.post(f"/api/characters/{chid}/inventory/{eid}/experto", json={"experto": "si"})
+    assert r.status_code == 409 and "ficha" in r.json()["detail"]

@@ -303,6 +303,31 @@ contenedor, lo de sus mascotas, su guardado personal y el guardado del grupo, ca
 su barra de carga. Desde ahí puede **darle** cosas (🎁), **ajustar cantidades** (+ / −) y
 **sacarle** lo que sea (✕).
 
+### Expertise en armas y armaduras
+
+Un arma o una armadura puede traer **rasgos de experto**, que solo aplican si tenés
+expertise en ella (el Estoque tiene *Defensive*; la Placa deja de ser `Cumbersome`…).
+
+La expertise se marca **en tu ficha**, no en cada objeto: *✎ Editar → Expertise en armas
+y armaduras*. Ahí aparece un chip por cada arma y armadura **del catálogo del DM** y del
+**inventario propio**, y se prende tocándolo. Lo que el DM esconde no aparece. Si querés
+una que no está en ninguna lista, la escribís a mano y listo.
+
+Como vive en la ficha, **te queda marcada aunque todavía no tengas el arma**: la anotás
+cuando la aprendés y, el día que te llega, ya viene con sus rasgos de experto puestos. Y
+no se pierde si dejás el objeto, lo guardás o se lo pasás a otro.
+
+El nombre se compara con tolerancia: marcar **Espada** alcanza para una *Espada larga*.
+
+En el inventario, cada arma y armadura sigue mostrando su **cartel** (*★ experto* /
+*☆ sin expertise*), y tocarlo prende o apaga la expertise en la ficha. Los rasgos que no
+aplican se ven tachados en la línea del objeto.
+
+> Las fichas viejas, que nunca pasaron por este editor, siguen deduciendo la expertise
+> del texto de **Otras especialidades** como antes. La primera vez que guardás la ficha
+> (o tocás un cartel) la lista queda escrita con lo que ya tenías, y a partir de ahí
+> manda ella.
+
 ### Inventario y capacidad de carga
 
 Regla opcional del Cosmere RPG. El inventario vive en la pestaña **Mi personaje**, debajo

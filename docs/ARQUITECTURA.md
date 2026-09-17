@@ -445,6 +445,12 @@ marcha igual obliga a acampar).
 
 ## 5. Decisiones de diseño a tener en cuenta
 
+- **La expertise de armas y armaduras vive en la ficha** (`sheet.expertise_equipo`), no
+  en cada entrada del inventario: es del personaje, no del objeto, así que sobrevive a
+  dejarlo, guardarlo o pasarlo, y se puede marcar un arma que todavía no tiene. La marca
+  vieja por objeto (`inventory.experto`) se sigue **leyendo** para las fichas que no
+  tienen esa lista todavía, pero ya no se escribe: el endpoint viejo responde 409 sobre
+  una ficha que sí la tiene, para no guardar algo que nadie va a mirar.
 - **Los puntos del mapa se guardan en coordenadas relativas** (0..1), no en pixeles: el
   DM puede volver a subir la misma lámina escaneada en mejor resolución y los puntos
   siguen donde estaban. Y el alto real del mapa no se guarda: se deduce del ancho, así no

@@ -297,6 +297,20 @@ class InventoryRol(BaseModel):
     rol: str = ""
 
 
+class ExpertiseIn(BaseModel):
+    """Prender o apagar la expertise en un arma o armadura, por nombre. El
+    nombre alcanza: la expertise vive en la ficha, no en el objeto, así que
+    queda marcada aunque el personaje todavía no lo tenga."""
+    name: str
+    on: bool = True
+
+
+class ExpertiseList(BaseModel):
+    """La lista completa de armas y armaduras con expertise (la manda el
+    editor de la ficha)."""
+    lista: list[str] = []
+
+
 class InventoryExperto(BaseModel):
     """Marcar a mano si se tiene expertise en un objeto: 'si', 'no' o '' para
     que lo deduzca el sistema de las especialidades de la ficha."""

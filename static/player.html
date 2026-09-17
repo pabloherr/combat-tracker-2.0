@@ -215,6 +215,25 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);font-size:
 .sh-item .n b{color:var(--gold2);font-weight:500;}
 .chips{display:flex;flex-wrap:wrap;gap:5px;}
 .chip{font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:2px 9px;color:var(--text2);}
+/* Expertise de equipo, en el editor: un chip por arma o armadura del catálogo
+   (y del inventario), que se prende y se apaga tocándolo. */
+.exp-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+.exp-chip{font-family:var(--font-b);font-size:13px;background:var(--bg3);
+  border:1px solid var(--border);border-radius:14px;padding:3px 11px;color:var(--text2);
+  cursor:pointer;}
+.exp-chip:hover{border-color:var(--gold2);color:var(--text);}
+.exp-chip.on{background:var(--accsoft);border-color:var(--gold);color:var(--gold2);}
+/* Buscador + contador arriba, y los chips en grupos: las marcadas primero,
+   después las armas y las armaduras. */
+.exp-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+.exp-bar .exp-q{flex:1;min-width:190px;}
+.exp-count{font-family:var(--font-h);font-size:10px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--text3);white-space:nowrap;}
+.exp-grupo{margin-bottom:10px;}
+.exp-grupo:last-child{margin-bottom:0;}
+.exp-grupo-h{font-family:var(--font-h);font-size:9px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text3);margin-bottom:5px;}
+.exp-grupo-h span{opacity:.6;}
 .oc-fi{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:14px;outline:none;}
 .oc-inj-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--border);}
 .oc-inj-name{flex:1;min-width:130px;}
@@ -3279,7 +3298,11 @@ function openEditChar(){
     +edSurgesHTML()
     +'<div class="ed-sec">Talentos</div><div id="edTalents"></div>'
     +'<button class="btn-sheet ed-add" onclick="addEntryRow(\'edTalents\')">+ Agregar talento</button>'
-    +'<div class="ed-sec">Especialidades</div>'
+    +'<div class="ed-sec">Expertise en armas y armaduras <span style="text-transform:none;'
+      +'letter-spacing:0;color:var(--text3);font-family:inherit;font-size:11px">'
+      +'(queda marcada en la ficha: te la guardás aunque todavía no tengas el arma)</span></div>'
+    +'<div id="edExpEquipo"><div class="ed-hint">Cargando…</div></div>'
+    +'<div class="ed-sec">Otras especialidades</div>'
     +'<div class="ed-row">'+edFld('',edInp('edExpertise',s.expertise,'Cultura, Idiomas, Herrería… (separadas por coma)'))+'</div>'
     +'<div class="ed-sec">Armas, equipo y contactos</div>'
     +'<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr">'
@@ -3291,8 +3314,154 @@ function openEditChar(){
       +'<button class="btn-sheet" style="background:var(--gold);color:var(--onacc);border-color:var(--gold)" onclick="saveEditChar()">Guardar</button></div>';
   renderEntryRows('edTalents',s.talents||[]);
   edPreview();
+  cargarExpEquipo();
   document.getElementById('overlay').classList.add('on');
 }
+
+/* ── Expertise en armas y armaduras ──────────────────────────
+   Las opciones las arma el servidor con el catálogo del DM y lo que el
+   personaje tiene en el inventario (ver GET /api/characters/{id}/expertise);
+   acá solo se marcan. Lo elegido viaja dentro de la ficha al guardar, así que
+   es una sola escritura junto con el resto.
+
+   `CH_ED.exp` es la lista mientras el editor está abierto. Se compara
+   normalizada (sin tildes ni mayúsculas) porque "Cota de Malla" y
+   "cota de malla" son lo mismo. */
+function expNorm(t){
+  return String(t==null?'':t).normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ').trim().toLowerCase();
+}
+/* Misma regla que el servidor (`tiene_expertise` en app/routers/characters.py):
+   vale la igualdad o que una esté entera dentro de la otra. Así marcar "Espada"
+   prende también la "Espada larga", y el chip dice lo mismo que va a decir la
+   ficha después de guardar. Se compara palabra completa: "Espada" no cubre a
+   "Espadón". */
+function expDentro(chico,grande){
+  var i=grande.indexOf(chico);
+  while(i>=0){
+    var antes=(i===0)||!/[a-z0-9]/.test(grande.charAt(i-1));
+    var j=i+chico.length;
+    var desp=(j===grande.length)||!/[a-z0-9]/.test(grande.charAt(j));
+    if(antes&&desp) return true;
+    i=grande.indexOf(chico,i+1);
+  }
+  return false;
+}
+function expCubre(marca,nombre){
+  var a=expNorm(marca), b=expNorm(nombre);
+  if(a.length<3||!b) return false;
+  return a===b||expDentro(a,b)||expDentro(b,a);
+}
+function expTiene(n){
+  return ((CH_ED&&CH_ED.exp)||[]).some(function(x){return expCubre(x,n);});
+}
+async function cargarExpEquipo(){
+  var cont=document.getElementById('edExpEquipo'); if(!cont)return;
+  var d;
+  try{ d=await api('/api/characters/'+MYCHAR+'/expertise'); }
+  catch(e){ cont.innerHTML='<div class="ed-hint">No se pudo leer el catálogo.</div>'; return; }
+  if(!CH_ED) return;                       // cerró el editor mientras cargaba
+  CH_ED.exp=d.lista||[];
+  CH_ED.expOpts=d.opciones||[];
+  renderExpEquipo();
+}
+/* El catálogo del DM puede tener treinta armas: sin orden es una pared de
+   chips. Van en tres grupos —las que ya marcaste, las armas y las armaduras— y
+   el buscador filtra los tres. Ese mismo campo sirve para agregar una que no
+   esté en ninguna lista: el botón aparece cuando lo escrito no coincide con
+   nada. */
+function expTitulo(o){
+  return (o.kind==='armadura'?'Armadura':'Arma')
+    +(o.origen==='catalogo'?' - del catalogo del DM'
+      :(o.origen==='inventario'?' - lo tenes en el inventario':' - la agregaste vos'));
+}
+function renderExpEquipo(){
+  var cont=document.getElementById('edExpEquipo'); if(!cont||!CH_ED)return;
+  var opts=CH_ED.expOpts||[];
+  // lo marcado a mano que no figura en ninguna lista igual se puede sacar
+  (CH_ED.exp||[]).forEach(function(n){
+    if(!opts.some(function(o){return expNorm(o.name)===expNorm(n);}))
+      opts.push({name:n,kind:'arma',origen:''});
+  });
+  CH_ED.expOpts=opts;
+  // La barra se dibuja una sola vez: si se rehiciera en cada tecla, el
+  // buscador perdería el foco mientras escribís.
+  cont.innerHTML='<div class="exp-bar">'
+    +'<input class="fi exp-q" id="edExpBuscar" '
+      +'placeholder="Buscar arma o armadura, o escribir una que no esté"/>'
+    +'<button type="button" class="btn-sheet" id="edExpAdd" style="display:none" '
+      +'onclick="expAgregar()"></button>'
+    +'<span class="exp-count" id="edExpCount"></span></div>'
+    +'<div id="edExpLista"></div>';
+  var q=document.getElementById('edExpBuscar');
+  q.value=CH_ED.expQ||'';
+  q.oninput=function(){ CH_ED.expQ=this.value; pintarExpChips(); };
+  q.onkeydown=function(e){ if(e.key==='Enter'){ e.preventDefault(); expAgregar(); } };
+  pintarExpChips();
+}
+function pintarExpChips(){
+  var cont=document.getElementById('edExpLista'); if(!cont||!CH_ED)return;
+  var q=expNorm(CH_ED.expQ||'');
+  var grupos=[{t:'Las tuyas',lista:[]},{t:'Armas',lista:[]},{t:'Armaduras',lista:[]}];
+  (CH_ED.expOpts||[]).forEach(function(o,i){
+    if(q && expNorm(o.name).indexOf(q)<0) return;
+    var on=expTiene(o.name);
+    grupos[on?0:(o.kind==='armadura'?2:1)].lista.push({o:o,i:i,on:on});
+  });
+  var h=grupos.filter(function(g){return g.lista.length;}).map(function(g){
+    return '<div class="exp-grupo"><div class="exp-grupo-h">'+esc(g.t)
+      +' <span>'+g.lista.length+'</span></div><div class="exp-chips">'
+      +g.lista.map(function(x){
+        return '<button type="button" class="exp-chip'+(x.on?' on':'')+'" '
+          +'onclick="expToggle('+x.i+')" title="'+escA(expTitulo(x.o))+'">'
+          +(x.on?'★ ':'☆ ')+esc(x.o.name)+'</button>';
+      }).join('')+'</div></div>';
+  }).join('');
+  if(!h) h='<div class="ed-hint">'+(q
+    ? 'Ninguna coincide con lo que escribiste. Podés agregarla igual.'
+    : 'Todavía no hay armas ni armaduras en el catálogo del DM ni en tu '
+      +'inventario. Escribí el nombre y agregala.')+'</div>';
+  cont.innerHTML=h;
+
+  var n=((CH_ED.exp)||[]).length;
+  var c=document.getElementById('edExpCount');
+  if(c) c.textContent=n?(n+(n===1?' marcada':' marcadas')):'ninguna marcada';
+  /* El botón de agregar aparece cuando lo escrito no es ninguna de las que ya
+     están. Pide 3 letras, que es el mínimo que el servidor toma en serio para
+     una marca (ver `tiene_expertise`): ofrecer "es" sería ofrecer basura. */
+  var add=document.getElementById('edExpAdd');
+  if(add){
+    var t=(CH_ED.expQ||'').trim();
+    var nueva=expNorm(t).length>=3
+      &&!(CH_ED.expOpts||[]).some(function(o){return expNorm(o.name)===expNorm(t);});
+    add.style.display=nueva?'':'none';
+    if(nueva) add.textContent='+ Agregar '+t;
+  }
+}
+function expToggle(i){
+  var o=(CH_ED.expOpts||[])[i]; if(!o)return;
+  // Apagar saca todo lo que se la estaba dando: si "Espada" cubría a la
+  // "Espada larga", sacar solo "Espada larga" dejaría el chip prendido.
+  if(expTiene(o.name))
+    CH_ED.exp=CH_ED.exp.filter(function(x){return !expCubre(x,o.name);});
+  else CH_ED.exp.push(o.name);
+  pintarExpChips();
+}
+function expAgregar(){
+  var el=document.getElementById('edExpBuscar'); if(!el)return;
+  var n=el.value.trim();
+  if(expNorm(n).length>=3){
+    // si coincide con una del catálogo, se guarda con el nombre de ella
+    var ya=(CH_ED.expOpts||[]).filter(function(o){return expNorm(o.name)===expNorm(n);})[0];
+    if(ya) n=ya.name;
+    else CH_ED.expOpts.push({name:n,kind:'arma',origen:''});
+    if(!expTiene(n)) CH_ED.exp.push(n);
+  }
+  el.value=''; CH_ED.expQ='';
+  pintarExpChips();
+  el.focus();
+}
+
 async function saveEditChar(){
   var c=meChar(); if(!c||!CH_ED)return; var s=Object.assign({},c.sheet||{});
   var name=edVal('edName');
@@ -3331,6 +3500,9 @@ async function saveEditChar(){
   if(der){ s.movement=der.movement; s.recovery=der.recovery; s.senses=der.senses; }
   s.talents=readEntries('edTalents');
   s.expertise=edVal('edExpertise');
+  // La expertise de equipo va en la ficha (no en cada objeto). Si el editor no
+  // llegó a cargarla, se deja la que ya estaba en vez de borrarla.
+  if(CH_ED.exp) s.expertise_equipo=CH_ED.exp;
   s.weapons=leerLineas('edWeapons'); s.equipment=leerLineas('edEquipment'); s.connections=leerLineas('edConnections');
   try{
     await api('/api/characters/'+MYCHAR,'PUT',{
@@ -3756,8 +3928,10 @@ function invItemRow(it,dentro,zona){
   // especialidades de la ficha, y el jugador la puede marcar a mano
   var expBtn=(it.kind==='arma'||it.kind==='armadura')
     ? '<button class="btn-sheet'+(it.expertise?' rol-on':' off')+'" onclick="invExperto('+it.id+')" title="'
-        +escA((it.expertise?'Tenés expertise en este objeto: aplican sus rasgos de experto.':'Sin expertise: sus rasgos de experto no aplican.')
-          +(it.experto?' Lo marcaste a mano.':' Lo dedujo el sistema de tus especialidades.')+' Tocá para cambiarlo.')+'">'
+        +escA((it.expertise?'Tenés expertise en este objeto: aplican sus rasgos de experto.'
+                           :'Sin expertise: sus rasgos de experto no aplican.')
+          +' Se marca en tu ficha (✎ Editar → Expertise en armas y armaduras), así que te queda '
+          +'aunque dejes el objeto. Tocá para cambiarlo.')+'">'
         +(it.expertise?'★ experto':'☆ sin expertise')+'</button>':'';
   // lo que está dentro de un contenedor viaja con él: la zona la decide la mochila
   var zonaBtn=dentro?''
@@ -3887,9 +4061,15 @@ async function invPost(eid,accion,body){
 }
 // Tocar el que ya tiene lo apaga: con expertise deducida pasa a "no", sin
 // expertise pasa a "si".
+/* El cartel prende y apaga la expertise en la ficha, no en el objeto: por eso
+   manda el nombre y no el id. Apagarla saca de la lista lo que se la estaba
+   dando (ver POST /api/characters/{id}/expertise). */
 async function invExperto(eid){
   var it=findInv(eid); if(!it) return;
-  if(await invPost(eid,'experto',{experto:it.expertise?'no':'si'})) loadInventory();
+  try{ await api('/api/characters/'+MYCHAR+'/expertise','POST',
+                 {name:it.name, on:!it.expertise}); }
+  catch(e){ return; }
+  loadInventory();
 }
 function findInv(eid){
   var hallado=null;
